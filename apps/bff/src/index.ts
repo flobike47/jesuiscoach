@@ -1,0 +1,57 @@
+import { buildServer } from './server.js';
+import { config } from './config.js';
+import { redis } from './cache.js';
+import { closeDb, db } from './db/index.js';
+import { migrate } from './db/migrate.js';
+import { purgeExpiredSessions } from './db/repo.js';
+
+// Schéma à jour avant d'accepter la moindre requête (échec = arrêt : Portainer
+// garde l'ancienne version visible dans les logs plutôt qu'un BFF à moitié prêt).
+const applied = await migrate(db());
+if (applied.length) console.info(`[migrations] appliquées : ${applied.join(', ')}`);
+
+const app = await buildServer();
+
+try {
+  await app.listen({ port: config.port, host: config.host });
+  app.log.info(
+    `🟢 BFF up on http://${config.host}:${config.port} (env=${process.env.NODE_ENV ?? 'development'})`,
+  );
+} catch (err) {
+  app.log.error(err);
+  process.exit(1);
+}
+
+// Ménage quotidien des sessions expirées.
+const purgeTimer = setInterval(() => {
+  purgeExpiredSessions().catch((err) => app.log.warn({ err }, 'purge des sessions échouée'));
+}, 24 * 60 * 60 * 1000);
+purgeTimer.unref();
+
+let shuttingDown = false;
+const shutdown = async (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  app.log.info(`Received ${signal}, shutting down...`);
+  try {
+    clearInterval(purgeTimer);
+    await app.close();
+    await closeDb();
+    await redis.quit();
+  } catch (e) {
+    app.log.error({ err: e }, 'error during shutdown');
+  }
+  process.exit(0);
+};
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// Erreurs non capturées : log et arrêt propre (au lieu d'une fermeture
+// brutale qui laisse Redis ou Fastify dans un état pendouillant).
+process.on('uncaughtException', (err) => {
+  app.log.fatal({ err }, 'uncaughtException');
+  shutdown('uncaughtException');
+});
+process.on('unhandledRejection', (reason) => {
+  app.log.error({ reason }, 'unhandledRejection');
+});

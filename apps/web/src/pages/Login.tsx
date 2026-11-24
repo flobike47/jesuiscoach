@@ -1,0 +1,78 @@
+import { useQuery } from '@tanstack/react-query';
+import { Navigate, useSearchParams } from 'react-router-dom';
+import { Activity } from 'lucide-react';
+import { api } from '@/services/api';
+import { useAuth } from '@/lib/auth';
+
+const ERRORS: Record<string, string> = {
+  refus: 'Connexion annulée sur Intervals.icu.',
+  session_expiree: 'La connexion a pris trop de temps. Recommence.',
+  echange_refuse: "Intervals.icu n'a pas validé la connexion. Recommence.",
+  invitation_requise: "Il te faut une invitation de ton coach pour créer un compte.",
+  invitation_invalide: 'Cette invitation a expiré ou a déjà servi. Demande-en une nouvelle à ton coach.',
+  requete_invalide: 'Retour de connexion incomplet. Recommence.',
+};
+
+export default function Login() {
+  const { signedIn, signInWithIntervals, signInDemo } = useAuth();
+  const [params] = useSearchParams();
+  const invite = params.get('invitation') ?? undefined;
+  const error = params.get('erreur');
+  const status = useQuery({ queryKey: ['status'], queryFn: api.status, retry: false });
+
+  if (signedIn) return <Navigate to="/" replace />;
+
+  return (
+    <div
+      style={{
+        minHeight: '100dvh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: 'calc(env(safe-area-inset-top, 0px) + 64px) 24px calc(env(safe-area-inset-bottom, 0px) + 24px)',
+        maxWidth: 440,
+        margin: '0 auto',
+      }}
+    >
+      <div>
+        <div style={{ width: 72, height: 72, borderRadius: 18, background: 'var(--blue)', display: 'grid', placeItems: 'center', color: '#fff' }}>
+          <Activity size={40} strokeWidth={2.2} aria-hidden />
+        </div>
+        <h1 className="large-title" style={{ marginTop: 24 }}>
+          Je suis coach
+        </h1>
+        <p className="secondary" style={{ margin: '8px 0 0', fontSize: 17, lineHeight: 1.45 }}>
+          {invite
+            ? 'Ton coach t’invite à rejoindre son équipe. Connecte ton compte Intervals.icu pour partager tes sorties.'
+            : 'La forme de ton équipe, les sorties du jour et les séances envoyées directement sur les montres Garmin.'}
+        </p>
+        {error && (
+          <p role="alert" className="footnote" style={{ color: 'var(--red)', marginTop: 16 }}>
+            {ERRORS[error] ?? 'La connexion a échoué. Recommence.'}
+          </p>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gap: 12 }}>
+        {status.data?.intervals !== false && (
+          <button type="button" className="button filled block pressable" onClick={() => signInWithIntervals(invite)}>
+            Se connecter avec Intervals.icu
+          </button>
+        )}
+        {status.data?.demo && (
+          <button type="button" className="button tinted block pressable" onClick={signInDemo}>
+            Essayer avec une équipe de démo
+          </button>
+        )}
+        {status.isError && (
+          <p className="footnote secondary" style={{ textAlign: 'center', margin: 0 }}>
+            Serveur injoignable. Vérifie ta connexion.
+          </p>
+        )}
+        <p className="caption secondary" style={{ textAlign: 'center', margin: '4px 0 0' }}>
+          Tes sorties Garmin arrivent via Intervals.icu. Ton mot de passe ne passe jamais par cette app.
+        </p>
+      </div>
+    </div>
+  );
+}

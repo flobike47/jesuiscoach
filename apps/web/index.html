@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <!-- __BASE_PATH__ est substitué par docker-entrypoint.sh au boot du
+         conteneur en fonction de la variable BASE_PATH (ex: /jesuiscoach/).
+         En dev, le plugin Vite remplace par "/" à la volée. -->
+    <base href="__BASE_PATH__" />
+
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <!-- PWA : manifeste + réglages iOS (« Sur l'écran d'accueil »). Chemins
+         relatifs : résolus contre <base href>, donc compatibles BASE_PATH. -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Coach" />
+    <!-- Pas de apple-mobile-web-app-status-bar-style : barre d'état opaque
+         (style par défaut), teintée par theme-color, et la page commence
+         dessous. Avec black-translucent, iOS 26 pose sa bande floutée
+         (Liquid Glass) sur le haut de la page. iOS ne lit ce réglage qu'à
+         l'ajout sur l'écran d'accueil : une app déjà installée le garde
+         jusqu'à sa réinstallation. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Couleur du navigateur (Android, Safari) avant le boot de React, selon
+         le thème de l'OS. Ensuite App.tsx (lib/documentTheme.ts) y écrit la
+         couleur du thème choisi dans l'app. Valeurs = DOCUMENT_COLORS de
+         src/theme.ts. L'app installée sur iOS l'ignore (.ios-status-bar-band).
+         Pas de maximum-scale / user-scalable=no : le zoom reste possible. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <meta name="description" content="Coaching vélo pour ton équipe, branché sur Intervals.icu" />
+    <title>Je suis coach</title>
+    <!-- Runtime config injectée au boot conteneur (sed). En dev les
+         placeholders restent et runtimeConfig fallback sur VITE_*. -->
+    <script src="config.js"></script>
+  </head>
+  <body>
+    <!-- Source de couleur de la barre d'état iOS (app installée), voir
+         .ios-status-bar-band dans styles.css. Dès le HTML initial : iOS
+         échantillonne dès les premières images. -->
+    <div class="ios-status-bar-band" aria-hidden="true"></div>
+    <div id="root"></div>
+    <!-- App installée tenue en portrait : le manifeste le demande, mais iOS
+         l'ignore et n'offre pas d'API de verrouillage. En paysage sur
+         téléphone, styles.css affiche cet écran par-dessus l'app. `hidden`
+         le masque tant que la feuille de style n'est pas chargée. -->
+    <div class="rotate-hint" hidden>
+      <svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
+        <path d="M11 18.5h2" />
+      </svg>
+      <p>Tourne ton téléphone</p>
+      <p>L’app s’utilise en mode portrait.</p>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
