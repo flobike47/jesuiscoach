@@ -1,0 +1,145 @@
+# =============================================================================
+# Stack de production jesuiscoach — Raspberry Pi (arm64)
+# =============================================================================
+# Usage typique :
+#   1. Sur ta machine de dev (amd64), build les images en arm64 et push-les vers
+#      un registry, OU charge-les en local et transfère via `docker save` / `scp`.
+#   2. Sur la Pi, place ce fichier + un `.env.prod` à côté.
+#   3. `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d`
+#
+# Caddy global (sur la Pi, hors stack) fait la terminaison TLS :
+#   coach.tondomaine.com      → 127.0.0.1:8180 (web)
+#   api-coach.tondomaine.com  → 127.0.0.1:4100 (bff)
+# Ports hôte distincts d'investhelper (8080 / 4000) : les deux stacks
+# tournent sur le même Pi.
+# =============================================================================
+
+services:
+  # Postgres : la base de l'app, sur le Pi. Jamais exposé hors du réseau interne.
+  # Données sur un SSD de préférence (une carte SD s'use vite sous Postgres).
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jesuiscoach
+      POSTGRES_USER: jesuiscoach
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jesuiscoach -d jesuiscoach"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - internal
+
+  # Sauvegarde quotidienne : pg_dump compressé, 14 jours gardés, dans BACKUP_DIR
+  # (à placer sur un autre disque que la base, voir DEPLOY.md). Un dump raté
+  # reste en .tmp et est nettoyé au passage suivant.
+  postgres-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: jesuiscoach
+      PGDATABASE: jesuiscoach
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ${BACKUP_DIR:-postgres-backups}:/backups
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -o pipefail
+        while true; do
+          f=/backups/jesuiscoach-$$(date +%Y-%m-%d).sql.gz
+          if pg_dump --no-owner | gzip > "$$f.tmp" && mv "$$f.tmp" "$$f"; then echo "sauvegarde OK : $$f";
+          else echo "sauvegarde ÉCHOUÉE" >&2; fi
+          find /backups -name 'jesuiscoach-*' -mtime +14 -delete
+          find /backups -name '*.tmp' -mmin +60 -delete
+          sleep 86400
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    # Pas de port mappé : Redis n'est exposé qu'au réseau interne du compose
+    networks:
+      - internal
+
+  bff:
+    image: ${BFF_IMAGE:-jesuiscoach-bff:latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      LOG_LEVEL: info
+
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      APP_URL: ${APP_URL:-}                     # optionnel : https://tondomaine.com/jesuiscoach/ si BASE_PATH ≠ /
+
+      # Mot de passe : lettres et chiffres seulement (il est placé dans une URL).
+      DATABASE_URL: postgres://jesuiscoach:${POSTGRES_PASSWORD}@postgres:5432/jesuiscoach
+
+      PUBLIC_API_URL: ${PUBLIC_API_URL}         # https://api-coach.tondomaine.com (callback OAuth)
+      DEMO_MODE: ${DEMO_MODE:-false}
+
+      INTERVALS_CLIENT_ID: ${INTERVALS_CLIENT_ID:-}
+      INTERVALS_CLIENT_SECRET: ${INTERVALS_CLIENT_SECRET:-}
+      COACH_ATHLETE_IDS: ${COACH_ATHLETE_IDS:-}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY}
+
+      # Notifications push (optionnel) : sans elles, aucune notification n'est envoyée
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      # Bind sur l'interface locale uniquement — c'est le reverse proxy
+      # (Caddy/Nginx sur l'host) qui expose en HTTPS vers l'extérieur.
+      - "127.0.0.1:4100:4000"
+    networks:
+      - internal
+
+  web:
+    image: ${WEB_IMAGE:-jesuiscoach-web:latest}
+    restart: unless-stopped
+    environment:
+      # Injectées dans /config.js + <base href> de /index.html au boot
+      # du conteneur (entrypoint sed). Modifiables depuis Portainer sans
+      # rebuild d'image — restart suffit.
+      BASE_PATH: ${BASE_PATH:-/}                # ex: /jesuiscoach/ si servi sous sous-chemin
+      BFF_URL: ${BFF_URL}
+    ports:
+      - "127.0.0.1:8180:80"
+    networks:
+      - internal
+
+volumes:
+  postgres-data:
+  postgres-backups:
+  redis-data:
+
+networks:
+  internal:
+    driver: bridge
