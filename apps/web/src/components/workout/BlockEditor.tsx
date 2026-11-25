@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronUp, Minus, Plus, Repeat, Trash2, TrendingUp, Square } from 'lucide-react';
+import { ChevronDown, ChevronUp, Repeat, Trash2, TrendingUp, Square } from 'lucide-react';
+import { NumberStepper } from '@/components/common/NumberStepper';
 import { Segmented } from '@/components/ios';
 import { zoneColor, type Sport } from '@/lib/workout';
 import {
@@ -436,13 +437,14 @@ function RepeatControls({ block, sport, onChange }: { block: RepeatBlock; sport:
   const set = (next: InnerBlock[]) => onChange({ ...block, steps: next });
   return (
     <>
-      <Stepper
+      <NumberStepper
         label="Répétitions"
-        value={`${block.count} ×`}
-        onMinus={() => onChange({ ...block, count: clamp(block.count - 1, LIMITS.minCount, LIMITS.maxCount) })}
-        onPlus={() => onChange({ ...block, count: clamp(block.count + 1, LIMITS.minCount, LIMITS.maxCount) })}
-        minusDisabled={block.count <= LIMITS.minCount}
-        plusDisabled={block.count >= LIMITS.maxCount}
+        value={block.count}
+        unit="×"
+        min={LIMITS.minCount}
+        max={LIMITS.maxCount}
+        step={1}
+        onChange={(count) => onChange({ ...block, count })}
       />
       <div style={{ background: 'var(--cell-2)', borderRadius: 10, overflow: 'hidden' }}>
         {steps.map((s, i) => (
@@ -469,42 +471,6 @@ function RepeatControls({ block, sport, onChange }: { block: RepeatBlock; sport:
         }}
       />
     </>
-  );
-}
-
-function Stepper({
-  label,
-  value,
-  onMinus,
-  onPlus,
-  minusDisabled,
-  plusDisabled,
-}: {
-  label: string;
-  value: string;
-  onMinus: () => void;
-  onPlus: () => void;
-  minusDisabled?: boolean;
-  plusDisabled?: boolean;
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span className="secondary" style={{ flex: 1 }}>
-        {label}
-      </span>
-      <span className="tabular-nums" style={{ fontWeight: 600, minWidth: 84, textAlign: 'right' }} aria-live="polite">
-        {value}
-      </span>
-      <div style={{ display: 'flex', background: 'var(--fill)', borderRadius: 9, overflow: 'hidden' }}>
-        <button type="button" aria-label={`${label} : moins`} disabled={minusDisabled} onClick={onMinus} style={{ width: 46, height: 34, display: 'grid', placeItems: 'center', opacity: minusDisabled ? 0.35 : 1 }}>
-          <Minus size={18} aria-hidden />
-        </button>
-        <span aria-hidden style={{ width: 0.5, background: 'var(--separator)', margin: '7px 0' }} />
-        <button type="button" aria-label={`${label} : plus`} disabled={plusDisabled} onClick={onPlus} style={{ width: 46, height: 34, display: 'grid', placeItems: 'center', opacity: plusDisabled ? 0.35 : 1 }}>
-          <Plus size={18} aria-hidden />
-        </button>
-      </div>
-    </div>
   );
 }
 
