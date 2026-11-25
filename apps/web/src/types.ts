@@ -203,3 +203,36 @@ export interface ActivityView {
   powerZones: number[] | null;
   hrZones: number[] | null;
 }
+
+/* ---------- Planification (BFF : routes/planning.ts) ---------- */
+
+export interface LibraryWorkout {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface LibraryFolder {
+  id: string;
+  name: string;
+  workouts: LibraryWorkout[];
+}
+
+export interface PlanWorkout {
+  /** 0 = jour de départ du plan. */
+  day: number;
+  name: string;
+  description: string;
+}
+
+export interface TrainingPlan {
+  id: string;
+  name: string;
+  workouts: PlanWorkout[];
+  updatedAt: string;
+}
+
+export interface ApplyPlanResult {
+  total: number;
+  results: Array<{ id: string; ok: boolean; created: number; error?: string }>;
+}

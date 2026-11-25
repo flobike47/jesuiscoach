@@ -155,6 +155,16 @@ export function blocksToText(blocks: Block[]): string {
     .join('\n\n');
 }
 
+/** 600 → « 10 min », 225 → « 3 min 45 s », 5400 → « 1 h 30 » (affichage). */
+export function formatMinutes(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h) return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`;
+  if (m) return s ? `${m} min ${s} s` : `${m} min`;
+  return `${s} s`;
+}
+
 export const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 /**
