@@ -23,6 +23,13 @@ export const router = createBrowserRouter(
       errorElement: <RouteError fullPage />,
     },
     {
+      // Page publique (exigée par Intervals.icu pour l'app OAuth)
+      path: '/confidentialite',
+      lazy: page(() => import('@/pages/Privacy')),
+      hydrateFallbackElement: <PageLoader />,
+      errorElement: <RouteError fullPage />,
+    },
+    {
       // Retour d'Intervals.icu (OAuth via le BFF) : #token_hash ou #error
       path: '/connexion/retour',
       lazy: page(() => import('@/pages/AuthReturn')),

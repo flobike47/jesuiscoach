@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Bike, Link2, LogOut, Moon, Repeat } from 'lucide-react';
+import { Bell, Bike, Link2, LogOut, Moon, Repeat, Shield } from 'lucide-react';
 import { Cell, Page, Section, Segmented } from '@/components/ios';
 import { useAuth } from '@/lib/auth';
 import { useMe } from '@/hooks/useCoach';
@@ -132,6 +132,10 @@ export default function Settings() {
           />
         </Section>
       )}
+
+      <Section>
+        <Cell inset={52} leading={<Shield size={20} color="var(--label-2)" aria-hidden />} title="Politique de confidentialité" to="/confidentialite" />
+      </Section>
 
       <Section>
         <Cell inset={52} leading={<LogOut size={20} color="var(--red)" aria-hidden />} title={<span style={{ color: 'var(--red)' }}>{demo ? 'Quitter la démo' : 'Se déconnecter'}</span>} onClick={() => signOut()} />
