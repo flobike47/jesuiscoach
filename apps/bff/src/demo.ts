@@ -128,6 +128,10 @@ function simulate(k: number, now: Date): DemoAthlete {
       id: `demo-${k}`,
       name: NAMES[k],
       icu_weight: 62 + k * 2,
+      // Réglages de connexion variés : la démo athlète (Julie, k = 1) a une étape à faire.
+      icu_garmin_sync_activities: true,
+      icu_garmin_upload_workouts: k % 2 === 0,
+      strava_authorized: k % 3 === 0,
       sportSettings: [{ types: ['Ride', 'VirtualRide'], ftp, power_zones: POWER_ZONES, hr_zones: HR_ZONES, sweet_spot_min: 84, sweet_spot_max: 97 }],
     },
     wellness,

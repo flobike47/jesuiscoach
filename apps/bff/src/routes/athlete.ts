@@ -1,6 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { requireUser } from '../auth.js';
+import { invalidateKeys } from '../cache.js';
+import { config } from '../config.js';
+import { setupStatus } from '../lib/setup.js';
 import { isoDay, summarize } from '../lib/summary.js';
+import { enforceQuota } from '../ratelimit.js';
 import { listCheckins, saveCheckin, sourceFor } from '../sources.js';
 import { BadRequest } from '../validation.js';
 
@@ -26,6 +30,21 @@ interface CheckinBody {
 }
 
 export async function registerAthleteRoutes(app: FastifyInstance) {
+  /**
+   * « Bien démarrer » : réglages de connexion de l'utilisateur connecté (Garmin
+   * direct, envoi des séances). Lu dans le profil en cache (6 h) ; `refresh=1`
+   * (bouton « Revérifier ») relit Intervals.icu, borné par le quota de synchro manuelle.
+   */
+  app.get<{ Querystring: { refresh?: string } }>('/me/setup', async (req) => {
+    const me = requireUser(req);
+    if (req.query.refresh === '1' && !config.demoMode) {
+      await enforceQuota(me.id, 'manualSync');
+      await invalidateKeys(`icu:athlete:${me.athleteId}:*`);
+    }
+    const src = await sourceFor(me.athleteId);
+    return setupStatus(await src.athlete(me.athleteId));
+  });
+
   app.get('/me/today', async (req) => {
     const me = requireUser(req);
     const id = me.athleteId;

@@ -12,6 +12,13 @@ export interface Me {
   demo: boolean;
 }
 
+/** Réglages de connexion Intervals.icu (« Bien démarrer ») ; null = non lisible. */
+export interface SetupStatus {
+  garminSync: boolean | null;
+  garminUploadWorkouts: boolean | null;
+  stravaLinked: boolean | null;
+}
+
 export interface Alert {
   level: 'high' | 'warn';
   code: 'fatigue' | 'ramp' | 'inactive' | 'missed';

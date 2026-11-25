@@ -16,6 +16,10 @@ export interface IntervalsAthlete {
   }>;
   icu_weight?: number | null;
   icu_ftp?: number | null;
+  /** Réglages de connexion (scope SETTINGS) : sorties Garmin importées directement, séances envoyées à Garmin, Strava relié. */
+  icu_garmin_sync_activities?: boolean | null;
+  icu_garmin_upload_workouts?: boolean | null;
+  strava_authorized?: boolean | null;
 }
 
 export interface IntervalsWellness {

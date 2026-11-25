@@ -116,6 +116,19 @@ describe('connexion Intervals.icu', () => {
     expect(await signIn('i300', 'Paul', '?invite=invite-once00')).toEqual({ error: 'invitation_invalide' });
   });
 
+  it("signale au web la première connexion d'un athlète invité (écran « Bien démarrer »), et seulement elle", async () => {
+    const welcome = async (athleteId: string, query = '') => {
+      exchangeMock.mockResolvedValue({ accessToken: `tok-${athleteId}`, scope: 'ACTIVITY:READ', athleteId, athleteName: 'X' });
+      const { state } = await start(query);
+      return (await callback(state)).get('bienvenue');
+    };
+    await invite('invite-welcome', new Date(Date.now() + 86_400_000).toISOString());
+    expect(await welcome('i200', '?invite=invite-welcome')).toBe('1');
+    // Reconnexion du même athlète, ou coach : pas d'écran d'accueil.
+    expect(await welcome('i200')).toBeNull();
+    expect(await welcome('i100')).toBeNull();
+  });
+
   it('retrouve un compte existant sans invitation', async () => {
     await invite('invite-abcdef', new Date(Date.now() + 86_400_000).toISOString());
     await signIn('i200', 'Julie', '?invite=invite-abcdef');
