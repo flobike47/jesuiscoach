@@ -214,3 +214,12 @@ describe('patches vers Intervals.icu', () => {
     expect(wellnessPatch({})).toEqual({});
   });
 });
+
+describe('localToday', () => {
+  it('compte le jour à l’heure de Paris, pas en UTC', async () => {
+    const { localToday } = await import('../src/routes/profile.js');
+    // 23 h 30 UTC le 25 = 0 h 30 le 26 à Paris (heure d'hiver).
+    expect(localToday(new Date('2026-11-25T23:30:00Z'))).toBe('2026-11-26');
+    expect(localToday(new Date('2026-11-25T10:00:00Z'))).toBe('2026-11-25');
+  });
+});

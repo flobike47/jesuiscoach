@@ -24,7 +24,6 @@ import {
   type StoredProfile,
   type UpdatedBy,
 } from '../lib/profile.js';
-import { isoDay } from '../lib/summary.js';
 import { SPORTS, type Sport } from '../lib/sport.js';
 import { ProviderError } from '../providers/http.js';
 import { enforceQuota, QuotaExceeded } from '../ratelimit.js';
@@ -69,10 +68,19 @@ async function ctxOf(req: FastifyRequest, athleteIdParam: string): Promise<Ctx> 
   return { me, athleteId: athleteIdParam, store, by: me.athleteId === athleteIdParam ? 'athlete' : 'coach' };
 }
 
+/**
+ * Date du jour en France (AAAA-MM-JJ) : la « forme du jour » d'Intervals.icu et
+ * les bornes de saisie se comptent en jour local, pas en UTC (sinon décalage
+ * d'un jour entre minuit et 1 h ou 2 h).
+ */
+export function localToday(now = new Date(), timeZone = 'Europe/Paris'): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
 /** Valeurs actuelles d'Intervals.icu (lecture en cache, 6 h). */
 async function intervalsValues(athleteId: string): Promise<ProfileValues> {
   const info = await (await sourceFor(athleteId)).athlete(athleteId);
-  return snapshotOf(info, isoDay(new Date()));
+  return snapshotOf(info, localToday());
 }
 
 /** Première ouverture : copie les valeurs d'Intervals.icu dans la fiche. */
@@ -172,7 +180,7 @@ export async function registerProfileRoutes(app: FastifyInstance) {
 
   app.put<{ Params: { id: string }; Body: unknown }>('/athletes/:id/profile/identity', async (req) => {
     const ctx = await ctxOf(req, req.params.id);
-    const today = isoDay(new Date());
+    const today = localToday();
     const patch = parseIdentityPatch(req.body, today);
     await ensureImported(ctx);
     await ctx.store.saveIdentity(patch, ctx.by);
@@ -244,7 +252,7 @@ export async function registerProfileRoutes(app: FastifyInstance) {
   /** Ajoute un test ; `apply` met aussi à jour la valeur correspondante du profil. */
   app.post<{ Params: { id: string }; Body: unknown }>('/athletes/:id/profile/tests', async (req, reply) => {
     const ctx = await ctxOf(req, req.params.id);
-    const { test, apply } = parseTest(req.body, isoDay(new Date()));
+    const { test, apply } = parseTest(req.body, localToday());
     await ensureImported(ctx);
     const row = await ctx.store.addTest(test, BOUNDS.maxTests);
     if (!row) throw new Conflict(`${BOUNDS.maxTests} tests au plus : supprime un ancien test`);

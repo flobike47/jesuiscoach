@@ -129,7 +129,7 @@ export function IdentityRow({ athleteId, base }: RowProps) {
   const q = useProfile(athleteId);
   const i = q.data?.identity;
   const parts = [i?.birthDate ? `${ageOf(i.birthDate, todayIso())} ans` : null, i?.weightKg != null ? formatField('weightKg', null, i.weightKg) : null].filter(Boolean);
-  return <Cell title="Identité" detail={parts.length ? parts.join(' · ') : 'À renseigner'} to={`${base}/identite`} chevron />;
+  return <Cell title="Identité" subtitle={parts.length ? parts.join(' · ') : 'À renseigner'} to={`${base}/identite`} chevron />;
 }
 
 /** Ligne de la fiche : physiologie (FTP, FC seuil, allure). */
@@ -140,7 +140,7 @@ export function PhysiologyRow({ athleteId, base }: RowProps) {
   if (p?.Ride.ftp != null) parts.push(`FTP ${p.Ride.ftp} W`);
   if (p?.Ride.lthr != null) parts.push(`FC seuil ${p.Ride.lthr}`);
   if (parts.length === 0 && p?.Run.thresholdSecs != null) parts.push(`Course ${formatPace(p.Run.thresholdSecs, 'Run')}`);
-  return <Cell title="Physiologie" detail={parts.length ? parts.join(' · ') : 'À renseigner'} to={`${base}/physiologie`} chevron />;
+  return <Cell title="Physiologie" subtitle={parts.length ? parts.join(' · ') : 'À renseigner'} to={`${base}/physiologie`} chevron />;
 }
 
 /** Plages de zones en texte : « Z1 ≤ 137 · Z2 138–187 · … Z7 ≥ 375 ». */
@@ -294,7 +294,7 @@ export default function PhysiologyPage() {
         )}
       </Section>
 
-      <Section header="Commun à tous les sports" footer="Poids et FC de repos sont aussi enregistrés dans ta forme du jour.">
+      <Section header="Commun à tous les sports" footer="Poids et FC de repos sont aussi enregistrés dans la forme du jour d’Intervals.icu.">
         <div className="cell">
           <NumberStepper label="Poids" value={idVal('weightKg')} onChange={(v) => setId({ weightKg: v })} min={LIMITS.weightKg.min} max={LIMITS.weightKg.max} step={LIMITS.weightKg.step} unit="kg" />
         </div>

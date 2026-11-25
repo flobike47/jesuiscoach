@@ -326,7 +326,7 @@ function AthleteWarnings({ name, warnings, confirmed, onConfirm }: { name: strin
       {warnings.map((w, i) => (
         <p key={i} role={w.level === 'block' ? 'alert' : 'status'} className="footnote" style={{ margin: 0, color: w.level === 'block' ? 'var(--red)' : 'var(--orange)' }}>
           <strong>{w.title}</strong> — {w.detail}
-          {w.suggestDate && ` ${formatShortDay(w.suggestDate)} conviendrait mieux.`}
+          {w.suggestDate && ` Le ${formatShortDay(w.suggestDate)} conviendrait mieux.`}
         </p>
       ))}
       {blocking && (

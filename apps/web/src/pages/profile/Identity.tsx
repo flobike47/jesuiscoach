@@ -60,7 +60,7 @@ export default function IdentityPage() {
       }
     >
       <CoachNote profile={data} self={self} />
-      <Section footer="Ces valeurs sont envoyées à Intervals.icu. Le poids et la FC de repos vont aussi dans ta forme du jour.">
+      <Section footer="Ces valeurs sont envoyées à Intervals.icu. Le poids et la FC de repos vont aussi dans la forme du jour d’Intervals.icu.">
         <div className="cell">
           <label htmlFor="identity-birth" style={{ flex: 1 }}>
             Date de naissance

@@ -68,7 +68,7 @@ export function NumberStepper({ label, value, onChange, min, max, step, unit, ki
   };
 
   return (
-    <div style={{ display: 'grid', gap: 2 }}>
+    <div style={{ display: 'grid', gap: 2, flex: 1, width: '100%', minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44 }}>
         <span style={{ flex: 1 }}>{label}</span>
         {editing ? (
