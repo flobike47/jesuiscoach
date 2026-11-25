@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import dayjs from 'dayjs';
-import { AlertTriangle, TrendingUp, Clock } from 'lucide-react';
+import { AlertTriangle, BarChart3, Clock, TrendingUp, Zap } from 'lucide-react';
 import { Avatar, Cell, Page, Placeholder, Section, Segmented } from '@/components/ios';
 import { Spinner } from '@/components/common/PageLoader';
 import { useAthleteOverview } from '@/hooks/useCoach';
@@ -75,6 +75,11 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
             </div>
           </div>
 
+          <Section header="Analyse">
+            <Cell inset={52} leading={<Zap size={20} color="var(--blue)" aria-hidden />} title="Puissance" subtitle="Courbe, records, FTP estimée" to={`/athletes/${encodeURIComponent(id!)}/puissance`} chevron />
+            <Cell inset={52} leading={<BarChart3 size={20} color="var(--green)" aria-hidden />} title="Zones" subtitle="Temps par zone, semaine par semaine" to={`/athletes/${encodeURIComponent(id!)}/zones`} chevron />
+          </Section>
+
           {data.summary.alerts.length > 0 && (
             <Section header="Points d'attention">
               {data.summary.alerts.map((a) => {
@@ -117,6 +122,8 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
                   </span>
                 }
                 detail={a.icu_training_load != null ? <span aria-label={`Charge ${a.icu_training_load}`}>{a.icu_training_load}</span> : undefined}
+                to={`/athletes/${encodeURIComponent(id!)}/sorties/${encodeURIComponent(a.id)}`}
+                chevron
               />
             ))}
           </Section>

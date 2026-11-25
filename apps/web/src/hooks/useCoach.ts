@@ -12,6 +12,22 @@ export const useFeed = () => useQuery({ queryKey: ['feed'], queryFn: api.feed })
 export const useAthleteOverview = (id: string | undefined) =>
   useQuery({ queryKey: ['athlete', id], queryFn: () => api.athleteOverview(id!), enabled: Boolean(id) });
 
+/** Tableaux de bord avancés : données lentes à changer, gardées 10 min. */
+export const usePower = (id: string | undefined) =>
+  useQuery({ queryKey: ['power', id], queryFn: () => api.power(id!), enabled: Boolean(id), staleTime: 10 * 60_000 });
+
+export const useZones = (id: string | undefined) =>
+  useQuery({ queryKey: ['zones', id], queryFn: () => api.zones(id!), enabled: Boolean(id), staleTime: 10 * 60_000 });
+
+/** Une sortie terminée ne change plus : pas de relecture automatique. */
+export const useActivityDetail = (id: string | undefined, activityId: string | undefined) =>
+  useQuery({
+    queryKey: ['activity', id, activityId],
+    queryFn: () => api.activity(id!, activityId!),
+    enabled: Boolean(id && activityId),
+    staleTime: Infinity,
+  });
+
 export const useCalendar = (id: string | undefined, from: string, to: string) =>
   useQuery({ queryKey: ['calendar', id, from, to], queryFn: () => api.calendar(id!, from, to), enabled: Boolean(id) });
 

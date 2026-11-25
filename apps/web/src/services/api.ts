@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance } from 'axios';
 import { runtimeConfig } from '@/lib/runtimeConfig';
 import type { PushTestReport } from '@/lib/push';
-import type { Checkin, TodayView, PlannedEvent, AthleteOverview, AthleteSummary, CalendarRange, FeedItem, Me, PublicStatus } from '@/types';
+import type { Checkin, TodayView, PlannedEvent, AthleteOverview, AthleteSummary, CalendarRange, FeedItem, Me, PublicStatus, PowerView, ZonesView, ActivityView } from '@/types';
 
 /**
  * Client unique vers le BFF. Toutes les requêtes portent le jeton de session
@@ -118,6 +118,10 @@ export const api = {
   team: () => get<{ athletes: AthleteSummary[]; errors: Array<{ id: string; error: string }> }>('/team'),
   feed: () => get<{ items: FeedItem[] }>('/feed'),
   athleteOverview: (id: string) => get<AthleteOverview>(`/athletes/${encodeURIComponent(id)}/overview`),
+  power: (id: string) => get<PowerView>(`/athletes/${encodeURIComponent(id)}/power`),
+  zones: (id: string, weeks = 8) => get<ZonesView>(`/athletes/${encodeURIComponent(id)}/zones`, { weeks }),
+  activity: (id: string, activityId: string) =>
+    get<ActivityView>(`/athletes/${encodeURIComponent(id)}/activities/${encodeURIComponent(activityId)}`),
   calendar: (id: string, from: string, to: string) =>
     get<CalendarRange>(`/athletes/${encodeURIComponent(id)}/calendar`, { from, to }),
   assignWorkout: (body: { athleteIds: string[]; date: string; name: string; description: string }) =>

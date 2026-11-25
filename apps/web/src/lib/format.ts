@@ -38,3 +38,29 @@ export function formColor(form: number): string {
   if (form > 15) return 'var(--blue)';
   return 'var(--green)';
 }
+
+/** Durée d'effort → « 5 s », « 1 min », « 20 min », « 1 h », « 1 h 30 ». */
+export function formatSpan(secs: number): string {
+  if (secs < 60) return `${secs} s`;
+  if (secs < 3600) return `${Math.round(secs / 60)} min`;
+  const h = Math.floor(secs / 3600);
+  const m = Math.round((secs % 3600) / 60);
+  return m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`;
+}
+
+/** Secondes → « 1:05:30 » ou « 12:30 » (chronomètre). */
+export function formatClock(secs: number): string {
+  const s = Math.max(0, Math.round(secs));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}` : `${m}:${String(r).padStart(2, '0')}`;
+}
+
+/** Secondes → « 7 h 30 » / « 45 min ». */
+export function formatHours(secs: number): string {
+  if (secs < 3600) return `${Math.round(secs / 60)} min`;
+  const h = Math.floor(secs / 3600);
+  const m = Math.round((secs % 3600) / 60);
+  return m === 60 ? `${h + 1} h` : m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`;
+}

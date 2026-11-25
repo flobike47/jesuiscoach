@@ -22,6 +22,9 @@ vi.mock('../src/sources.js', async (orig) => ({
     createWorkout: async () => ({ start_date_local: '' }),
     moveEvent: async () => ({ start_date_local: '' }),
     deleteEvent: async () => undefined,
+    activity: async () => ({ id: 'x', start_date_local: '' }),
+    streams: async () => ({ step: 1, time: [], watts: null, heartrate: null }),
+    powerCurves: async () => ({ list: [] }),
   }),
 }));
 
