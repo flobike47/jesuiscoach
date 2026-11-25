@@ -47,6 +47,12 @@ describe('tableaux de bord (mode démo)', () => {
     expect((await get('/api/athletes/demo-0/zones?weeks=500')).json().weeks).toHaveLength(26);
   });
 
+  it('« Bien démarrer » en démo : réglages de connexion de l’athlète démo, sans quota', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/me/setup?refresh=1', headers: { authorization: 'Bearer demo-athlete' } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ garminSync: true, garminUploadWorkouts: false, stravaLinked: false });
+  });
+
   it('détail d’une sortie : streams réduits et intervalles', async () => {
     const overview = (await get('/api/athletes/demo-0/overview')).json();
     const ids: string[] = overview.activities.map((a: { id: string }) => a.id);

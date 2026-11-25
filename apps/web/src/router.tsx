@@ -67,6 +67,7 @@ export const router = createBrowserRouter(
             { path: 'calendrier', lazy: page(() => import('@/pages/Calendar')) },
             { path: 'seances', lazy: page(() => import('@/pages/Workouts')) },
             { path: 'reglages', lazy: page(() => import('@/pages/Settings')) },
+            { path: 'bien-demarrer', lazy: page(() => import('@/pages/Welcome')) },
             { path: '*', element: <Navigate to="/" replace /> },
           ],
         },

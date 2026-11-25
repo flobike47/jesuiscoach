@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Bell, Bike, Link2, LogOut, Moon, Repeat, Shield, Trash2 } from 'lucide-react';
+import { Bell, Bike, Link2, ListChecks, LogOut, Moon, Repeat, Shield, Trash2 } from 'lucide-react';
+import { inviteMessage } from '@/lib/onboarding';
 import { Cell, Page, Section, Segmented, Sheet } from '@/components/ios';
 import { useAuth } from '@/lib/auth';
 import { useMe } from '@/hooks/useCoach';
@@ -65,9 +66,21 @@ export default function Settings() {
     setMessage(null);
     try {
       const { url } = await api.createInvitation();
-      setInvite(url);
-      if (navigator.share) await navigator.share({ title: 'Rejoins mon équipe', url }).catch(() => undefined);
-      else await navigator.clipboard?.writeText(url);
+      const text = inviteMessage(url, me.data?.name);
+      // Feuille de partage native (Messages, WhatsApp…) ; sinon le texte complet est copié.
+      if (navigator.share) {
+        const shared = await navigator.share({ title: 'Rejoins mon équipe', text }).then(
+          () => true,
+          () => false,
+        );
+        setInvite(shared ? `Invitation partagée, valable 7 jours : ${url}` : `Partage annulé. Lien valable 7 jours : ${url}`);
+      } else {
+        const copied = await navigator.clipboard?.writeText(text).then(
+          () => true,
+          () => false,
+        );
+        setInvite(copied ? `Invitation copiée (texte et lien), valable 7 jours : ${url}` : `Lien valable 7 jours : ${url}`);
+      }
     } catch (e) {
       setMessage((e as Error).message);
     }
@@ -77,6 +90,9 @@ export default function Settings() {
     <Page title="Réglages">
       <Section>
         <Cell title={me.data?.name ?? '…'} subtitle={me.data ? `${me.data.role === 'coach' ? 'Coach' : 'Athlète'}${demo ? ' · démo' : ''}` : undefined} />
+        {me.data?.role === 'athlete' && (
+          <Cell inset={52} leading={<ListChecks size={20} color="var(--green)" aria-hidden />} title="Bien démarrer" subtitle="Garmin, séances sur la montre, notifications" to="/bien-demarrer" chevron />
+        )}
       </Section>
 
       <Section header="Apparence">
@@ -112,7 +128,7 @@ export default function Settings() {
       </Section>
 
       {me.data?.role === 'coach' && !demo && (
-        <Section header="Équipe" footer={invite ? `Lien copié, valable 7 jours : ${invite}` : "Un lien à usage unique : ton ami connecte son compte Intervals.icu et rejoint ton équipe."}>
+        <Section header="Équipe" footer={invite ?? 'Un lien à usage unique, avec un court message qui rappelle de relier Garmin directement à Intervals.icu.'}>
           <Cell inset={52} leading={<Link2 size={20} color="var(--blue)" aria-hidden />} title="Inviter un athlète" onClick={createInvite} chevron />
         </Section>
       )}

@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance } from 'axios';
 import { runtimeConfig } from '@/lib/runtimeConfig';
 import type { PushTestReport } from '@/lib/push';
-import type { Checkin, TodayView, PlannedEvent, AthleteOverview, AthleteSummary, CalendarRange, FeedItem, Me, PublicStatus, PowerView, ZonesView, ActivityView } from '@/types';
+import type { Checkin, TodayView, PlannedEvent, AthleteOverview, AthleteSummary, CalendarRange, FeedItem, Me, PublicStatus, PowerView, ZonesView, ActivityView, SetupStatus } from '@/types';
 
 /**
  * Client unique vers le BFF. Toutes les requêtes portent le jeton de session
@@ -115,6 +115,7 @@ export interface AssignResult {
 export const api = {
   status: () => get<PublicStatus>('/public/status'),
   me: () => get<Me>('/me'),
+  setup: (refresh = false) => get<SetupStatus>('/me/setup', refresh ? { refresh: 1 } : undefined),
   team: () => get<{ athletes: AthleteSummary[]; errors: Array<{ id: string; error: string }> }>('/team'),
   feed: () => get<{ items: FeedItem[] }>('/feed'),
   athleteOverview: (id: string) => get<AthleteOverview>(`/athletes/${encodeURIComponent(id)}/overview`),

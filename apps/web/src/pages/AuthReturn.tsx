@@ -23,8 +23,10 @@ export default function AuthReturn() {
       navigate(`/connexion?erreur=${encodeURIComponent(params.get('error') ?? 'requete_invalide')}`, { replace: true });
       return;
     }
+    // Première connexion d'un athlète invité : écran « Bien démarrer ».
+    const next = params.get('bienvenue') === '1' ? '/bien-demarrer' : '/';
     completeSignIn(code).then(
-      () => navigate('/', { replace: true }),
+      () => navigate(next, { replace: true }),
       () => navigate('/connexion?erreur=echange_refuse', { replace: true }),
     );
   }, [completeSignIn, navigate]);
