@@ -124,6 +124,7 @@ export const api = {
     post<AssignResult>('/workouts', body),
   exchangeLoginCode: (code: string) => post<{ token: string }>('/public/auth/exchange', { code }),
   logout: () => post<{ ok: true }>('/auth/logout', {}),
+  deleteAccount: () => del<{ ok: true }>('/me'),
   today: () => get<TodayView>('/me/today'),
   saveCheckin: (body: Checkin) => post<{ checkin: Checkin }>('/me/checkins', body),
   moveEvent: (athleteId: string, eventId: string, date: string) =>

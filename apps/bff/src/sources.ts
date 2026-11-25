@@ -1,9 +1,10 @@
 import { config } from './config.js';
-import { cachedJson, TTL } from './cache.js';
+import { cachedJson, invalidateKeys, redis, TTL } from './cache.js';
 import { DemoSource } from './demo.js';
 import { decrypt, parseKey } from './lib/crypto.js';
 import { IntervalsClient } from './providers/intervals.js';
-import { checkinsOf, intervalsTokenOf, teamAthleteIds, upsertCheckin, type CheckinRow } from './db/repo.js';
+import { checkinsOf, deleteUser, intervalsTokenOf, teamAthleteIds, upsertCheckin, type CheckinRow } from './db/repo.js';
+import { revokeAllSessions } from './sessions.js';
 import type { AuthUser } from './auth.js';
 import type { IntervalsActivity, IntervalsAthlete, IntervalsEvent, IntervalsWellness, NewWorkoutEvent } from './types.js';
 import { HttpError, NotFound } from './validation.js';
@@ -78,4 +79,26 @@ export async function saveCheckin(user: AuthUser, c: CheckinRow): Promise<void> 
 export async function listCheckins(athleteId: string, from: string, to: string): Promise<CheckinRow[]> {
   if (config.demoMode) return demoSource().listCheckins(athleteId, from, to);
   return checkinsOf(athleteId, from, to);
+}
+
+/**
+ * Suppression de compte : révoque le jeton chez Intervals.icu (au mieux : un
+ * jeton déjà révoqué par l'athlète ne doit pas bloquer la suppression), puis
+ * efface l'utilisateur (sessions, jeton, ressentis, notifications et liens
+ * coach en cascade) et les copies en cache de ses données.
+ */
+export async function deleteAccount(user: AuthUser, onRevokeError: (err: unknown) => void): Promise<void> {
+  const enc = await intervalsTokenOf(user.athleteId);
+  if (enc && config.tokenEncryptionKey) {
+    try {
+      const token = decrypt(enc, parseKey(config.tokenEncryptionKey));
+      await new IntervalsClient({ kind: 'oauth', accessToken: token }).disconnect();
+    } catch (err) {
+      onRevokeError(err);
+    }
+  }
+  await revokeAllSessions(user.id);
+  await deleteUser(user.id);
+  await invalidateKeys(`icu:*:${user.athleteId}:*`);
+  await redis.del(`webhook:pending:${user.athleteId}`).catch(() => undefined);
 }

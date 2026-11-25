@@ -60,6 +60,7 @@ Portainer pourra ensuite pull les images privées automatiquement.
 | `BACKUP_DIR` | sauvegardes | `/mnt/ssd/backups/jesuiscoach` (dossier hôte) |
 | `PUBLIC_API_URL` | BFF | `https://jesuiscoach.fb-cloud.fr` (callback OAuth) |
 | `INTERVALS_CLIENT_ID`, `INTERVALS_CLIENT_SECRET` | BFF | app OAuth Intervals.icu (⚠️ secret) |
+| `INTERVALS_WEBHOOK_SECRET` | BFF | secret des webhooks Intervals.icu (Manage App) ; URL `/api/public/webhooks/intervals`, événements `ACTIVITY_ANALYZED`, `CALENDAR_UPDATED`, `SPORT_SETTINGS_UPDATED` (⚠️ secret) |
 | `COACH_ATHLETE_IDS` | BFF | `i123456` : ton ID Intervals.icu (rôle coach) |
 | `TOKEN_ENCRYPTION_KEY` | BFF | 32 octets base64 (⚠️ secret, ne plus jamais la changer) |
 | `DEMO_MODE` | BFF | `false` en prod |

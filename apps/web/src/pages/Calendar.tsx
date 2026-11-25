@@ -35,6 +35,7 @@ export function CalendarView({ fixed }: { fixed?: { id: string; title: string } 
     const done = (cal.data?.activities ?? []).filter((a) => a.start_date_local.startsWith(key));
     return { d, key, planned, done };
   });
+  const doneIds = new Set(cal.data?.doneEventIds ?? []);
   const plannedLoad = (cal.data?.events ?? []).length;
   const doneCount = (cal.data?.activities ?? []).length;
 
@@ -111,9 +112,9 @@ export function CalendarView({ fixed }: { fixed?: { id: string; title: string } 
           .map(({ d, key, planned, done }) => (
             <Section key={key} header={d.format('dddd D MMMM')}>
               {planned.map((e, i) => {
-                // Faite dès qu'une sortie existe ce jour-là (aujourd'hui compris) ;
+                // Faite si le serveur l'a appariée à une sortie (aujourd'hui compris) ;
                 // manquée seulement une fois la journée passée.
-                const made = done.length > 0;
+                const made = e.id != null && doneIds.has(String(e.id));
                 const missed = !made && key < today;
                 return (
                   <Cell

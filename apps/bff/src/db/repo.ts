@@ -87,6 +87,12 @@ export async function deleteSession(tokenHash: string): Promise<void> {
   await db().query('delete from sessions where token_hash = $1', [tokenHash]);
 }
 
+/** Supprime toutes les sessions d'un utilisateur et renvoie leurs empreintes (pour vider le cache). */
+export async function deleteSessionsOf(userId: string): Promise<string[]> {
+  const { rows } = await db().query<{ token_hash: string }>('delete from sessions where user_id = $1 returning token_hash', [userId]);
+  return rows.map((r) => r.token_hash);
+}
+
 export async function purgeExpiredSessions(): Promise<number> {
   return affected(await db().query('delete from sessions where expires_at <= now()'));
 }
@@ -163,7 +169,7 @@ export async function pushSubscriptionsOf(userId: string): Promise<PushSubRow[]>
   return rows;
 }
 
-/** Annule une inscription incomplète (invitation consommée entre-temps par quelqu'un d'autre). */
+/** Supprime un utilisateur et, en cascade, toutes ses données (compte supprimé, ou inscription annulée). */
 export async function deleteUser(userId: string): Promise<void> {
   await db().query('delete from users where id = $1', [userId]);
 }
@@ -186,6 +192,18 @@ export async function syncTargets(): Promise<SyncTarget[]> {
      order by u.id`,
   );
   return rows;
+}
+
+/** Cible de synchro d'un athlète précis (webhook), ou null s'il n'est pas connecté. */
+export async function syncTargetOf(athleteId: string): Promise<SyncTarget | null> {
+  const { rows } = await db().query<SyncTarget>(
+    `select u.id, u.intervals_athlete_id, u.name, (s.user_id is not null) as initialized
+     from users u join intervals_tokens t on t.user_id = u.id
+     left join sync_state s on s.user_id = u.id
+     where u.intervals_athlete_id = $1`,
+    [athleteId],
+  );
+  return rows[0] ?? null;
 }
 
 /**

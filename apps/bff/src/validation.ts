@@ -31,6 +31,9 @@ export class Gone extends HttpError {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Identifiant d'athlète Intervals.icu (même contrainte que users.intervals_athlete_id). */
+export const ATHLETE_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+
 export function validateUuid(input: unknown, name = 'id'): string {
   if (typeof input !== 'string' || !UUID_RE.test(input)) throw new BadRequest(`${name} invalide`);
   return input;

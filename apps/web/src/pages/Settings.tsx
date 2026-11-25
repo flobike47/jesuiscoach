@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Bell, Bike, Link2, LogOut, Moon, Repeat, Shield } from 'lucide-react';
-import { Cell, Page, Section, Segmented } from '@/components/ios';
+import { Bell, Bike, Link2, LogOut, Moon, Repeat, Shield, Trash2 } from 'lucide-react';
+import { Cell, Page, Section, Segmented, Sheet } from '@/components/ios';
 import { useAuth } from '@/lib/auth';
 import { useMe } from '@/hooks/useCoach';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -22,6 +22,7 @@ const DEV_HELP = 'Indisponibles en développement (pas de service worker). Lance
 
 export default function Settings() {
   const { signOut, signInDemo, demo } = useAuth();
+  const [deleting, setDeleting] = useState(false);
   const demoRole = useLocalSettings((s) => s.demoRole);
 
   const me = useMe();
@@ -140,6 +141,56 @@ export default function Settings() {
       <Section>
         <Cell inset={52} leading={<LogOut size={20} color="var(--red)" aria-hidden />} title={<span style={{ color: 'var(--red)' }}>{demo ? 'Quitter la démo' : 'Se déconnecter'}</span>} onClick={() => signOut()} />
       </Section>
+
+      {!demo && (
+        <Section footer="Efface ton compte et tout ce que l'app garde sur toi. Tes données restent dans Intervals.icu.">
+          <Cell inset={52} leading={<Trash2 size={20} color="var(--red)" aria-hidden />} title={<span style={{ color: 'var(--red)' }}>Supprimer mon compte</span>} onClick={() => setDeleting(true)} />
+        </Section>
+      )}
+      <DeleteAccountSheet open={deleting} onClose={() => setDeleting(false)} isCoach={me.data?.role === 'coach'} />
     </Page>
+  );
+}
+
+/** Confirmation de la suppression : action destructive et définitive, donc une étape explicite. */
+function DeleteAccountSheet({ open, onClose, isCoach }: { open: boolean; onClose: () => void; isCoach: boolean }) {
+  const { deleteAccount } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const confirm = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteAccount();
+    } catch {
+      setError("La suppression n'a pas abouti. Réessaie dans un instant.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Supprimer mon compte">
+      <div style={{ padding: '8px 20px 24px', display: 'grid', gap: 16 }}>
+        <p style={{ margin: 0, fontSize: 17, lineHeight: 1.45 }}>
+          Ton compte, tes ressentis, tes appareils pour les notifications et ton lien avec {isCoach ? 'tes athlètes' : 'ton coach'} seront
+          effacés. L'accès de l'app à ton compte Intervals.icu sera coupé.
+        </p>
+        <p className="footnote secondary" style={{ margin: 0 }}>
+          {isCoach
+            ? "Tes athlètes gardent leur compte, mais tu ne recevras plus leurs sorties. Tes sorties, ta forme et ton calendrier restent dans Intervals.icu."
+            : "Tes sorties, ta forme et ton calendrier restent dans Intervals.icu. Ton coach ne verra plus rien dans l'app."}{' '}
+          Cette action est définitive.
+        </p>
+        {error && (
+          <p role="alert" className="footnote" style={{ margin: 0, color: 'var(--red)' }}>
+            {error}
+          </p>
+        )}
+        <button type="button" className="button filled block pressable" style={{ background: 'var(--red)' }} disabled={busy} onClick={confirm}>
+          {busy ? 'Suppression…' : 'Supprimer définitivement'}
+        </button>
+      </div>
+    </Sheet>
   );
 }

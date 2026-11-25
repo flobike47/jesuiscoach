@@ -99,6 +99,19 @@ describe('fil et calendrier (mode démo)', () => {
     expect((await get('from=2026-01-01&to=2026-11-29')).statusCode).toBe(400);
     expect((await get('from=2026-11-29&to=2026-11-23')).statusCode).toBe(400);
   });
+
+  it('indique les séances réalisées (une sortie le même jour en démo)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/athletes/demo-1/calendar?from=2026-10-27&to=2026-11-23', headers: auth('token-a') });
+    const { events, activities, doneEventIds } = res.json() as {
+      events: Array<{ id: string; category: string; start_date_local: string }>;
+      activities: Array<{ start_date_local: string; type: string }>;
+      doneEventIds: string[];
+    };
+    const rideDays = new Set(activities.filter((a) => a.type.includes('Ride')).map((a) => a.start_date_local.slice(0, 10)));
+    const expected = events.filter((e) => e.category === 'WORKOUT' && rideDays.has(e.start_date_local.slice(0, 10))).map((e) => e.id);
+    expect(expected.length).toBeGreaterThan(0);
+    expect(doneEventIds.sort()).toEqual(expected.sort());
+  });
 });
 
 describe('calendrier : déplacer et supprimer (mode démo)', () => {

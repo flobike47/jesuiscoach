@@ -80,6 +80,23 @@ export async function cachedBinary(
   return value;
 }
 
+/**
+ * Supprime toutes les clés qui correspondent au motif (SCAN, jamais KEYS :
+ * non bloquant). Redis indisponible → rien à invalider, on ignore.
+ */
+export async function invalidateKeys(pattern: string): Promise<void> {
+  try {
+    let cursor = '0';
+    do {
+      const [next, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 200);
+      if (keys.length) await redis.del(...keys);
+      cursor = next;
+    } while (cursor !== '0');
+  } catch {
+    /* passthrough */
+  }
+}
+
 /** Helper de hash stable pour des clés à partir d'entrées de longueur variable. */
 export function hashKey(input: string): string {
   return createHash('sha1').update(input).digest('hex').slice(0, 16);

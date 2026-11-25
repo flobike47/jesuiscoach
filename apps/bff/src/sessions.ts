@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { config } from './config.js';
 import { redis } from './cache.js';
 import { randomToken } from './lib/crypto.js';
-import { deleteSession, insertSession, userOfSession, type UserRow } from './db/repo.js';
+import { deleteSession, deleteSessionsOf, insertSession, userOfSession, type UserRow } from './db/repo.js';
 
 /**
  * Sessions de l'app : jeton opaque aléatoire (256 bits) envoyé par le web en
@@ -47,6 +47,20 @@ export async function revokeSession(token: string): Promise<void> {
   await deleteSession(hash);
   try {
     await redis.del(`session:${hash}`);
+  } catch {
+    /* le cache expire seul en 5 min */
+  }
+}
+
+/**
+ * Révoque toutes les sessions d'un utilisateur (suppression de compte), cache
+ * compris : sinon une session resterait valide jusqu'à 5 min.
+ */
+export async function revokeAllSessions(userId: string): Promise<void> {
+  const hashes = await deleteSessionsOf(userId);
+  if (hashes.length === 0) return;
+  try {
+    await redis.del(...hashes.map((h) => `session:${h}`));
   } catch {
     /* le cache expire seul en 5 min */
   }

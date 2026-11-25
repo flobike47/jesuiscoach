@@ -69,6 +69,11 @@ export class IntervalsClient {
   async deleteEvent(id: string, eventId: string): Promise<void> {
     await this.http.delete(`/athlete/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`);
   }
+
+  /** Révoque le jeton OAuth de l'app pour cet athlète (et coupe ses webhooks). */
+  async disconnect(): Promise<void> {
+    await this.http.delete('/disconnect-app');
+  }
 }
 
 /**
