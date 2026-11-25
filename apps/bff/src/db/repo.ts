@@ -319,7 +319,7 @@ export async function ensureDemoUsers(coach: { id: string; athleteId: string; na
 export interface PlanRow {
   id: string;
   name: string;
-  workouts: Array<{ day: number; name: string; description: string }>;
+  workouts: Array<{ day: number; name: string; description: string; sport?: 'Ride' | 'Run' | 'Swim' }>;
   updated_at: Date | string;
 }
 
@@ -360,4 +360,56 @@ export async function updatePlan(coachId: string, planId: string, name: string, 
 
 export async function deletePlan(coachId: string, planId: string): Promise<boolean> {
   return affected(await db().query('delete from training_plans where coach_id = $1 and id = $2', [coachId, planId])) > 0;
+}
+
+/* ---------- Séances enregistrées (toujours filtrées par coach) ---------- */
+
+export interface SavedWorkoutRow {
+  id: string;
+  name: string;
+  sport: 'Ride' | 'Run' | 'Swim';
+  description: string;
+  updated_at: Date | string;
+}
+
+const SAVED_COLS = 'id, name, sport, description, updated_at';
+
+export async function savedWorkoutsOf(coachId: string): Promise<SavedWorkoutRow[]> {
+  const { rows } = await db().query<SavedWorkoutRow>(`select ${SAVED_COLS} from saved_workouts where coach_id = $1 order by updated_at desc`, [coachId]);
+  return rows;
+}
+
+/**
+ * Enregistre une séance si le coach en a moins de `max` (une seule
+ * instruction : deux enregistrements simultanés ne dépassent pas la borne).
+ */
+export async function insertSavedWorkout(
+  coachId: string,
+  w: Pick<SavedWorkoutRow, 'name' | 'sport' | 'description'>,
+  max: number,
+): Promise<SavedWorkoutRow | null> {
+  const { rows } = await db().query<SavedWorkoutRow>(
+    `insert into saved_workouts (coach_id, name, sport, description)
+     select $1, $2, $3, $4 where (select count(*) from saved_workouts where coach_id = $1) < $5
+     returning ${SAVED_COLS}`,
+    [coachId, w.name, w.sport, w.description, max],
+  );
+  return rows[0] ?? null;
+}
+
+export async function updateSavedWorkout(
+  coachId: string,
+  id: string,
+  w: Pick<SavedWorkoutRow, 'name' | 'sport' | 'description'>,
+): Promise<SavedWorkoutRow | null> {
+  const { rows } = await db().query<SavedWorkoutRow>(
+    `update saved_workouts set name = $3, sport = $4, description = $5, updated_at = now()
+     where coach_id = $1 and id = $2 returning ${SAVED_COLS}`,
+    [coachId, id, w.name, w.sport, w.description],
+  );
+  return rows[0] ?? null;
+}
+
+export async function deleteSavedWorkout(coachId: string, id: string): Promise<boolean> {
+  return affected(await db().query('delete from saved_workouts where coach_id = $1 and id = $2', [coachId, id])) > 0;
 }

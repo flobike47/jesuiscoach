@@ -20,16 +20,29 @@ vi.mock('../src/sources.js', async (orig) => ({
 
 describe('setupStatus', () => {
   it('lit les réglages de connexion', () => {
-    expect(setupStatus({ id: 'i1', icu_garmin_sync_activities: true, icu_garmin_upload_workouts: false, strava_authorized: true })).toEqual({
-      garminSync: true,
-      garminUploadWorkouts: false,
-      stravaLinked: true,
+    const s = setupStatus({ id: 'i1', icu_garmin_sync_activities: true, icu_garmin_upload_workouts: false, strava_authorized: true });
+    expect(s).toMatchObject({ deviceSync: true, uploadWorkouts: false, stravaLinked: true });
+    expect(s.devices.find((d) => d.provider === 'garmin')).toEqual({ provider: 'garmin', label: 'Garmin', sync: true, uploadWorkouts: false });
+  });
+
+  it('plusieurs services reliés en même temps (Garmin et Coros)', () => {
+    const s = setupStatus({ id: 'i1', icu_garmin_sync_activities: true, icu_garmin_upload_workouts: true, coros_sync_activities: true, coros_upload_workouts: true });
+    expect(s).toMatchObject({ deviceSync: true, uploadWorkouts: true });
+    expect(s.devices.filter((d) => d.sync).map((d) => d.label)).toEqual(['Garmin', 'Coros']);
+    expect(s.devices.filter((d) => d.uploadWorkouts).map((d) => d.label)).toEqual(['Garmin', 'Coros']);
+  });
+
+  it('Coros ou Wahoo comptent comme Garmin', () => {
+    expect(setupStatus({ id: 'i1', icu_garmin_sync_activities: false, coros_sync_activities: true, coros_upload_workouts: true })).toMatchObject({
+      deviceSync: true,
+      uploadWorkouts: true,
     });
+    expect(setupStatus({ id: 'i1', wahoo_sync_activities: true, wahoo_upload_workouts: false })).toMatchObject({ deviceSync: true, uploadWorkouts: false });
   });
 
   it("renvoie null pour un réglage absent ou illisible plutôt que de l'inventer", () => {
-    expect(setupStatus({ id: 'i1' })).toEqual({ garminSync: null, garminUploadWorkouts: null, stravaLinked: null });
-    expect(setupStatus({ id: 'i1', icu_garmin_sync_activities: 'oui' as never })).toMatchObject({ garminSync: null });
+    expect(setupStatus({ id: 'i1' })).toMatchObject({ deviceSync: null, uploadWorkouts: null, stravaLinked: null });
+    expect(setupStatus({ id: 'i1', icu_garmin_sync_activities: 'oui' as never })).toMatchObject({ deviceSync: null });
   });
 });
 
@@ -60,7 +73,7 @@ describe('GET /api/me/setup', () => {
   it("ne lit que le profil de l'utilisateur connecté", async () => {
     const res = await get('?athleteId=iA');
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ garminSync: true, garminUploadWorkouts: false, stravaLinked: null });
+    expect(res.json()).toMatchObject({ deviceSync: true, uploadWorkouts: false, stravaLinked: null });
     expect(state.asked).toEqual(['iB']);
   });
 

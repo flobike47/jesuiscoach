@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance } from 'axios';
 import { runtimeConfig } from '@/lib/runtimeConfig';
 import type { PushTestReport } from '@/lib/push';
-import type { Checkin, TodayView, PlannedEvent, AthleteOverview, AthleteSummary, CalendarRange, FeedItem, Me, PublicStatus, PowerView, ZonesView, ActivityView, LibraryFolder, TrainingPlan, PlanWorkout, ApplyPlanResult, SetupStatus } from '@/types';
+import type { Checkin, TodayView, PlannedEvent, AthleteOverview, AthleteSummary, CalendarRange, FeedItem, Me, PublicStatus, PowerView, ZonesView, ActivityView, LibraryFolder, TrainingPlan, PlanWorkout, ApplyPlanResult, SetupStatus, SavedWorkout, Sport } from '@/types';
 
 /**
  * Client unique vers le BFF. Toutes les requêtes portent le jeton de session
@@ -125,9 +125,14 @@ export const api = {
     get<ActivityView>(`/athletes/${encodeURIComponent(id)}/activities/${encodeURIComponent(activityId)}`),
   calendar: (id: string, from: string, to: string) =>
     get<CalendarRange>(`/athletes/${encodeURIComponent(id)}/calendar`, { from, to }),
-  assignWorkout: (body: { athleteIds: string[]; date: string; name: string; description: string }) =>
+  assignWorkout: (body: { athleteIds: string[]; date: string; name: string; description: string; sport: Sport }) =>
     post<AssignResult>('/workouts', body),
   library: () => get<{ folders: LibraryFolder[] }>('/library'),
+  savedWorkouts: () => get<{ workouts: SavedWorkout[] }>('/saved-workouts'),
+  createSavedWorkout: (body: { name: string; sport: Sport; description: string }) => post<SavedWorkout>('/saved-workouts', body),
+  updateSavedWorkout: (id: string, body: { name: string; sport: Sport; description: string }) =>
+    put<SavedWorkout>(`/saved-workouts/${encodeURIComponent(id)}`, body),
+  deleteSavedWorkout: (id: string) => del<{ ok: true }>(`/saved-workouts/${encodeURIComponent(id)}`),
   plans: () => get<{ plans: TrainingPlan[] }>('/plans'),
   createPlan: (body: { name: string; workouts: PlanWorkout[] }) => post<TrainingPlan>('/plans', body),
   updatePlan: (id: string, body: { name: string; workouts: PlanWorkout[] }) => put<TrainingPlan>(`/plans/${encodeURIComponent(id)}`, body),

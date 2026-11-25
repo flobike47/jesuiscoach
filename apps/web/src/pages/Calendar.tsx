@@ -242,7 +242,7 @@ function EditEventSheet({ athleteId, event, weekStart, onClose }: { athleteId: s
       <div className="group" style={{ marginTop: 12 }}>
         <input type="date" className="field" aria-label="Autre date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
       </div>
-      <p className="section-footer">La séance est déplacée dans Intervals.icu, puis sur la montre à la prochaine synchro Garmin.</p>
+      <p className="section-footer">La séance est déplacée dans Intervals.icu, puis sur la montre ou le compteur à leur prochaine synchro.</p>
 
       <div className="group" style={{ marginTop: 28 }}>
         <button type="button" className="cell" onClick={destroy} disabled={busy} style={{ color: 'var(--red)', justifyContent: 'center' }}>

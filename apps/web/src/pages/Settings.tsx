@@ -91,7 +91,7 @@ export default function Settings() {
       <Section>
         <Cell title={me.data?.name ?? '…'} subtitle={me.data ? `${me.data.role === 'coach' ? 'Coach' : 'Athlète'}${demo ? ' · démo' : ''}` : undefined} />
         {me.data?.role === 'athlete' && (
-          <Cell inset={52} leading={<ListChecks size={20} color="var(--green)" aria-hidden />} title="Bien démarrer" subtitle="Garmin, séances sur la montre, notifications" to="/bien-demarrer" chevron />
+          <Cell inset={52} leading={<ListChecks size={20} color="var(--green)" aria-hidden />} title="Bien démarrer" subtitle="Montre reliée, séances sur la montre, notifications" to="/bien-demarrer" chevron />
         )}
       </Section>
 
@@ -128,7 +128,7 @@ export default function Settings() {
       </Section>
 
       {me.data?.role === 'coach' && !demo && (
-        <Section header="Équipe" footer={invite ?? 'Un lien à usage unique, avec un court message qui rappelle de relier Garmin directement à Intervals.icu.'}>
+        <Section header="Équipe" footer={invite ?? 'Un lien à usage unique, avec un court message qui rappelle de relier sa montre ou son compteur directement à Intervals.icu.'}>
           <Cell inset={52} leading={<Link2 size={20} color="var(--blue)" aria-hidden />} title="Inviter un athlète" onClick={createInvite} chevron />
         </Section>
       )}

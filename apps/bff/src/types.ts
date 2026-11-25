@@ -19,6 +19,12 @@ export interface IntervalsAthlete {
   /** Réglages de connexion (scope SETTINGS) : sorties Garmin importées directement, séances envoyées à Garmin, Strava relié. */
   icu_garmin_sync_activities?: boolean | null;
   icu_garmin_upload_workouts?: boolean | null;
+  coros_sync_activities?: boolean | null;
+  coros_upload_workouts?: boolean | null;
+  wahoo_sync_activities?: boolean | null;
+  wahoo_upload_workouts?: boolean | null;
+  suunto_sync_activities?: boolean | null;
+  suunto_upload_workouts?: boolean | null;
   strava_authorized?: boolean | null;
 }
 
@@ -80,6 +86,8 @@ export interface NewWorkoutEvent {
   date: string;
   name: string;
   description: string;
+  /** Type de l'événement Intervals.icu (vélo par défaut). */
+  sport?: 'Ride' | 'Run' | 'Swim';
 }
 
 export type AlertLevel = 'high' | 'warn';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDuration, parseStep, parseWorkout, TEMPLATES, workoutStats } from './workout';
+import { parseDistance, parseDuration, parseStep, parseWorkout, TEMPLATES, workoutStats, zoneColor } from './workout';
 
 describe('parseDuration', () => {
   it.each([
@@ -15,9 +15,25 @@ describe('parseDuration', () => {
 
 describe('parseStep', () => {
   it('lit un palier, une plage et une rampe', () => {
-    expect(parseStep('- 10m 95%')).toEqual({ seconds: 600, from: 95, to: 95 });
-    expect(parseStep('- 12m 88-93%')).toEqual({ seconds: 720, from: 90.5, to: 90.5 });
-    expect(parseStep('- 15m ramp 50-75%')).toEqual({ seconds: 900, from: 50, to: 75 });
+    expect(parseStep('- 10m 95%')).toEqual({ seconds: 600, meters: 0, from: 95, to: 95, target: 'power' });
+    expect(parseStep('- 12m 88-93%')).toEqual({ seconds: 720, meters: 0, from: 90.5, to: 90.5, target: 'power' });
+    expect(parseStep('- 15m ramp 50-75%')).toEqual({ seconds: 900, meters: 0, from: 50, to: 75, target: 'power' });
+  });
+
+  it('lit les cibles cardio, allure et la cadence', () => {
+    expect(parseStep('- 20m 80-85% LTHR')).toMatchObject({ seconds: 1200, from: 82.5, target: 'hr' });
+    expect(parseStep('- 20m 70% HR')).toMatchObject({ target: 'hrmax' });
+    expect(parseStep('- 8m 97-100% Pace')).toMatchObject({ seconds: 480, target: 'pace' });
+    expect(parseStep('- 5m 85-90% 55-65rpm')).toMatchObject({ seconds: 300, from: 87.5, target: 'power' });
+  });
+
+  it('lit les paliers en distance (« m » = minutes, « mtr » = mètres)', () => {
+    expect(parseStep('- 400mtr 105% Pace')).toEqual({ seconds: 0, meters: 400, from: 105, to: 105, target: 'pace' });
+    expect(parseStep('- 1.5km 85% LTHR')).toMatchObject({ meters: 1500, seconds: 0 });
+    expect(parseStep('- 10m 70%')).toMatchObject({ seconds: 600, meters: 0 });
+    expect(parseDistance('1mi')).toBe(1609);
+    expect(parseDistance('100y')).toBe(91);
+    expect(parseDistance('10m')).toBeNull();
   });
 
   it('ignore titres et lignes incomplètes', () => {
@@ -39,7 +55,7 @@ describe('parseWorkout', () => {
 
 describe('workoutStats', () => {
   it('donne 100 de charge pour 1 h à 100 % FTP', () => {
-    expect(workoutStats(parseWorkout('- 1h 100%'))).toEqual({ seconds: 3600, load: 100, intensity: 1 });
+    expect(workoutStats(parseWorkout('- 1h 100%'))).toEqual({ seconds: 3600, meters: 0, load: 100, intensity: 1, complete: true });
   });
 
   it("retrouve le calcul d'Intervals.icu sur une séance de référence", () => {
@@ -58,6 +74,18 @@ describe('workoutStats', () => {
   });
 
   it('gère une séance vide', () => {
-    expect(workoutStats([])).toEqual({ seconds: 0, load: 0, intensity: 0 });
+    expect(workoutStats([])).toEqual({ seconds: 0, meters: 0, load: 0, intensity: 0, complete: true });
+  });
+
+  it('paliers en distance : durée et charge laissées à Intervals.icu', () => {
+    const s = workoutStats(parseWorkout('- 10m 70% Pace\n\n6x\n- 400mtr 105% Pace\n- 90s 60% Pace'));
+    expect(s).toMatchObject({ seconds: 600 + 6 * 90, meters: 2400, complete: false });
+  });
+
+  it('zones de couleur propres à chaque cible', () => {
+    expect(zoneColor(95)).toBe('var(--yellow)');
+    expect(zoneColor(95, 'hr')).toBe('var(--yellow)');
+    expect(zoneColor(85, 'hr')).toBe('var(--blue)');
+    expect(zoneColor(110, 'pace')).toBe('var(--red)');
   });
 });

@@ -72,6 +72,19 @@ describe('routes équipe (mode démo)', () => {
     expect((await send({ athleteIds: [], date: '2026-11-28', name: 'x', description: 'y' })).statusCode).toBe(400);
     expect((await send({ athleteIds: ['demo-1'], date: '28/11', name: 'x', description: 'y' })).statusCode).toBe(400);
     expect((await send({ athleteIds: ['demo-1'], date: '2026-11-28', name: '', description: 'y' })).statusCode).toBe(400);
+    expect((await send({ athleteIds: ['demo-1'], date: '2026-11-28', name: 'x', description: 'y', sport: 'Ski' })).statusCode).toBe(400);
+  });
+
+  it('envoie une séance de course ou de natation avec le bon type', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/workouts',
+      headers: auth('token-a'),
+      payload: { athleteIds: ['demo-4'], date: '2026-12-02', name: 'Natation 10×100', description: '10x\n- 100mtr 100% Pace\n- 20s 40% Pace', sport: 'Swim' },
+    });
+    expect(res.json().results).toEqual([{ id: 'demo-4', ok: true }]);
+    const cal = (await app.inject({ method: 'GET', url: '/api/athletes/demo-4/calendar?from=2026-12-02&to=2026-12-02', headers: auth('token-a') })).json();
+    expect(cal.events.find((e: { name: string }) => e.name === 'Natation 10×100')).toMatchObject({ type: 'Swim', category: 'WORKOUT' });
   });
 });
 

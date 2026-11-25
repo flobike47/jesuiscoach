@@ -129,8 +129,13 @@ function simulate(k: number, now: Date): DemoAthlete {
       name: NAMES[k],
       icu_weight: 62 + k * 2,
       // Réglages de connexion variés : la démo athlète (Julie, k = 1) a une étape à faire.
-      icu_garmin_sync_activities: true,
-      icu_garmin_upload_workouts: k % 2 === 0,
+      // Garmin pour la plupart, un Wahoo et un Coros pour varier.
+      icu_garmin_sync_activities: k !== 3 && k !== 5,
+      icu_garmin_upload_workouts: k % 2 === 0 && k !== 3 && k !== 5,
+      wahoo_sync_activities: k === 3,
+      wahoo_upload_workouts: k === 3,
+      coros_sync_activities: k === 5,
+      coros_upload_workouts: false,
       strava_authorized: k % 3 === 0,
       sportSettings: [{ types: ['Ride', 'VirtualRide'], ftp, power_zones: POWER_ZONES, hr_zones: HR_ZONES, sweet_spot_min: 84, sweet_spot_max: 97 }],
     },
@@ -207,7 +212,7 @@ export class DemoSource {
     return between(this.get(id).events, (e) => e.start_date_local, oldest, newest);
   }
   async createWorkout(id: string, w: NewWorkoutEvent): Promise<IntervalsEvent> {
-    const ev = { id: `demo-new-${Date.now()}`, category: 'WORKOUT', type: 'Ride', start_date_local: `${w.date}T00:00:00`, name: w.name, description: w.description };
+    const ev = { id: `demo-new-${Date.now()}`, category: 'WORKOUT', type: w.sport ?? 'Ride', start_date_local: `${w.date}T00:00:00`, name: w.name, description: w.description };
     this.get(id).events.push(ev);
     return ev;
   }
@@ -357,6 +362,7 @@ export class DemoSource {
           { id: 1021, name: 'Seuil 2×15', type: 'Ride', description: 'Échauffement\n- 15m ramp 50-75%\n\n2x\n- 15m 98-102%\n- 5m 55%\n\n- 10m 50%' },
           { id: 1022, name: '30/30 × 12', type: 'Ride', description: 'Échauffement\n- 15m ramp 50-75%\n\n12x\n- 30s 130%\n- 30s 50%\n\n- 15m 55%' },
           { id: 1023, name: 'Pignon fixe en cadence', type: 'Ride', description: '- 45m 70% 95rpm' },
+          { id: 1024, name: 'Natation 10×100 m', type: 'Swim', description: 'Échauffement\n- 400mtr 70% Pace\n\n10x\n- 100mtr 100% Pace\n- 20s 40% Pace\n\n- 200mtr 65% Pace' },
         ],
       },
     ];

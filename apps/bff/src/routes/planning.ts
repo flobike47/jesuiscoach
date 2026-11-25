@@ -1,7 +1,20 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { requireUser, type AuthUser } from '../auth.js';
 import { invalidateKeys } from '../cache.js';
-import { deletePlan, insertPlan, planOf, plansOf, updatePlan, type PlanRow } from '../db/repo.js';
+import {
+  deletePlan,
+  deleteSavedWorkout,
+  insertPlan,
+  insertSavedWorkout,
+  planOf,
+  plansOf,
+  savedWorkoutsOf,
+  updatePlan,
+  updateSavedWorkout,
+  type PlanRow,
+  type SavedWorkoutRow,
+} from '../db/repo.js';
+import { validateSport } from '../lib/sport.js';
 import { libraryView } from '../lib/library.js';
 import { PLAN_LIMITS, planDates, validatePlanWorkouts } from '../lib/plans.js';
 import { enforceQuota } from '../ratelimit.js';
@@ -31,6 +44,22 @@ function requireCoach(req: FastifyRequest): AuthUser {
 
 const planJson = (p: PlanRow) => ({ id: p.id, name: p.name, workouts: p.workouts, updatedAt: new Date(p.updated_at).toISOString() });
 
+/** 200 séances enregistrées au plus par coach. */
+const MAX_SAVED_WORKOUTS = 200;
+
+interface SavedBody {
+  name?: unknown;
+  sport?: unknown;
+  description?: unknown;
+}
+
+const savedJson = (w: SavedWorkoutRow) => ({ id: w.id, name: w.name, sport: w.sport, description: w.description, updatedAt: new Date(w.updated_at).toISOString() });
+
+function savedInput(body: SavedBody | undefined) {
+  if (typeof body?.name !== 'string' || typeof body.description !== 'string') throw new BadRequest('name et description requis');
+  return { name: validateString(body.name, 'name', 120), sport: validateSport(body.sport), description: validateString(body.description, 'description', 4000) };
+}
+
 function planInput(body: PlanBody | undefined) {
   if (typeof body?.name !== 'string') throw new BadRequest('name requis');
   return { name: validateString(body.name, 'name', 120), workouts: validatePlanWorkouts(body.workouts) };
@@ -42,6 +71,33 @@ export async function registerPlanningRoutes(app: FastifyInstance) {
     const me = requireCoach(req);
     const folders = await (await sourceFor(me.athleteId)).folders(me.athleteId);
     return { folders: libraryView(folders) };
+  });
+
+  /** Séances enregistrées sans envoi (« Mes séances »). */
+  app.get('/saved-workouts', async (req) => {
+    const me = requireCoach(req);
+    return { workouts: (await savedWorkoutsOf(me.id)).map(savedJson) };
+  });
+
+  app.post<{ Body: SavedBody }>('/saved-workouts', async (req, reply) => {
+    const me = requireCoach(req);
+    const saved = await insertSavedWorkout(me.id, savedInput(req.body), MAX_SAVED_WORKOUTS);
+    if (!saved) throw new Conflict(`${MAX_SAVED_WORKOUTS} séances au plus : supprime une ancienne séance`);
+    reply.code(201);
+    return savedJson(saved);
+  });
+
+  app.put<{ Params: { id: string }; Body: SavedBody }>('/saved-workouts/:id', async (req) => {
+    const me = requireCoach(req);
+    const saved = await updateSavedWorkout(me.id, validateUuid(req.params.id), savedInput(req.body));
+    if (!saved) throw new NotFound('Séance introuvable');
+    return savedJson(saved);
+  });
+
+  app.delete<{ Params: { id: string } }>('/saved-workouts/:id', async (req) => {
+    const me = requireCoach(req);
+    if (!(await deleteSavedWorkout(me.id, validateUuid(req.params.id)))) throw new NotFound('Séance introuvable');
+    return { ok: true };
   });
 
   app.get('/plans', async (req) => {
@@ -103,7 +159,7 @@ export async function registerPlanningRoutes(app: FastifyInstance) {
         try {
           const src = await sourceFor(id);
           for (const w of dated) {
-            await src.createWorkout(id, { date: w.date, name: w.name, description: w.description });
+            await src.createWorkout(id, { date: w.date, name: w.name, description: w.description, sport: w.sport ?? 'Ride' });
             created++;
           }
           return { id, ok: true as const, created };

@@ -53,7 +53,7 @@ export class IntervalsClient {
     return (
       await this.http.post(`/athlete/${encodeURIComponent(id)}/events`, {
         category: 'WORKOUT',
-        type: 'Ride',
+        type: workout.sport ?? 'Ride',
         start_date_local: `${workout.date}T00:00:00`,
         name: workout.name,
         description: workout.description,

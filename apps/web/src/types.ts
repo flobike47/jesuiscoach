@@ -13,9 +13,17 @@ export interface Me {
 }
 
 /** Réglages de connexion Intervals.icu (« Bien démarrer ») ; null = non lisible. */
+export interface DeviceLink {
+  provider: 'garmin' | 'coros' | 'wahoo' | 'suunto';
+  label: string;
+  sync: boolean | null;
+  uploadWorkouts: boolean | null;
+}
+
 export interface SetupStatus {
-  garminSync: boolean | null;
-  garminUploadWorkouts: boolean | null;
+  devices: DeviceLink[];
+  deviceSync: boolean | null;
+  uploadWorkouts: boolean | null;
   stravaLinked: boolean | null;
 }
 
@@ -213,10 +221,22 @@ export interface ActivityView {
 
 /* ---------- Planification (BFF : routes/planning.ts) ---------- */
 
+export type Sport = 'Ride' | 'Run' | 'Swim';
+
 export interface LibraryWorkout {
   id: string;
   name: string;
   description: string;
+  sport: Sport;
+}
+
+/** Séance enregistrée par le coach sans être envoyée (« Mes séances »). */
+export interface SavedWorkout {
+  id: string;
+  name: string;
+  sport: Sport;
+  description: string;
+  updatedAt: string;
 }
 
 export interface LibraryFolder {
@@ -230,6 +250,8 @@ export interface PlanWorkout {
   day: number;
   name: string;
   description: string;
+  /** Absent dans les plans créés avant la course et la natation : vélo. */
+  sport?: Sport;
 }
 
 export interface TrainingPlan {

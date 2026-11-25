@@ -1,4 +1,5 @@
 import { BadRequest, validateString } from '../validation.js';
+import { validateSport, type Sport } from './sport.js';
 
 /**
  * Plans d'entraînement : une suite de séances placées par décalage en jours
@@ -10,6 +11,8 @@ export interface PlanWorkout {
   day: number;
   name: string;
   description: string;
+  /** Absent dans les plans enregistrés avant la course et la natation : vélo. */
+  sport?: Sport;
 }
 
 /**
@@ -25,12 +28,12 @@ export function validatePlanWorkouts(input: unknown): PlanWorkout[] {
   if (input.length > PLAN_LIMITS.maxWorkouts) throw new BadRequest(`${PLAN_LIMITS.maxWorkouts} séances au plus par plan`);
   return input
     .map((w: unknown, i) => {
-      const { day, name, description } = (w ?? {}) as Record<string, unknown>;
+      const { day, name, description, sport } = (w ?? {}) as Record<string, unknown>;
       if (typeof day !== 'number' || !Number.isInteger(day) || day < 0 || day > PLAN_LIMITS.maxDay) {
         throw new BadRequest(`Séance ${i + 1} : jour invalide (0 à ${PLAN_LIMITS.maxDay})`);
       }
       if (typeof name !== 'string' || typeof description !== 'string') throw new BadRequest(`Séance ${i + 1} : nom et structure requis`);
-      return { day, name: validateString(name, 'name', 120), description: validateString(description, 'description', 4000) };
+      return { day, name: validateString(name, 'name', 120), description: validateString(description, 'description', 4000), sport: validateSport(sport) };
     })
     .sort((a, b) => a.day - b.day);
 }

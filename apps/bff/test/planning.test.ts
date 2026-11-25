@@ -28,7 +28,7 @@ vi.mock('../src/sources.js', async (orig) => ({
 }));
 
 describe('libraryView', () => {
-  it('garde les séances vélo avec une structure, et les dossiers non vides', () => {
+  it('garde les séances vélo, course et natation avec une structure, et les dossiers non vides', () => {
     const v = libraryView([
       {
         id: 1,
@@ -38,9 +38,11 @@ describe('libraryView', () => {
           { id: 12, name: 'Footing', type: 'Run', description: '- 30m Z2' },
           { id: 13, name: 'Vide', type: 'Ride', description: '  ' },
           { id: 14, name: null, type: null, description: '- 10m 60%' },
+          { id: 15, name: 'Muscu', type: 'WeightTraining', description: '- 30m' },
+          { id: 16, name: 'Nage', type: 'OpenWaterSwim', description: '- 400mtr 80% Pace' },
         ],
       },
-      { id: 2, name: 'Course', children: [{ id: 21, type: 'Run', description: '- 1h Z2' }] },
+      { id: 2, name: 'Course', children: [{ id: 21, type: 'TrailRun', description: '- 1h Z2' }] },
       { id: 3, name: null, children: null },
     ]);
     expect(v).toEqual([
@@ -48,10 +50,13 @@ describe('libraryView', () => {
         id: '1',
         name: 'Hiver',
         workouts: [
-          { id: '11', name: 'Tempo', description: '- 20m 80%' },
-          { id: '14', name: 'Séance', description: '- 10m 60%' },
+          { id: '11', name: 'Tempo', description: '- 20m 80%', sport: 'Ride' },
+          { id: '12', name: 'Footing', description: '- 30m Z2', sport: 'Run' },
+          { id: '14', name: 'Séance', description: '- 10m 60%', sport: 'Ride' },
+          { id: '16', name: 'Nage', description: '- 400mtr 80% Pace', sport: 'Swim' },
         ],
       },
+      { id: '2', name: 'Course', workouts: [{ id: '21', name: 'Séance', description: '- 1h Z2', sport: 'Run' }] },
     ]);
   });
 
@@ -104,7 +109,7 @@ const PLAN = {
   workouts: [
     { day: 7, name: 'Seuil 2×15', description: '2x\n- 15m 100%\n- 5m 55%' },
     { day: 0, name: 'Endurance', description: '- 1h 70%' },
-    { day: 2, name: 'Tempo', description: '- 40m 80%' },
+    { day: 2, name: 'Footing', description: '- 40m 85% LTHR', sport: 'Run' as const },
   ],
 };
 
@@ -118,7 +123,7 @@ describe('routes de planification', () => {
 
   it('lit la bibliothèque Intervals.icu du coach', async () => {
     const res = await call('GET', '/api/library', 'token-a');
-    expect(res.json()).toEqual({ folders: [{ id: '1', name: 'Hiver', workouts: [{ id: '11', name: 'Tempo', description: '- 20m 80%' }] }] });
+    expect(res.json()).toEqual({ folders: [{ id: '1', name: 'Hiver', workouts: [{ id: '11', name: 'Tempo', description: '- 20m 80%', sport: 'Ride' }] }] });
   });
 
   it('crée, liste, modifie et supprime un plan', async () => {
@@ -133,6 +138,37 @@ describe('routes de planification', () => {
     expect((await call('DELETE', `/api/plans/${plan.id}`, 'token-a')).statusCode).toBe(200);
     expect((await call('GET', '/api/plans', 'token-a')).json().plans).toEqual([]);
     expect((await call('DELETE', `/api/plans/${plan.id}`, 'token-a')).statusCode).toBe(404);
+  });
+
+  it('séances enregistrées : créer, lister, modifier, supprimer, sans rien envoyer', async () => {
+    const created = await call('POST', '/api/saved-workouts', 'token-a', { name: 'Fractionné', sport: 'Run', description: '6x\n- 400mtr 105% Pace\n- 90s 60% Pace' });
+    expect(created.statusCode).toBe(201);
+    const w = created.json();
+    expect(w).toMatchObject({ name: 'Fractionné', sport: 'Run' });
+    expect((await call('GET', '/api/saved-workouts', 'token-a')).json().workouts).toHaveLength(1);
+    const updated = await call('PUT', `/api/saved-workouts/${w.id}`, 'token-a', { name: 'Fractionné v2', sport: 'Run', description: '- 20m 85% LTHR' });
+    expect(updated.json()).toMatchObject({ name: 'Fractionné v2', description: '- 20m 85% LTHR' });
+    expect(writes).toEqual([]);
+    expect((await call('DELETE', `/api/saved-workouts/${w.id}`, 'token-a')).statusCode).toBe(200);
+    expect((await call('DELETE', `/api/saved-workouts/${w.id}`, 'token-a')).statusCode).toBe(404);
+  });
+
+  it('séances enregistrées : réservées au coach, isolées par coach, entrées validées', async () => {
+    const w = (await call('POST', '/api/saved-workouts', 'token-a', { name: 'Seuil', description: '- 20m 95%' })).json();
+    expect(w.sport).toBe('Ride');
+    expect((await call('GET', '/api/saved-workouts', 'token-b')).statusCode).toBe(403);
+    expect((await call('PUT', `/api/saved-workouts/${w.id}`, 'token-b', { name: 'x', description: '- 1m 50%' })).statusCode).toBe(403);
+    expect((await call('POST', '/api/saved-workouts', 'token-a', { name: 'x', sport: 'Ski', description: '- 1m 50%' })).statusCode).toBe(400);
+    expect((await call('POST', '/api/saved-workouts', 'token-a', { name: '', description: '- 1m 50%' })).statusCode).toBe(400);
+    expect((await call('PUT', '/api/saved-workouts/pas-un-uuid', 'token-a', { name: 'x', description: '- 1m 50%' })).statusCode).toBe(400);
+  });
+
+  it("isole les séances enregistrées d'un coach à l'autre", async () => {
+    const w = (await call('POST', '/api/saved-workouts', 'token-a', { name: 'Seuil', description: '- 20m 95%' })).json();
+    await db.query(`update users set role = 'coach' where id = $1`, [USER_B]);
+    expect((await call('GET', '/api/saved-workouts', 'token-b')).json().workouts).toEqual([]);
+    expect((await call('PUT', `/api/saved-workouts/${w.id}`, 'token-b', { name: 'x', description: '- 1m 50%' })).statusCode).toBe(404);
+    expect((await call('DELETE', `/api/saved-workouts/${w.id}`, 'token-b')).statusCode).toBe(404);
   });
 
   it('refuse les entrées invalides', async () => {
@@ -168,10 +204,10 @@ describe('routes de planification', () => {
     const res = await call('POST', `/api/plans/${plan.id}/apply`, 'token-a', { athleteIds: ['iB', 'iZ', 'iB'], startDate: '2026-12-01' });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ total: 3, results: [{ id: 'iB', ok: true, created: 3 }] });
-    expect(writes.map((x) => [x.id, x.w.date, x.w.name])).toEqual([
-      ['iB', '2026-12-01', 'Endurance'],
-      ['iB', '2026-12-03', 'Tempo'],
-      ['iB', '2026-12-08', 'Seuil 2×15'],
+    expect(writes.map((x) => [x.id, x.w.date, x.w.name, x.w.sport])).toEqual([
+      ['iB', '2026-12-01', 'Endurance', 'Ride'],
+      ['iB', '2026-12-03', 'Footing', 'Run'],
+      ['iB', '2026-12-08', 'Seuil 2×15', 'Ride'],
     ]);
   });
 
