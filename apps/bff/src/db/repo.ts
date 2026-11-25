@@ -167,3 +167,129 @@ export async function pushSubscriptionsOf(userId: string): Promise<PushSubRow[]>
 export async function deleteUser(userId: string): Promise<void> {
   await db().query('delete from users where id = $1', [userId]);
 }
+
+/* ---------- Synchro des sorties ---------- */
+
+export interface SyncTarget {
+  id: string;
+  intervals_athlete_id: string;
+  name: string;
+  initialized: boolean;
+}
+
+/** Athlètes à synchroniser : ceux qui ont connecté Intervals.icu. */
+export async function syncTargets(): Promise<SyncTarget[]> {
+  const { rows } = await db().query<SyncTarget>(
+    `select u.id, u.intervals_athlete_id, u.name, (s.user_id is not null) as initialized
+     from users u join intervals_tokens t on t.user_id = u.id
+     left join sync_state s on s.user_id = u.id
+     order by u.id`,
+  );
+  return rows;
+}
+
+/**
+ * Marque des sorties comme vues et renvoie celles qui ne l'étaient pas.
+ * Une seule instruction : deux synchros concurrentes ne peuvent pas
+ * renvoyer la même sortie (donc pas de double notification).
+ */
+export async function markActivitiesSeen(userId: string, activityIds: string[]): Promise<string[]> {
+  if (activityIds.length === 0) return [];
+  const { rows } = await db().query<{ activity_id: string }>(
+    `insert into seen_activities (user_id, activity_id)
+     select $1, unnest($2::text[])
+     on conflict do nothing
+     returning activity_id`,
+    [userId, activityIds],
+  );
+  return rows.map((r) => r.activity_id);
+}
+
+export async function recordSync(userId: string, error: string | null): Promise<void> {
+  await db().query(
+    `insert into sync_state (user_id, last_sync_at, last_error) values ($1, now(), $2)
+     on conflict (user_id) do update set last_sync_at = now(), last_error = excluded.last_error`,
+    [userId, error?.slice(0, 500) ?? null],
+  );
+}
+
+/** Ménage : les sorties vues il y a plus de 30 jours ne reviendront plus dans la fenêtre de synchro. */
+export async function purgeSeenActivities(): Promise<number> {
+  return affected(await db().query(`delete from seen_activities where seen_at < now() - interval '30 days'`));
+}
+
+/** Coachs d'un athlète (destinataires de ses notifications). */
+export async function coachesOf(athleteUserId: string): Promise<string[]> {
+  const { rows } = await db().query<{ coach_id: string }>('select coach_id from coach_athletes where athlete_id = $1', [athleteUserId]);
+  return rows.map((r) => r.coach_id);
+}
+
+/**
+ * Remplace l'ensemble des alertes actives d'un athlète et renvoie celles qui
+ * viennent d'apparaître (à notifier). Transaction : lecture et écriture cohérentes.
+ */
+export async function updateActiveAlerts(userId: string, codes: string[]): Promise<string[]> {
+  return db().transaction(async (tx) => {
+    await tx.query('delete from active_alerts where user_id = $1 and not (code = any($2::text[]))', [userId, codes]);
+    if (codes.length === 0) return [];
+    const { rows } = await tx.query<{ code: string }>(
+      `insert into active_alerts (user_id, code) select $1, unnest($2::text[]) on conflict do nothing returning code`,
+      [userId, codes],
+    );
+    return rows.map((r) => r.code);
+  });
+}
+
+export async function activeAlertCodes(userId: string): Promise<string[]> {
+  const { rows } = await db().query<{ code: string }>('select code from active_alerts where user_id = $1', [userId]);
+  return rows.map((r) => r.code);
+}
+
+/* ---------- Ressenti ---------- */
+
+export interface CheckinRow {
+  day: string;
+  feeling: number;
+  rpe: number | null;
+  note: string | null;
+}
+
+export async function upsertCheckin(userId: string, c: CheckinRow): Promise<void> {
+  await db().query(
+    `insert into checkins (user_id, day, feeling, rpe, note, updated_at) values ($1, $2, $3, $4, $5, now())
+     on conflict (user_id, day) do update set feeling = excluded.feeling, rpe = excluded.rpe, note = excluded.note, updated_at = now()`,
+    [userId, c.day, c.feeling, c.rpe, c.note],
+  );
+}
+
+/** Ressentis d'un athlète (par ID Intervals) entre deux dates, du plus récent au plus ancien. */
+export async function checkinsOf(athleteId: string, from: string, to: string): Promise<CheckinRow[]> {
+  const { rows } = await db().query<CheckinRow>(
+    `select to_char(c.day, 'YYYY-MM-DD') as day, c.feeling, c.rpe, c.note
+     from checkins c join users u on u.id = c.user_id
+     where u.intervals_athlete_id = $1 and c.day between $2 and $3
+     order by c.day desc`,
+    [athleteId, from, to],
+  );
+  return rows;
+}
+
+/* ---------- Mode démo ---------- */
+
+/**
+ * Crée (ou remet d'aplomb) les deux comptes démo en base, pour que les
+ * notifications puissent s'y abonner. Appelé au démarrage UNIQUEMENT en
+ * DEMO_MODE (index.ts) ; ids fixes, sans jeton Intervals (donc jamais synchronisés).
+ */
+export async function ensureDemoUsers(coach: { id: string; athleteId: string; name: string }, athlete: { id: string; athleteId: string; name: string }): Promise<void> {
+  await db().transaction(async (tx) => {
+    for (const [u, role] of [[coach, 'coach'], [athlete, 'athlete']] as const) {
+      await tx.query(
+        `insert into users (id, intervals_athlete_id, name, role) values ($1, $2, $3, $4)
+         on conflict (id) do update set intervals_athlete_id = excluded.intervals_athlete_id, name = excluded.name, role = excluded.role`,
+        [u.id, u.athleteId, u.name, role],
+      );
+    }
+    await tx.query('insert into coach_athletes (coach_id, athlete_id) values ($1, $2) on conflict do nothing', [coach.id, athlete.id]);
+  });
+}

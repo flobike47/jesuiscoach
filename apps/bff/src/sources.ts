@@ -3,7 +3,7 @@ import { cachedJson, TTL } from './cache.js';
 import { DemoSource } from './demo.js';
 import { decrypt, parseKey } from './lib/crypto.js';
 import { IntervalsClient } from './providers/intervals.js';
-import { intervalsTokenOf, teamAthleteIds } from './db/repo.js';
+import { checkinsOf, intervalsTokenOf, teamAthleteIds, upsertCheckin, type CheckinRow } from './db/repo.js';
 import type { AuthUser } from './auth.js';
 import type { IntervalsActivity, IntervalsAthlete, IntervalsEvent, IntervalsWellness, NewWorkoutEvent } from './types.js';
 import { HttpError, NotFound } from './validation.js';
@@ -18,6 +18,8 @@ export interface AthleteSource {
   activities(id: string, oldest: string, newest: string): Promise<IntervalsActivity[]>;
   events(id: string, oldest: string, newest: string): Promise<IntervalsEvent[]>;
   createWorkout(id: string, workout: NewWorkoutEvent): Promise<IntervalsEvent>;
+  moveEvent(id: string, eventId: string, date: string): Promise<IntervalsEvent>;
+  deleteEvent(id: string, eventId: string): Promise<void>;
 }
 
 export class NotConnected extends HttpError {
@@ -62,5 +64,18 @@ function cachedSource(athleteId: string, client: IntervalsClient): AthleteSource
     activities: (id, o, n) => cachedJson(k('activities', o, n), TTL.activities, () => client.activities(id, o, n)),
     events: (id, o, n) => cachedJson(k('events', o, n), TTL.events, () => client.events(id, o, n)),
     createWorkout: (id, w) => client.createWorkout(id, w),
+    moveEvent: (id, eventId, date) => client.moveEvent(id, eventId, date),
+    deleteEvent: (id, eventId) => client.deleteEvent(id, eventId),
   };
+}
+
+/** Ressentis : en base, ou en mémoire en mode démo (les comptes démo n'existent pas en base). */
+export async function saveCheckin(user: AuthUser, c: CheckinRow): Promise<void> {
+  if (config.demoMode) return demoSource().saveCheckin(user.athleteId, c);
+  return upsertCheckin(user.id, c);
+}
+
+export async function listCheckins(athleteId: string, from: string, to: string): Promise<CheckinRow[]> {
+  if (config.demoMode) return demoSource().listCheckins(athleteId, from, to);
+  return checkinsOf(athleteId, from, to);
 }

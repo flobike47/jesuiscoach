@@ -12,9 +12,12 @@ interface LocalSettings {
   theme: ThemeMode;
   demo: boolean;
   session: string | null;
+  /** Côté de la démo : coach (équipe fictive) ou athlète (Julie). */
+  demoRole: 'coach' | 'athlete';
   setTheme: (t: ThemeMode) => void;
   setDemo: (d: boolean) => void;
   setSession: (token: string | null) => void;
+  setDemoRole: (role: 'coach' | 'athlete') => void;
 }
 
 export const useLocalSettings = create<LocalSettings>()(
@@ -23,9 +26,11 @@ export const useLocalSettings = create<LocalSettings>()(
       theme: 'system',
       demo: false,
       session: null,
+      demoRole: 'coach',
       setTheme: (theme) => set({ theme }),
       setDemo: (demo) => set({ demo }),
       setSession: (session) => set({ session }),
+      setDemoRole: (demoRole) => set({ demoRole }),
     }),
     { name: 'jesuiscoach.localSettings' },
   ),

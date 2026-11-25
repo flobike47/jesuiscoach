@@ -12,17 +12,24 @@ import type { SeriesPoint } from '@/types';
 
 type Range = '30' | '90';
 
-/** Écran 4 : fiche athlète (forme sur 90 jours, alertes, sorties récentes). */
+const FEELING_LABELS = ['Très mal', 'Fatigué', 'Correct', 'Bien', 'En pleine forme'];
+
+/** Écran 4 (coach) : fiche d'un athlète de l'équipe. */
 export default function Athlete() {
   const { id } = useParams();
+  return <AthleteView id={id} back={{ to: '/', label: 'Équipe' }} />;
+}
+
+/** Fiche athlète (forme sur 90 jours, alertes, ressentis, sorties récentes). */
+export function AthleteView({ id, back, title }: { id: string | undefined; back?: { to: string; label: string }; title?: string }) {
   const { data, isLoading, error } = useAthleteOverview(id);
   const [range, setRange] = useState<Range>('90');
   const name = data?.summary.name ?? 'Athlète';
 
   return (
     <Page
-      title={name}
-      back={{ to: '/', label: 'Équipe' }}
+      title={title ?? name}
+      back={back}
       header={
         data && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -81,6 +88,19 @@ export default function Athlete() {
                   />
                 );
               })}
+            </Section>
+          )}
+
+          {data.checkins.length > 0 && (
+            <Section header="Ressenti">
+              {data.checkins.slice(0, 5).map((c) => (
+                <Cell
+                  key={c.day}
+                  title={`${FEELING_LABELS[c.feeling - 1]}${c.rpe != null ? ` · effort ${c.rpe}/10` : ''}`}
+                  subtitle={c.note ?? undefined}
+                  detail={relativeDay(`${c.day}T12:00:00`)}
+                />
+              ))}
             </Section>
           )}
 

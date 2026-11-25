@@ -1,11 +1,12 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, configureApi } from '@/services/api';
 import { disableDevicePush } from '@/services/push';
 import { runtimeConfig } from './runtimeConfig';
 import { useLocalSettings } from '@/store/localSettings';
 
-/** Jeton accepté par le BFF seulement en DEMO_MODE (équipe fictive). */
-const DEMO_TOKEN = 'demo';
+/** Jetons acceptés par le BFF seulement en DEMO_MODE (équipe fictive). */
+const DEMO_TOKENS = { coach: 'demo', athlete: 'demo-athlete' } as const;
 
 interface AuthCtx {
   /** Connecté (vraie session ou démo). */
@@ -15,7 +16,7 @@ interface AuthCtx {
   signInWithIntervals: (invite?: string) => void;
   /** Termine la connexion au retour d'Intervals.icu (#code à usage unique). */
   completeSignIn: (code: string) => Promise<void>;
-  signInDemo: () => void;
+  signInDemo: (role?: 'coach' | 'athlete') => void;
   signOut: () => Promise<void>;
 }
 
@@ -31,14 +32,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const session = useLocalSettings((s) => s.session);
   const setDemo = useLocalSettings((s) => s.setDemo);
   const setSession = useLocalSettings((s) => s.setSession);
+  const demoRole = useLocalSettings((s) => s.demoRole);
+  const setDemoRole = useLocalSettings((s) => s.setDemoRole);
 
   // Jeton transmis au client API pendant le rendu : les requêtes lancées par
   // les enfants à ce même rendu doivent déjà le porter.
-  configureApi(runtimeConfig.bffUrl, demo ? DEMO_TOKEN : (session ?? ''), () => {
+  const token = demo ? DEMO_TOKENS[demoRole] : (session ?? '');
+  configureApi(runtimeConfig.bffUrl, token, () => {
     // Session expirée ou révoquée : retour à l'écran de connexion.
     setSession(null);
     setDemo(false);
   });
+
+  // Changement de compte (connexion, déconnexion, démo coach ↔ athlète) :
+  // les données en cache appartiennent à l'ancien compte.
+  const qc = useQueryClient();
+  const previous = useRef(token);
+  useEffect(() => {
+    // resetQueries et non clear : clear vide le cache mais laisse les écrans
+    // affichés sur les données de l'ancien compte ; reset les relance.
+    if (previous.current !== token) qc.resetQueries();
+    previous.current = token;
+  }, [token, qc]);
 
   const value: AuthCtx = {
     signedIn: demo || Boolean(session),
@@ -53,7 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDemo(false);
       setSession(token);
     },
-    signInDemo: () => setDemo(true),
+    signInDemo: (role = 'coach') => {
+      setDemoRole(role);
+      setDemo(true);
+    },
     signOut: async () => {
       if (demo) {
         setDemo(false);

@@ -63,6 +63,7 @@ Portainer pourra ensuite pull les images privées automatiquement.
 | `COACH_ATHLETE_IDS` | BFF | `i123456` : ton ID Intervals.icu (rôle coach) |
 | `TOKEN_ENCRYPTION_KEY` | BFF | 32 octets base64 (⚠️ secret, ne plus jamais la changer) |
 | `DEMO_MODE` | BFF | `false` en prod |
+| `SYNC_INTERVAL_MIN` | BFF | `30` : fréquence de synchro des sorties (notifications au coach) |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | BFF | notifications push, optionnelles (voir ci-dessous) |
 
 **Notifications push (nouvelles sorties, alertes).** Génère une paire de clés

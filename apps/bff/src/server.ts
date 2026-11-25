@@ -6,6 +6,8 @@ import { config } from './config.js';
 import { registerAuth } from './auth.js';
 import { registerPushRoutes } from './routes/push.js';
 import { registerTeamRoutes } from './routes/team.js';
+import { registerAthleteRoutes } from './routes/athlete.js';
+import { registerDemoRoutes } from './routes/demo.js';
 import { registerIntervalsAuthRoutes } from './routes/intervalsAuth.js';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -126,6 +128,8 @@ export async function buildServer() {
   app.get('/health', async () => ({ ok: true, ts: Date.now() }));
 
   await app.register(registerTeamRoutes, { prefix: '/api' });
+  await app.register(registerAthleteRoutes, { prefix: '/api' });
+  await app.register(registerDemoRoutes, { prefix: '/api' });
   await app.register(registerPushRoutes, { prefix: '/api' });
   await app.register(registerIntervalsAuthRoutes, { prefix: '/api' });
 

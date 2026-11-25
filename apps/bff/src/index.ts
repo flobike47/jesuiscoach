@@ -3,12 +3,17 @@ import { config } from './config.js';
 import { redis } from './cache.js';
 import { closeDb, db } from './db/index.js';
 import { migrate } from './db/migrate.js';
-import { purgeExpiredSessions } from './db/repo.js';
+import { ensureDemoUsers, purgeExpiredSessions } from './db/repo.js';
+import { DEMO_ATHLETE, DEMO_USER } from './auth.js';
+import { startSync } from './jobs/sync.js';
 
 // Schéma à jour avant d'accepter la moindre requête (échec = arrêt : Portainer
 // garde l'ancienne version visible dans les logs plutôt qu'un BFF à moitié prêt).
 const applied = await migrate(db());
 if (applied.length) console.info(`[migrations] appliquées : ${applied.join(', ')}`);
+
+// Démo : comptes fictifs en base, pour pouvoir tester les notifications.
+if (config.demoMode) await ensureDemoUsers(DEMO_USER, DEMO_ATHLETE);
 
 const app = await buildServer();
 
@@ -21,6 +26,8 @@ try {
   app.log.error(err);
   process.exit(1);
 }
+
+const stopSync = startSync(app.log);
 
 // Ménage quotidien des sessions expirées.
 const purgeTimer = setInterval(() => {
@@ -35,6 +42,7 @@ const shutdown = async (signal: string) => {
   app.log.info(`Received ${signal}, shutting down...`);
   try {
     clearInterval(purgeTimer);
+    stopSync();
     await app.close();
     await closeDb();
     await redis.quit();

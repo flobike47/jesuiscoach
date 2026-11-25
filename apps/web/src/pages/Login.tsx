@@ -54,19 +54,39 @@ export default function Login() {
       </div>
 
       <div style={{ display: 'grid', gap: 12 }}>
-        {status.data?.intervals !== false && (
+        {/* Seulement si le serveur confirme que la connexion est configurée :
+            sinon le bouton mène à une 503 (serveur injoignable, mode démo). */}
+        {status.data?.intervals && (
           <button type="button" className="button filled block pressable" onClick={() => signInWithIntervals(invite)}>
             Se connecter avec Intervals.icu
           </button>
         )}
         {status.data?.demo && (
-          <button type="button" className="button tinted block pressable" onClick={signInDemo}>
-            Essayer avec une équipe de démo
-          </button>
+          <>
+            <button type="button" className="button tinted block pressable" onClick={() => signInDemo('coach')}>
+              Essayer avec une équipe de démo
+            </button>
+            <button type="button" className="pressable" style={{ color: 'var(--tint)', minHeight: 44 }} onClick={() => signInDemo('athlete')}>
+              Voir la démo côté athlète
+            </button>
+          </>
         )}
         {status.isError && (
+          <div role="alert" style={{ textAlign: 'center' }}>
+            <p className="footnote" style={{ margin: 0, color: 'var(--red)' }}>
+              Serveur injoignable depuis cette adresse.
+            </p>
+            <p className="caption secondary" style={{ margin: '4px 0 8px' }}>
+              Vérifie ta connexion, ou ouvre l'app sur l'adresse autorisée par le serveur (CORS_ORIGIN).
+            </p>
+            <button type="button" className="pressable" style={{ color: 'var(--tint)', minHeight: 44 }} onClick={() => status.refetch()}>
+              Réessayer
+            </button>
+          </div>
+        )}
+        {status.data && !status.data.intervals && !status.data.demo && (
           <p className="footnote secondary" style={{ textAlign: 'center', margin: 0 }}>
-            Serveur injoignable. Vérifie ta connexion.
+            La connexion Intervals.icu n'est pas encore configurée sur ce serveur.
           </p>
         )}
         <p className="caption secondary" style={{ textAlign: 'center', margin: '4px 0 0' }}>

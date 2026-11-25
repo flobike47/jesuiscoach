@@ -10,6 +10,8 @@ export const QUOTAS = {
   manualSync:    { max: 30, windowSec: 24 * 60 * 60 },
   // Envoi d'une séance à plusieurs athlètes : une écriture calendrier par athlète.
   assignWorkout: { max: 200, windowSec: 24 * 60 * 60 },
+  // Déplacer / supprimer une séance du calendrier : une écriture Intervals.icu chacune.
+  editCalendar:  { max: 200, windowSec: 24 * 60 * 60 },
   // Bouton « Envoyer un test » des réglages : borne les envois manuels.
   pushTest:      { max: 10, windowSec: 24 * 60 * 60 },
 } as const;

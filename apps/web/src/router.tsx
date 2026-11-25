@@ -48,7 +48,10 @@ export const router = createBrowserRouter(
           // Une exception dans une page s'affiche DANS le layout (onglets utilisables).
           errorElement: <RouteError />,
           children: [
-            { index: true, lazy: page(() => import('@/pages/Team')) },
+            { index: true, lazy: page(() => import('@/pages/Home')) },
+            // Parcours athlète : son calendrier et sa progression
+            { path: 'plan', lazy: page(() => import('@/pages/MyPlan')) },
+            { path: 'progres', lazy: page(() => import('@/pages/MyProgress')) },
             { path: 'athletes/:id', lazy: page(() => import('@/pages/Athlete')) },
             { path: 'activite', lazy: page(() => import('@/pages/Activity')) },
             { path: 'calendrier', lazy: page(() => import('@/pages/Calendar')) },
