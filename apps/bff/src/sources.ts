@@ -28,6 +28,10 @@ export interface AthleteSource {
   powerCurves(id: string): Promise<IntervalsPowerCurves>;
   /** Bibliothèque Intervals.icu (lecture seule). */
   folders(id: string): Promise<IntervalsFolder[]>;
+  /** Écritures de la fiche profil (scopes SETTINGS:WRITE / WELLNESS:WRITE). */
+  updateSportSettings(id: string, sport: 'Ride' | 'Run' | 'Swim', patch: { ftp?: number; lthr?: number; max_hr?: number; threshold_pace?: number }): Promise<void>;
+  updateAthleteProfile(id: string, patch: { icu_weight?: number | null; icu_resting_hr?: number | null; sex?: string | null; height?: number | null; icu_date_of_birth?: string | null }): Promise<void>;
+  updateWellness(id: string, day: string, patch: { weight?: number; restingHR?: number }): Promise<void>;
 }
 
 export class NotConnected extends HttpError {
@@ -79,6 +83,19 @@ function cachedSource(athleteId: string, client: IntervalsClient): AthleteSource
     streams: (_id, activityId) => cachedJson(k('streams', activityId), TTL.streams, async () => downsampleStreams(await client.streams(activityId))),
     powerCurves: (id) => cachedJson(k('powercurves'), TTL.powerCurve, () => client.powerCurves(id)),
     folders: (id) => cachedJson(k('folders'), TTL.library, () => client.folders(id)),
+    // Une écriture rend obsolète la copie en cache (profil, forme du jour) : on la vide après succès.
+    updateSportSettings: async (id, sport, patch) => {
+      await client.updateSportSettings(id, sport, patch);
+      await invalidateKeys(`icu:athlete:${athleteId}:*`);
+    },
+    updateAthleteProfile: async (id, patch) => {
+      await client.updateAthleteProfile(id, patch);
+      await invalidateKeys(`icu:athlete:${athleteId}:*`);
+    },
+    updateWellness: async (id, day, patch) => {
+      await client.updateWellness(id, day, patch);
+      await invalidateKeys(`icu:wellness:${athleteId}:*`);
+    },
   };
 }
 
