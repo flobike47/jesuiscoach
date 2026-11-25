@@ -53,3 +53,13 @@ describe('matchPlan', () => {
     expect(m.eventOfActivity.size).toBe(0);
   });
 });
+
+describe('matchPlan : sport', () => {
+  it('ne réalise une séance de course que par une course, en repli', () => {
+    const run: IntervalsEvent = { id: 5, category: 'WORKOUT', type: 'Run', start_date_local: '2026-11-20T00:00:00' };
+    const bike = ride('a1', '2026-11-20');
+    const jog = ride('r1', '2026-11-20', { type: 'TrailRun' });
+    expect(matchPlan([run], [bike]).activityOf.has(run)).toBe(false);
+    expect(matchPlan([run], [bike, jog]).activityOf.get(run)).toBe(jog);
+  });
+});

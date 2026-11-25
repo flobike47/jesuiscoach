@@ -1,4 +1,5 @@
 import type { IntervalsActivity, IntervalsEvent } from '../types.js';
+import { sportOf } from './sport.js';
 
 /**
  * Appariement séances prévues ↔ sorties faites.
@@ -6,12 +7,12 @@ import type { IntervalsActivity, IntervalsEvent } from '../types.js';
  * 1. Intervals.icu apparie lui-même une sortie à la séance du jour
  *    (`paired_event_id` sur la sortie) : c'est la source de vérité.
  * 2. Repli pour les sorties sans appariement (synchro ancienne, séance
- *    ajoutée après coup) : une sortie vélo non appariée le même jour.
+ *    ajoutée après coup) : une sortie non appariée du même sport, le même jour
+ *    (séance sans type = vélo).
  *
  * Une sortie ne réalise qu'une séance, une séance n'est réalisée qu'une fois.
  */
 
-const isRide = (a: IntervalsActivity) => (a.type ?? '').includes('Ride');
 const dayOf = (iso: string) => iso.slice(0, 10);
 
 export interface PlanMatch {
@@ -40,11 +41,11 @@ export function matchPlan(events: IntervalsEvent[], activities: IntervalsActivit
   }
 
   // Repli : séances restantes, dans l'ordre du calendrier, avec une sortie
-  // vélo du même jour qu'Intervals.icu n'a appariée à rien.
+  // du même sport et du même jour qu'Intervals.icu n'a appariée à rien.
   for (const e of workouts) {
     if (activityOf.has(e)) continue;
     const a = activities.find(
-      (x) => isRide(x) && x.paired_event_id == null && !eventOfActivity.has(String(x.id)) && dayOf(x.start_date_local) === dayOf(e.start_date_local),
+      (x) => sportOf(x.type) === (sportOf(e.type) ?? 'Ride') && x.paired_event_id == null && !eventOfActivity.has(String(x.id)) && dayOf(x.start_date_local) === dayOf(e.start_date_local),
     );
     if (a) pair(e, a);
   }

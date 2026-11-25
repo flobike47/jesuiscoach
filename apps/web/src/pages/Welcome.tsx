@@ -40,7 +40,7 @@ export default function Welcome() {
     [setup.data, pushSupport, push.deviceSubscribed],
   );
   const remaining = steps.filter((s) => s.state !== 'done').length;
-  const intervalsTodo = steps.some((s) => (s.key === 'garmin' || s.key === 'workouts') && s.state !== 'done');
+  const intervalsTodo = steps.some((s) => (s.key === 'device' || s.key === 'workouts') && s.state !== 'done');
 
   const recheck = async () => {
     setChecking(true);
@@ -73,7 +73,7 @@ export default function Welcome() {
         </p>
       }
     >
-      <Section header="Intervals.icu et Garmin" footer={setup.isError ? 'Réglages Intervals.icu illisibles pour le moment : vérifie-les directement.' : undefined}>
+      <Section header="Intervals.icu et ta montre" footer={setup.isError ? 'Réglages Intervals.icu illisibles pour le moment : vérifie-les directement.' : undefined}>
         {steps.slice(0, 2).map((s) => (
           <StepCell key={s.key} step={s} loading={setup.isLoading} />
         ))}

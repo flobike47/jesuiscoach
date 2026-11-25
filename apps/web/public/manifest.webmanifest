@@ -1,7 +1,7 @@
 {
   "name": "Je suis coach",
   "short_name": "Coach",
-  "description": "Coaching vélo : forme de l'équipe, sorties, calendrier et séances envoyées sur Garmin via Intervals.icu.",
+  "description": "Coaching vélo, course et natation : forme de l'équipe, sorties, calendrier et séances envoyées sur la montre via Intervals.icu.",
   "lang": "fr",
   "dir": "ltr",
   "id": "./",

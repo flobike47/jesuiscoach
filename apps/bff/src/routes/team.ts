@@ -5,6 +5,7 @@ import { redis } from '../cache.js';
 import { randomToken } from '../lib/crypto.js';
 import { insertInvitation } from '../db/repo.js';
 import { matchPlan } from '../lib/plan.js';
+import { validateSport } from '../lib/sport.js';
 import { isoDay, summarize } from '../lib/summary.js';
 import { enforceQuota } from '../ratelimit.js';
 import { assertCanView, listCheckins, sourceFor, teamOf } from '../sources.js';
@@ -20,6 +21,7 @@ interface AssignBody {
   date: string;
   name: string;
   description: string;
+  sport?: unknown;
 }
 
 export async function registerTeamRoutes(app: FastifyInstance) {
@@ -178,6 +180,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
       date: body.date,
       name: validateString(body.name, 'name', 120),
       description: validateString(body.description, 'description', 4000),
+      sport: validateSport(body.sport),
     };
     const team = new Set(await teamOf(me));
     const targets = clampArray(body.athleteIds, 50).filter((id): id is string => typeof id === 'string' && team.has(id));

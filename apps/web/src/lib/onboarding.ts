@@ -7,7 +7,7 @@ import type { SetupStatus } from '@/types';
  */
 
 export type StepState = 'done' | 'todo' | 'unknown';
-export type StepKey = 'garmin' | 'workouts' | 'install' | 'push';
+export type StepKey = 'device' | 'workouts' | 'install' | 'push';
 
 export interface Step {
   key: StepKey;
@@ -30,11 +30,18 @@ export interface DeviceState {
 
 const fromFlag = (v: boolean | null | undefined): StepState => (v === true ? 'done' : v === false ? 'todo' : 'unknown');
 
+/** « Garmin », « Garmin et Coros », « Garmin, Coros et Wahoo ». */
+function list(labels: string[]): string {
+  return labels.length < 2 ? (labels[0] ?? '') : `${labels.slice(0, -1).join(', ')} et ${labels[labels.length - 1]}`;
+}
+
 export function buildChecklist(setup: SetupStatus | undefined, device: DeviceState): Step[] {
-  const garmin = fromFlag(setup?.garminSync);
-  const workouts = fromFlag(setup?.garminUploadWorkouts);
+  const linked = fromFlag(setup?.deviceSync);
+  const workouts = fromFlag(setup?.uploadWorkouts);
+  const synced = (setup?.devices ?? []).filter((d) => d.sync).map((d) => d.label);
+  const uploading = (setup?.devices ?? []).filter((d) => d.uploadWorkouts).map((d) => d.label);
   const strava = setup?.stravaLinked
-    ? ' Les sorties qui passent par Strava ne sont pas lisibles par l’app : c’est bien Garmin qu’il faut relier.'
+    ? ' Les sorties qui passent par Strava ne sont pas lisibles par l’app : c’est ta montre ou ton compteur qu’il faut relier.'
     : '';
 
   const install: StepState = device.standalone ? 'done' : 'todo';
@@ -43,26 +50,26 @@ export function buildChecklist(setup: SetupStatus | undefined, device: DeviceSta
 
   return [
     {
-      key: 'garmin',
-      title: 'Garmin relié en direct',
-      state: garmin,
+      key: 'device',
+      title: linked === 'done' && synced.length ? `${list(synced)} relié${synced.length > 1 ? 's' : ''} en direct` : 'Montre ou compteur relié',
+      state: linked,
       help:
-        garmin === 'done'
+        linked === 'done'
           ? null
-          : garmin === 'todo'
-            ? `Dans Intervals.icu → Settings → Connections, relie Garmin et active l’import des activités.${strava}`
-            : `À vérifier dans Intervals.icu → Settings → Connections : Garmin doit être relié et importer tes activités.${strava}`,
+          : linked === 'todo'
+            ? `Dans Intervals.icu → Settings → Connections, relie ta montre ou ton compteur (Garmin, Coros, Wahoo, Suunto…) et active l’import des activités.${strava}`
+            : `À vérifier dans Intervals.icu → Settings → Connections : ta montre ou ton compteur doit être relié et importer tes activités.${strava}`,
     },
     {
       key: 'workouts',
-      title: 'Séances sur la montre',
+      title: workouts === 'done' && uploading.length ? `Séances envoyées vers ${list(uploading)}` : 'Séances sur la montre',
       state: workouts,
       help:
         workouts === 'done'
           ? null
           : workouts === 'todo'
-            ? 'Dans Intervals.icu → Settings → Connections → Garmin, coche « Upload planned workouts ». Les séances de ton coach arriveront sur la montre.'
-            : 'À vérifier dans Intervals.icu → Settings → Connections → Garmin : « Upload planned workouts » doit être coché.',
+            ? 'Dans Intervals.icu → Settings → Connections, ouvre ta montre ou ton compteur et coche « Upload planned workouts ». Les séances de ton coach y arriveront.'
+            : 'À vérifier dans Intervals.icu → Settings → Connections : « Upload planned workouts » doit être coché pour ta montre ou ton compteur.',
     },
     {
       key: 'install',
@@ -95,7 +102,7 @@ export function buildChecklist(setup: SetupStatus | undefined, device: DeviceSta
 export function inviteMessage(url: string, coachName?: string): string {
   return [
     `${coachName ? `${coachName} t’invite` : 'Je t’invite'} à rejoindre son équipe sur Je suis coach.`,
-    'Avant d’ouvrir le lien : crée un compte Intervals.icu (gratuit) et relie ta montre Garmin directement (pas via Strava).',
+    'Avant d’ouvrir le lien : crée un compte Intervals.icu (gratuit) et relie ta montre ou ton compteur (Garmin, Coros, Wahoo…) directement, pas via Strava.',
     `Lien personnel, valable 7 jours et utilisable une seule fois : ${url}`,
   ].join('\n\n');
 }

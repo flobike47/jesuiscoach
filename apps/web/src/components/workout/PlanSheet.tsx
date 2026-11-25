@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { ChevronDown, Minus, Plus, Trash2 } from 'lucide-react';
 import { Cell, Sheet } from '@/components/ios';
-import { useApplyPlan, useDeletePlan, useLibrary, useSavePlan, useTeam } from '@/hooks/useCoach';
+import { useApplyPlan, useDeletePlan, useLibrary, useSavedWorkouts, useSavePlan, useTeam } from '@/hooks/useCoach';
 import { formatDuration } from '@/lib/format';
-import { parseWorkout, TEMPLATES, workoutStats } from '@/lib/workout';
+import { parseWorkout, SPORT_LABELS, STARTERS, TEMPLATES, workoutStats, type Sport } from '@/lib/workout';
+import { formatMeters } from '@/lib/workoutBlocks';
 import type { PlanWorkout, TrainingPlan } from '@/types';
 import { AthletePicker } from './AthletePicker';
 import { StructureEditor, WorkoutProfile } from './StructureEditor';
@@ -57,9 +58,9 @@ export function PlanSheet({ plan, onClose }: { plan: TrainingPlan | null; onClos
     setDirty(true);
   };
   const update = (key: string, patch: Partial<PlanWorkout>) => change(items.map((w) => (w.key === key ? { ...w, ...patch } : w)));
-  const add = (w: { name: string; description: string }) => {
+  const add = (w: Source) => {
     const last = items.length ? Math.max(...items.map((x) => x.day)) : -2;
-    const item = keyed({ day: Math.min(MAX_DAY, last + 2), name: w.name, description: w.description });
+    const item = keyed({ day: Math.min(MAX_DAY, last + 2), name: w.name, description: w.description, sport: w.sport ?? 'Ride' });
     change([...items, item]);
     setPicking(false);
     setOpen(item.key);
@@ -70,7 +71,7 @@ export function PlanSheet({ plan, onClose }: { plan: TrainingPlan | null; onClos
     if (!name.trim()) return setError('Donne un nom au plan.');
     if (items.length === 0) return setError('Ajoute au moins une séance.');
     try {
-      const saved = await save.mutateAsync({ id: id ?? undefined, name: name.trim(), workouts: sorted.map(({ day, name: n, description }) => ({ day, name: n, description })) });
+      const saved = await save.mutateAsync({ id: id ?? undefined, name: name.trim(), workouts: sorted.map(({ day, name: n, description, sport }) => ({ day, name: n, description, sport: sport ?? 'Ride' })) });
       setId(saved.id);
       setDirty(false);
     } catch (e) {
@@ -172,16 +173,18 @@ function PlanItem({
 }) {
   const steps = useMemo(() => parseWorkout(item.description), [item.description]);
   const stats = workoutStats(steps);
+  const sport: Sport = item.sport ?? 'Ride';
+  const size = stats.complete ? `${formatDuration(stats.seconds)} · charge ${stats.load}` : formatMeters(stats.meters);
   return (
     <div style={{ borderTop: first ? 'none' : '0.5px solid var(--separator)' }}>
       <button type="button" onClick={onToggle} aria-expanded={open} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', minHeight: 56, padding: '8px 16px', textAlign: 'left' }}>
         <span style={{ width: 54, flexShrink: 0 }}>
-          <WorkoutProfile steps={steps} height={28} />
+          <WorkoutProfile steps={steps} sport={sport} height={28} />
         </span>
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
           <span className="footnote secondary tabular-nums">
-            {dayLabel(item.day, null)} · {formatDuration(stats.seconds)} · charge {stats.load}
+            {dayLabel(item.day, null)} · {SPORT_LABELS[sport]} · {size}
           </span>
         </span>
         <ChevronDown size={18} color="var(--label-3)" aria-hidden style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease-out' }} />
@@ -213,7 +216,7 @@ function PlanItem({
               </button>
             </div>
           </div>
-          <StructureEditor description={item.description} onChange={(description) => onChange({ description })} />
+          <StructureEditor description={item.description} sport={sport} onChange={(description) => onChange({ description })} />
           <button type="button" className="pressable" onClick={onDelete} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--red)', minHeight: 36, justifySelf: 'start' }}>
             <Trash2 size={16} aria-hidden />
             Retirer du plan
@@ -224,9 +227,17 @@ function PlanItem({
   );
 }
 
-/** Choix d'une séance à ajouter : séances types de l'app et bibliothèque Intervals.icu. */
-function SourcePicker({ onPick, onCancel }: { onPick: (w: { name: string; description: string }) => void; onCancel: () => void }) {
+interface Source {
+  name: string;
+  description: string;
+  sport?: Sport;
+}
+
+/** Choix d'une séance à ajouter : mes séances, séances types et bibliothèque Intervals.icu. */
+function SourcePicker({ onPick, onCancel }: { onPick: (w: Source) => void; onCancel: () => void }) {
   const library = useLibrary();
+  const saved = useSavedWorkouts();
+  const mine = saved.data?.workouts ?? [];
   return (
     <div style={{ marginTop: 10 }}>
       <h3 className="section-header">
@@ -236,17 +247,40 @@ function SourcePicker({ onPick, onCancel }: { onPick: (w: { name: string; descri
         </button>
       </h3>
       <div className="group">
-        <Cell title={<span style={{ color: 'var(--tint)' }}>Séance vide</span>} onClick={() => onPick({ name: 'Nouvelle séance', description: '- 10m ramp 50-75%\n\n- 30m 70%\n\n- 10m 50%' })} />
-        {TEMPLATES.map((t) => (
-          <Cell key={t.name} title={t.name} onClick={() => onPick(t)} />
+        {(['Ride', 'Run', 'Swim'] as const).map((sport) => (
+          <Cell
+            key={sport}
+            title={<span style={{ color: 'var(--tint)' }}>Séance vide · {SPORT_LABELS[sport].toLowerCase()}</span>}
+            onClick={() => onPick({ name: 'Nouvelle séance', description: STARTERS[sport], sport })}
+          />
         ))}
       </div>
+      {mine.length > 0 && (
+        <>
+          <h3 className="section-header">Mes séances</h3>
+          <div className="group">
+            {mine.map((w) => (
+              <Cell key={w.id} title={w.name} detail={SPORT_LABELS[w.sport]} onClick={() => onPick(w)} />
+            ))}
+          </div>
+        </>
+      )}
+      {(['Ride', 'Run', 'Swim'] as const).map((sport) => (
+        <div key={sport}>
+          <h3 className="section-header">Séances types · {SPORT_LABELS[sport].toLowerCase()}</h3>
+          <div className="group">
+            {TEMPLATES.filter((t) => t.sport === sport).map((t) => (
+              <Cell key={t.name} title={t.name} onClick={() => onPick(t)} />
+            ))}
+          </div>
+        </div>
+      ))}
       {(library.data?.folders ?? []).map((f) => (
         <div key={f.id}>
           <h3 className="section-header">{f.name}</h3>
           <div className="group">
             {f.workouts.map((w) => (
-              <Cell key={w.id} title={w.name} onClick={() => onPick(w)} />
+              <Cell key={w.id} title={w.name} detail={SPORT_LABELS[w.sport]} onClick={() => onPick(w)} />
             ))}
           </div>
         </div>

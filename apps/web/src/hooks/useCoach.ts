@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
-import type { PlanWorkout } from '@/types';
+import type { PlanWorkout, Sport } from '@/types';
 
 /** Données du coach (via le BFF, jamais d'appel direct à Intervals.icu). */
 
@@ -47,6 +47,25 @@ export function useAssignWorkout() {
 
 /** Bibliothèque Intervals.icu du coach (déjà en cache 30 min côté serveur). */
 export const useLibrary = () => useQuery({ queryKey: ['library'], queryFn: api.library, staleTime: 10 * 60_000 });
+
+/* ---------- Mes séances (enregistrées sans envoi) ---------- */
+
+export const useSavedWorkouts = () => useQuery({ queryKey: ['saved-workouts'], queryFn: api.savedWorkouts });
+
+/** Crée (sans id) ou met à jour (avec id) une séance enregistrée. */
+export function useSaveWorkout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id?: string; name: string; sport: Sport; description: string }) =>
+      id ? api.updateSavedWorkout(id, body) : api.createSavedWorkout(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-workouts'] }),
+  });
+}
+
+export function useDeleteSavedWorkout() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deleteSavedWorkout, onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-workouts'] }) });
+}
 
 export const usePlans = () => useQuery({ queryKey: ['plans'], queryFn: api.plans });
 

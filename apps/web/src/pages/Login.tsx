@@ -41,7 +41,7 @@ export default function Login() {
         <p className="secondary" style={{ margin: '8px 0 0', fontSize: 17, lineHeight: 1.45 }}>
           {invite
             ? 'Ton coach t’invite à rejoindre son équipe. Connecte ton compte Intervals.icu pour partager tes sorties.'
-            : 'La forme de ton équipe, les sorties du jour et les séances envoyées directement sur les montres Garmin.'}
+            : 'La forme de ton équipe, les sorties du jour et les séances envoyées directement sur les montres et compteurs (Garmin, Coros, Wahoo…).'}
         </p>
         {error && (
           <p role="alert" className="footnote" style={{ color: 'var(--red)', marginTop: 16 }}>
@@ -87,7 +87,7 @@ export default function Login() {
           </p>
         )}
         <p className="caption secondary" style={{ textAlign: 'center', margin: '4px 0 0' }}>
-          Tes sorties Garmin arrivent via Intervals.icu. Ton mot de passe ne passe jamais par cette app.
+          Tes sorties arrivent de ta montre ou de ton compteur via Intervals.icu. Ton mot de passe ne passe jamais par cette app.
         </p>
         <Link to="/confidentialite" className="caption" style={{ textAlign: 'center', minHeight: 44, lineHeight: '44px' }}>
           Politique de confidentialité

@@ -1,24 +1,47 @@
 import { describe, expect, it } from 'vitest';
 import { buildChecklist, inviteMessage, type DeviceState } from './onboarding';
 
+const dev = (sync: boolean | null, upload: boolean | null) => [{ provider: 'garmin' as const, label: 'Garmin', sync, uploadWorkouts: upload }];
 const installed: DeviceState = { standalone: true, ios: true, push: 'supported', pushSubscribed: true };
 const states = (setup: Parameters<typeof buildChecklist>[0], device = installed) =>
   Object.fromEntries(buildChecklist(setup, device).map((s) => [s.key, s.state]));
 
 describe('buildChecklist', () => {
+  it('plusieurs services à la fois : Garmin et Coros, les deux reçoivent les séances', () => {
+    const devices = [
+      { provider: 'garmin' as const, label: 'Garmin', sync: true, uploadWorkouts: true },
+      { provider: 'coros' as const, label: 'Coros', sync: true, uploadWorkouts: true },
+      { provider: 'wahoo' as const, label: 'Wahoo', sync: false, uploadWorkouts: false },
+    ];
+    const [device, workouts] = buildChecklist({ devices, deviceSync: true, uploadWorkouts: true, stravaLinked: false }, installed);
+    expect(device).toMatchObject({ state: 'done', title: 'Garmin et Coros reliés en direct' });
+    expect(workouts).toMatchObject({ state: 'done', title: 'Séances envoyées vers Garmin et Coros' });
+  });
+
+  it('nomme les appareils reliés (Coros, Wahoo…)', () => {
+    const devices = [
+      { provider: 'garmin' as const, label: 'Garmin', sync: false, uploadWorkouts: false },
+      { provider: 'coros' as const, label: 'Coros', sync: true, uploadWorkouts: true },
+      { provider: 'wahoo' as const, label: 'Wahoo', sync: true, uploadWorkouts: false },
+    ];
+    const [device, workouts] = buildChecklist({ devices, deviceSync: true, uploadWorkouts: true, stravaLinked: false }, installed);
+    expect(device).toMatchObject({ state: 'done', title: 'Coros et Wahoo reliés en direct' });
+    expect(workouts).toMatchObject({ state: 'done', title: 'Séances envoyées vers Coros' });
+  });
+
   it('tout est prêt', () => {
-    const steps = buildChecklist({ garminSync: true, garminUploadWorkouts: true, stravaLinked: false }, installed);
+    const steps = buildChecklist({ devices: dev(true, true), deviceSync: true, uploadWorkouts: true, stravaLinked: false }, installed);
     expect(steps.map((s) => s.state)).toEqual(['done', 'done', 'done', 'done']);
     expect(steps.every((s) => s.help === null)).toBe(true);
   });
 
   it('réglage illisible ou pas encore chargé : « à vérifier », jamais « fait »', () => {
-    expect(states({ garminSync: null, garminUploadWorkouts: null, stravaLinked: null })).toMatchObject({ garmin: 'unknown', workouts: 'unknown' });
-    expect(states(undefined)).toMatchObject({ garmin: 'unknown', workouts: 'unknown' });
+    expect(states({ devices: dev(null, null), deviceSync: null, uploadWorkouts: null, stravaLinked: null })).toMatchObject({ device: 'unknown', workouts: 'unknown' });
+    expect(states(undefined)).toMatchObject({ device: 'unknown', workouts: 'unknown' });
   });
 
-  it('Garmin non relié alors que Strava l’est : on explique pourquoi Strava ne suffit pas', () => {
-    const garmin = buildChecklist({ garminSync: false, garminUploadWorkouts: false, stravaLinked: true }, installed)[0];
+  it('aucun appareil relié alors que Strava l’est : on explique pourquoi Strava ne suffit pas', () => {
+    const garmin = buildChecklist({ devices: dev(false, false), deviceSync: false, uploadWorkouts: false, stravaLinked: true }, installed)[0];
     expect(garmin.state).toBe('todo');
     expect(garmin.help).toContain('Strava ne sont pas lisibles');
   });

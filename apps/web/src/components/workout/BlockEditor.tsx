@@ -1,18 +1,36 @@
 import { useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronUp, Minus, Plus, Repeat, Trash2, TrendingUp, Square } from 'lucide-react';
-import { zoneColor } from '@/lib/workout';
-import { clamp, durationStep, formatMinutes, LIMITS, move, newBlock, type Block, type InnerBlock, type RepeatBlock } from '@/lib/workoutBlocks';
+import { Segmented } from '@/components/ios';
+import { zoneColor, type Sport } from '@/lib/workout';
+import {
+  clamp,
+  DISTANCE_PRESETS,
+  DURATION_PRESETS,
+  formatMeters,
+  formatMinutes,
+  formatSize,
+  LIMITS,
+  move,
+  newBlock,
+  PCT_RANGE,
+  retarget,
+  SPORT_TARGETS,
+  type Block,
+  type BlockTarget,
+  type InnerBlock,
+  type RepeatBlock,
+} from '@/lib/workoutBlocks';
 
 /**
  * Éditeur de séance par blocs : on ajoute des paliers, des rampes et des
- * répétitions, on règle durée et % FTP au toucher (sans clavier), on
- * réordonne et on supprime. Un seul bloc ouvert à la fois.
+ * répétitions, on règle durée (ou distance), cible et cadence au toucher
+ * (sans clavier), on réordonne et on supprime. Un seul bloc ouvert à la fois.
  */
-export function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (blocks: Block[]) => void }) {
+export function BlockEditor({ blocks, sport, onChange }: { blocks: Block[]; sport: Sport; onChange: (blocks: Block[]) => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const update = (i: number, b: Block) => onChange(blocks.map((x, j) => (j === i ? b : x)));
   const add = (kind: 'step' | 'ramp' | 'repeat') => {
-    const b = newBlock(kind);
+    const b = newBlock(kind, sport);
     onChange([...blocks, b]);
     setOpen(b.id);
   };
@@ -29,6 +47,7 @@ export function BlockEditor({ blocks, onChange }: { blocks: Block[]; onChange: (
           <BlockRow
             key={b.id}
             block={b}
+            sport={sport}
             open={open === b.id}
             onToggle={() => setOpen(open === b.id ? null : b.id)}
             onChange={(nb) => update(i, nb)}
@@ -65,21 +84,37 @@ function AddButton({ icon, label, onClick }: { icon: ReactNode; label: string; o
 
 /* ---------- Une ligne de bloc ---------- */
 
+const TARGET_SHORT: Record<BlockTarget, string> = { power: '%', hr: '% FC', pace: '% allure' };
+
+function pctText(b: InnerBlock): string {
+  const v = b.kind === 'ramp' ? `${b.from} → ${b.to}` : b.high > b.low ? `${b.low}–${b.high}` : `${b.low}`;
+  return `${v} ${TARGET_SHORT[b.target]}`;
+}
+
 function summary(b: Block | InnerBlock): string {
-  const d = formatMinutes(b.kind === 'repeat' ? 0 : b.seconds);
-  if (b.kind === 'ramp') return `Rampe ${d} · ${b.from} → ${b.to} %`;
-  if (b.kind === 'step') return `${d} · ${b.high > b.low ? `${b.low}–${b.high}` : b.low} %`;
-  const inner = b.steps.reduce((s, x) => s + x.seconds, 0);
-  return `${b.count} × ${formatMinutes(inner)} (${b.steps.length} palier${b.steps.length > 1 ? 's' : ''})`;
+  if (b.kind === 'repeat') {
+    const time = b.steps.reduce((s, x) => s + x.seconds, 0);
+    const dist = b.steps.reduce((s, x) => s + x.meters, 0);
+    const size = [dist ? formatMeters(dist) : '', time ? formatMinutes(time) : ''].filter(Boolean).join(' + ');
+    return `${b.count} × ${size} (${b.steps.length} palier${b.steps.length > 1 ? 's' : ''})`;
+  }
+  const cad = b.cadence ? ` · ${b.cadence.high > b.cadence.low ? `${b.cadence.low}–${b.cadence.high}` : b.cadence.low} rpm` : '';
+  return `${b.kind === 'ramp' ? 'Rampe ' : ''}${formatSize(b)} · ${pctText(b)}${cad}`;
 }
 
 function color(b: Block | InnerBlock): string {
-  if (b.kind === 'repeat') return zoneColor(Math.max(...b.steps.map((s) => (s.kind === 'ramp' ? Math.max(s.from, s.to) : s.high)), 0));
-  return zoneColor(b.kind === 'ramp' ? (b.from + b.to) / 2 : (b.low + b.high) / 2);
+  if (b.kind === 'repeat') {
+    const top = b.steps.reduce<InnerBlock | null>((m, s) => (!m || peak(s) > peak(m) ? s : m), null);
+    return top ? zoneColor(peak(top), top.target) : 'var(--label-3)';
+  }
+  return zoneColor(b.kind === 'ramp' ? (b.from + b.to) / 2 : (b.low + b.high) / 2, b.target);
 }
+
+const peak = (s: InnerBlock) => (s.kind === 'ramp' ? Math.max(s.from, s.to) : s.high);
 
 interface RowProps<T> {
   block: T;
+  sport: Sport;
   open: boolean;
   onToggle: () => void;
   onChange: (b: T) => void;
@@ -90,7 +125,7 @@ interface RowProps<T> {
   nested?: boolean;
 }
 
-function BlockRow({ block, open, onToggle, onChange, onMove, onDelete, first, last, nested }: RowProps<Block>) {
+function BlockRow({ block, sport, open, onToggle, onChange, onMove, onDelete, first, last, nested }: RowProps<Block>) {
   const label = block.kind === 'repeat' ? 'Répétition' : block.kind === 'ramp' ? 'Rampe' : 'Palier';
   return (
     <div style={{ borderTop: first ? 'none' : '0.5px solid var(--separator)', marginLeft: nested ? 16 : 0 }}>
@@ -112,7 +147,7 @@ function BlockRow({ block, open, onToggle, onChange, onMove, onDelete, first, la
       </button>
 
       {open && (
-        <div style={{ padding: '0 16px 12px', display: 'grid', gap: 10 }}>
+        <div style={{ padding: '0 16px 14px', display: 'grid', gap: 12 }}>
           {!nested && (
             <input
               className="field"
@@ -125,9 +160,9 @@ function BlockRow({ block, open, onToggle, onChange, onMove, onDelete, first, la
             />
           )}
           {block.kind === 'repeat' ? (
-            <RepeatControls block={block} onChange={(b) => onChange({ ...b, title: block.title })} />
+            <RepeatControls block={block} sport={sport} onChange={(b) => onChange({ ...b, title: block.title })} />
           ) : (
-            <InnerControls block={block} onChange={(b) => onChange({ ...b, title: block.title })} />
+            <InnerControls block={block} sport={sport} onChange={(b) => onChange({ ...b, title: block.title })} />
           )}
           <RowActions label={label} first={first} last={last} onMove={onMove} onDelete={onDelete} />
         </div>
@@ -169,52 +204,233 @@ function IconButton({ label, disabled, onClick, children }: { label: string; dis
   );
 }
 
-/* ---------- Réglages ---------- */
+/* ---------- Réglages d'un palier ---------- */
 
-function InnerControls({ block, onChange }: { block: InnerBlock; onChange: (b: InnerBlock) => void }) {
-  const duration = (
-    <Stepper
-      label="Durée"
-      value={formatMinutes(block.seconds)}
-      onMinus={() => onChange({ ...block, seconds: durationStep(block.seconds, -1) })}
-      onPlus={() => onChange({ ...block, seconds: durationStep(block.seconds, 1) })}
-      minusDisabled={block.seconds <= LIMITS.minSeconds}
-      plusDisabled={block.seconds >= LIMITS.maxSeconds}
-    />
-  );
-  if (block.kind === 'ramp') {
-    return (
-      <>
-        {duration}
-        <PctSlider label="Début" value={block.from} onChange={(from) => onChange({ ...block, from })} />
-        <PctSlider label="Fin" value={block.to} onChange={(to) => onChange({ ...block, to })} />
-      </>
-    );
-  }
-  const range = block.high > block.low;
+const TARGET_LABELS: Record<BlockTarget, string> = { power: 'Puissance', hr: 'Cardio', pace: 'Allure' };
+
+function InnerControls({ block, sport, onChange }: { block: InnerBlock; sport: Sport; onChange: (b: InnerBlock) => void }) {
+  const range = PCT_RANGE[block.target];
+  const fit = (v: number) => clamp(v, range.min, range.max);
+  // On garde une intensité comparable (ex. 100 % FTP → 95 % FC seuil).
+  const setTarget = (target: BlockTarget) => onChange(retarget(block, target));
+
   return (
     <>
-      {duration}
-      {range ? (
+      <SizePicker block={block} sport={sport} onChange={(size) => onChange({ ...block, ...size })} />
+
+      {SPORT_TARGETS[sport].length > 1 && (
+        <Segmented<BlockTarget>
+          label="Cible"
+          value={block.target}
+          onChange={setTarget}
+          options={SPORT_TARGETS[sport].map((t) => ({ value: t, label: TARGET_LABELS[t] }))}
+        />
+      )}
+
+      {block.kind === 'ramp' ? (
         <>
-          <PctSlider label="De" value={block.low} onChange={(low) => onChange({ ...block, low, high: Math.max(low + 1, block.high) })} />
-          <PctSlider label="À" value={block.high} onChange={(high) => onChange({ ...block, high, low: Math.min(block.low, high - 1) })} />
+          <PctSlider label="Début" value={block.from} target={block.target} onChange={(from) => onChange({ ...block, from })} />
+          <PctSlider label="Fin" value={block.to} target={block.target} onChange={(to) => onChange({ ...block, to })} />
+        </>
+      ) : block.high > block.low ? (
+        <>
+          <PctSlider label="De" value={block.low} target={block.target} onChange={(low) => onChange({ ...block, low, high: Math.max(low + 1, block.high) })} />
+          <PctSlider label="À" value={block.high} target={block.target} onChange={(high) => onChange({ ...block, high, low: Math.min(block.low, high - 1) })} />
         </>
       ) : (
-        <PctSlider label="Intensité" value={block.low} onChange={(v) => onChange({ ...block, low: v, high: v })} />
+        <PctSlider label="Intensité" value={block.low} target={block.target} onChange={(v) => onChange({ ...block, low: v, high: v })} />
       )}
-      <button
-        type="button"
-        style={{ color: 'var(--tint)', justifySelf: 'start', minHeight: 32, fontSize: 15 }}
-        onClick={() => onChange(range ? { ...block, high: block.low } : { ...block, high: clamp(block.low + 5, LIMITS.minPct, LIMITS.maxPct) })}
-      >
-        {range ? 'Une seule valeur' : 'Une plage (ex. 95–100 %)'}
-      </button>
+      {block.kind === 'step' && (
+        <TextButton onClick={() => onChange(block.high > block.low ? { ...block, high: block.low } : { ...block, high: fit(block.low + 5) })}>
+          {block.high > block.low ? 'Une seule valeur' : 'Une plage (ex. 95–100 %)'}
+        </TextButton>
+      )}
+
+      {sport === 'Ride' && <CadenceControl value={block.cadence} onChange={(cadence) => onChange({ ...block, cadence })} />}
     </>
   );
 }
 
-function RepeatControls({ block, onChange }: { block: RepeatBlock; onChange: (b: RepeatBlock) => void }) {
+function TextButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" style={{ color: 'var(--tint)', justifySelf: 'start', minHeight: 32, fontSize: 15 }} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+/** Cadence cible (vélo) : facultative, une valeur ou une plage. */
+function CadenceControl({ value, onChange }: { value: InnerBlock['cadence']; onChange: (v: InnerBlock['cadence']) => void }) {
+  if (!value) return <TextButton onClick={() => onChange({ low: 90, high: 90 })}>Ajouter une cadence</TextButton>;
+  const range = value.high > value.low;
+  const set = (low: number, high: number) => onChange({ low: clamp(low, LIMITS.minRpm, LIMITS.maxRpm), high: clamp(high, LIMITS.minRpm, LIMITS.maxRpm) });
+  return (
+    <div style={{ display: 'grid', gap: 6 }}>
+      {range ? (
+        <>
+          <RpmSlider label="Cadence de" value={value.low} onChange={(low) => set(low, Math.max(low + 1, value.high))} />
+          <RpmSlider label="à" value={value.high} onChange={(high) => set(Math.min(value.low, high - 1), high)} />
+        </>
+      ) : (
+        <RpmSlider label="Cadence" value={value.low} onChange={(v) => set(v, v)} />
+      )}
+      <div style={{ display: 'flex', gap: 16 }}>
+        <TextButton onClick={() => (range ? set(value.low, value.low) : set(value.low - 5, value.low + 5))}>{range ? 'Une seule valeur' : 'Une plage'}</TextButton>
+        <TextButton onClick={() => onChange(undefined)}>Retirer la cadence</TextButton>
+      </div>
+    </div>
+  );
+}
+
+function RpmSlider({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  return (
+    <label style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', rowGap: 4 }}>
+      <span className="secondary">{label}</span>
+      <span className="tabular-nums" style={{ fontWeight: 600 }}>
+        {value} rpm
+      </span>
+      <input
+        type="range"
+        min={40}
+        max={130}
+        step={1}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={`${label}, en tours par minute`}
+        style={{ gridColumn: '1 / -1', width: '100%', accentColor: 'var(--indigo)' }}
+      />
+    </label>
+  );
+}
+
+/* ---------- Durée ou distance ---------- */
+
+type SizeMode = 'time' | 'distance';
+
+/**
+ * Choix de la durée (ou de la distance en course et natation) : raccourcis
+ * en un toucher, puis réglage fin avec les roues natives (heures, minutes,
+ * secondes ; km et m) — les menus déroulants s'affichent en roue sur iPhone.
+ */
+function SizePicker({ block, sport, onChange }: { block: InnerBlock; sport: Sport; onChange: (size: { seconds: number; meters: number }) => void }) {
+  const mode: SizeMode = block.meters ? 'distance' : 'time';
+  const canDistance = sport !== 'Ride';
+  const setMode = (m: SizeMode) => {
+    if (m === mode) return;
+    onChange(m === 'distance' ? { seconds: 0, meters: sport === 'Swim' ? 100 : 1000 } : { seconds: 5 * 60, meters: 0 });
+  };
+  const presets = mode === 'time' ? DURATION_PRESETS : DISTANCE_PRESETS[sport];
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {canDistance && (
+        <Segmented<SizeMode>
+          label="Durée ou distance"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'time', label: 'Durée' },
+            { value: 'distance', label: 'Distance' },
+          ]}
+        />
+      )}
+      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }} role="group" aria-label={mode === 'time' ? 'Durées courantes' : 'Distances courantes'}>
+        {presets.map((p) => {
+          const active = mode === 'time' ? block.seconds === p : block.meters === p;
+          return (
+            <button
+              key={p}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(mode === 'time' ? { seconds: p, meters: 0 } : { seconds: 0, meters: p })}
+              className="pressable tabular-nums"
+              style={{
+                flex: '0 0 auto',
+                minHeight: 32,
+                padding: '0 12px',
+                borderRadius: 16,
+                fontSize: 14,
+                background: active ? 'var(--tint)' : 'var(--fill)',
+                color: active ? '#fff' : 'var(--label)',
+              }}
+            >
+              {mode === 'time' ? formatMinutes(p) : formatMeters(p)}
+            </button>
+          );
+        })}
+      </div>
+      {mode === 'time' ? (
+        <TimeWheels seconds={block.seconds} onChange={(seconds) => onChange({ seconds, meters: 0 })} />
+      ) : (
+        <DistanceWheels meters={block.meters} sport={sport} onChange={(meters) => onChange({ seconds: 0, meters })} />
+      )}
+    </div>
+  );
+}
+
+const numbers = (from: number, to: number, step = 1) => Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, i) => from + i * step);
+
+function TimeWheels({ seconds, onChange }: { seconds: number; onChange: (s: number) => void }) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const set = (nh: number, nm: number, ns: number) => onChange(clamp(nh * 3600 + nm * 60 + ns, LIMITS.minSeconds, LIMITS.maxSeconds));
+  const secs = numbers(0, 55, 5);
+  if (!secs.includes(s)) secs.push(s);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} className="tabular-nums">
+      <Wheel label="Heures" value={h} options={numbers(0, 6)} suffix="h" onChange={(v) => set(v, m, s)} />
+      <Wheel label="Minutes" value={m} options={numbers(0, 59)} suffix="min" onChange={(v) => set(h, v, s)} />
+      <Wheel label="Secondes" value={s} options={secs.sort((a, b) => a - b)} suffix="s" onChange={(v) => set(h, m, v)} />
+    </div>
+  );
+}
+
+function DistanceWheels({ meters, sport, onChange }: { meters: number; sport: Sport; onChange: (m: number) => void }) {
+  const set = (v: number) => onChange(clamp(v, LIMITS.minMeters, LIMITS.maxMeters));
+  if (sport === 'Swim') {
+    const opts = numbers(25, 4000, 25);
+    if (!opts.includes(meters)) opts.push(meters);
+    return <Wheel label="Mètres" value={meters} options={opts.sort((a, b) => a - b)} suffix="m" onChange={set} />;
+  }
+  const km = Math.floor(meters / 1000);
+  const m = meters % 1000;
+  const ms = numbers(0, 950, 50);
+  if (!ms.includes(m)) ms.push(m);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} className="tabular-nums">
+      <Wheel label="Kilomètres" value={km} options={numbers(0, 42)} suffix="km" onChange={(v) => set(v * 1000 + m)} />
+      <Wheel label="Mètres" value={m} options={ms.sort((a, b) => a - b)} suffix="m" onChange={(v) => set(km * 1000 + v)} />
+    </div>
+  );
+}
+
+/** Une « roue » : menu déroulant natif (roue sur iPhone), habillé en pastille. */
+function Wheel({ label, value, options, suffix, onChange }: { label: string; value: number; options: number[]; suffix: string; onChange: (v: number) => void }) {
+  return (
+    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--fill)', borderRadius: 9, padding: '0 10px', minHeight: 36 }}>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ appearance: 'none', background: 'transparent', border: 0, font: 'inherit', fontWeight: 600, color: 'var(--label)', fontSize: 16, padding: '6px 0', textAlign: 'right' }}
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+      <span className="secondary" style={{ fontSize: 15 }}>
+        {suffix}
+      </span>
+    </label>
+  );
+}
+
+/* ---------- Répétitions ---------- */
+
+function RepeatControls({ block, sport, onChange }: { block: RepeatBlock; sport: Sport; onChange: (b: RepeatBlock) => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const steps = block.steps;
   const set = (next: InnerBlock[]) => onChange({ ...block, steps: next });
@@ -234,6 +450,7 @@ function RepeatControls({ block, onChange }: { block: RepeatBlock; onChange: (b:
             key={s.id}
             nested
             block={s}
+            sport={sport}
             open={open === s.id}
             onToggle={() => setOpen(open === s.id ? null : s.id)}
             onChange={(nb) => set(steps.map((x, j) => (j === i ? (nb as InnerBlock) : x)))}
@@ -246,7 +463,7 @@ function RepeatControls({ block, onChange }: { block: RepeatBlock; onChange: (b:
       </div>
       <AddBar
         onAdd={(kind) => {
-          const b = newBlock(kind) as InnerBlock;
+          const b = newBlock(kind, sport) as InnerBlock;
           set([...steps, b]);
           setOpen(b.id);
         }}
@@ -291,24 +508,26 @@ function Stepper({
   );
 }
 
-/** Curseur de % FTP (pas de 1 %), de 40 à 200 % ; au-delà via le mode texte. */
-function PctSlider({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
-  const max = Math.max(200, value);
+/** Curseur du % de la cible (pas de 1 %), dans la plage de la cible ; au-delà via le mode texte. */
+function PctSlider({ label, value, target, onChange }: { label: string; value: number; target: BlockTarget; onChange: (v: number) => void }) {
+  const { min, max: top, unit } = PCT_RANGE[target];
+  const max = Math.max(top, value);
+  const c = zoneColor(value, target);
   return (
     <label style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', rowGap: 4 }}>
       <span className="secondary">{label}</span>
       <span className="tabular-nums" style={{ fontWeight: 600 }}>
-        {value} % FTP
+        {value} {unit}
       </span>
       <input
         type="range"
-        min={40}
+        min={Math.min(min, value)}
         max={max}
         step={1}
         value={value}
         onChange={(e) => onChange(clamp(Number(e.target.value), LIMITS.minPct, LIMITS.maxPct))}
-        aria-label={`${label}, en % de la FTP`}
-        style={{ gridColumn: '1 / -1', width: '100%', accentColor: zoneColor(value) === 'var(--label-3)' ? 'var(--gray)' : zoneColor(value) }}
+        aria-label={`${label}, en ${unit}`}
+        style={{ gridColumn: '1 / -1', width: '100%', accentColor: c === 'var(--label-3)' ? 'var(--gray)' : c }}
       />
     </label>
   );
