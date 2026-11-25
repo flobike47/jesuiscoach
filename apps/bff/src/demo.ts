@@ -1,4 +1,5 @@
 import { isoDay } from './lib/summary.js';
+import type { CheckinRow } from './db/repo.js';
 import type { IntervalsActivity, IntervalsAthlete, IntervalsEvent, IntervalsWellness, NewWorkoutEvent } from './types.js';
 
 /**
@@ -97,9 +98,42 @@ const between = <T,>(xs: T[], key: (x: T) => string, oldest: string, newest: str
 
 export class DemoSource {
   private athletes: DemoAthlete[];
+  private checkins = new Map<string, CheckinRow[]>();
+
+  saveCheckin(athleteId: string, c: CheckinRow): void {
+    const list = (this.checkins.get(athleteId) ?? []).filter((x) => x.day !== c.day);
+    this.checkins.set(athleteId, [c, ...list].sort((a, b) => b.day.localeCompare(a.day)));
+  }
+
+  listCheckins(athleteId: string, from: string, to: string): CheckinRow[] {
+    return (this.checkins.get(athleteId) ?? []).filter((c) => c.day >= from && c.day <= to);
+  }
 
   constructor(now = new Date()) {
     this.athletes = NAMES.map((_, k) => simulate(k, now));
+  }
+
+  /** Ajoute une sortie « qui vient de se terminer » à un athlète démo (test des notifications). */
+  simulateRide(athleteId: string, now = new Date()): { name: string; activity: IntervalsActivity } {
+    const a = this.get(athleteId);
+    const ftp = a.info.sportSettings?.[0]?.ftp ?? 250;
+    const pick = RIDE_NAMES[Math.floor(Math.random() * RIDE_NAMES.length)];
+    const hours = 1 + Math.round(Math.random() * 20) / 10;
+    const intensity = 0.7 + Math.random() * 0.2;
+    const activity: IntervalsActivity = {
+      id: `demo-sim-${now.getTime()}`,
+      start_date_local: now.toISOString().slice(0, 19),
+      type: 'Ride',
+      name: pick,
+      moving_time: Math.round(hours * 3600),
+      distance: Math.round(hours * 29 * 1000),
+      icu_training_load: Math.round(hours * intensity ** 2 * 100),
+      icu_weighted_avg_watts: Math.round(ftp * intensity),
+      icu_intensity: Math.round(intensity * 1000) / 10,
+      average_heartrate: 145,
+    };
+    a.activities.push(activity);
+    return { name: a.info.name ?? athleteId, activity };
   }
 
   athleteIds(): string[] {
@@ -128,5 +162,20 @@ export class DemoSource {
     const ev = { id: `demo-new-${Date.now()}`, category: 'WORKOUT', type: 'Ride', start_date_local: `${w.date}T00:00:00`, name: w.name, description: w.description };
     this.get(id).events.push(ev);
     return ev;
+  }
+  private event(id: string, eventId: string): IntervalsEvent {
+    const ev = this.get(id).events.find((e) => String(e.id) === eventId);
+    if (!ev) throw Object.assign(new Error('Séance introuvable'), { statusCode: 404 });
+    return ev;
+  }
+  async moveEvent(id: string, eventId: string, date: string): Promise<IntervalsEvent> {
+    const ev = this.event(id, eventId);
+    ev.start_date_local = `${date}T00:00:00`;
+    return ev;
+  }
+  async deleteEvent(id: string, eventId: string): Promise<void> {
+    this.event(id, eventId);
+    const a = this.get(id);
+    a.events = a.events.filter((e) => String(e.id) !== eventId);
   }
 }

@@ -65,10 +65,29 @@ export interface SeriesPoint {
   form: number;
 }
 
+export interface Checkin {
+  day: string;
+  /** 1 = très mal … 5 = en pleine forme */
+  feeling: number;
+  rpe: number | null;
+  note: string | null;
+}
+
 export interface AthleteOverview {
   summary: AthleteSummary;
   series: SeriesPoint[];
   activities: Activity[];
+  checkins: Checkin[];
+}
+
+export interface TodayView {
+  today: string;
+  name: string;
+  workouts: PlannedEvent[];
+  activitiesToday: Activity[];
+  week: Array<{ date: string; planned: string[]; load: number; done: boolean }>;
+  form: { fitness: number; fatigue: number; form: number };
+  checkin: Checkin | null;
 }
 
 export interface FeedItem {

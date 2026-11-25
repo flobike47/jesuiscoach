@@ -99,6 +99,7 @@ services:
 
       PUBLIC_API_URL: ${PUBLIC_API_URL}         # https://api-coach.tondomaine.com (callback OAuth)
       DEMO_MODE: ${DEMO_MODE:-false}
+      SYNC_INTERVAL_MIN: ${SYNC_INTERVAL_MIN:-30}
 
       INTERVALS_CLIENT_ID: ${INTERVALS_CLIENT_ID:-}
       INTERVALS_CLIENT_SECRET: ${INTERVALS_CLIENT_SECRET:-}

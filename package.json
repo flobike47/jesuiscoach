@@ -9,6 +9,8 @@
     "dev": "npm-run-all --parallel dev:bff dev:web",
     "dev:web": "npm run dev --workspace @jesuiscoach/web",
     "dev:bff": "npm run dev --workspace @jesuiscoach/bff",
+    "preview": "LOCAL_PREVIEW=1 npm run build --workspace @jesuiscoach/web && APP_URL=http://localhost:4173/ npm-run-all --parallel dev:bff preview:web",
+    "preview:web": "npm run preview --workspace @jesuiscoach/web",
     "build": "npm run build --workspace @jesuiscoach/web && npm run build --workspace @jesuiscoach/bff",
     "typecheck": "npm run typecheck --workspace @jesuiscoach/web && npm run typecheck --workspace @jesuiscoach/bff",
     "db:up": "docker compose up -d postgres redis",

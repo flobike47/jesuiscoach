@@ -34,6 +34,9 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL ?? 'postgres://jesuiscoach:jesuiscoach@localhost:5433/jesuiscoach',
   // Durée de vie d'une session de l'app (jeton opaque, révocable).
   sessionDays: 90,
+  // Synchro des sorties : intervalle en minutes (30 → 48 lectures/athlète/jour,
+  // sous le quota OAuth Intervals.icu de 100 requêtes/jour).
+  syncIntervalMin: Math.max(10, Number(process.env.SYNC_INTERVAL_MIN ?? 30)),
 
   // Intervals.icu — OAuth (app à demander sur https://intervals.icu/oauth/apply).
   // Optionnel tant que l'app n'est pas validée : sans client_id, la connexion

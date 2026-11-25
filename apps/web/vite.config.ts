@@ -3,13 +3,15 @@ import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
 /**
- * En dev (npm run dev), le conteneur Docker n'existe pas → l'entrypoint
- * ne fait pas la substitution. On remplace `__BASE_PATH__` par `/` à la
- * volée pour que <base href> et /config.js soient résolus correctement.
+ * En dev (npm run dev) et en aperçu local (npm run preview, LOCAL_PREVIEW=1),
+ * le conteneur Docker n'existe pas → l'entrypoint ne fait pas la
+ * substitution. On remplace `__BASE_PATH__` par `/` pour que <base href> et
+ * /config.js soient résolus correctement. Le build de l'image Docker ne
+ * définit pas LOCAL_PREVIEW : le placeholder y reste pour l'entrypoint.
  */
 const replaceBasePathDev: Plugin = {
   name: 'replace-base-path-dev',
-  apply: 'serve',
+  apply: (_config, { command }) => command === 'serve' || process.env.LOCAL_PREVIEW === '1',
   transformIndexHtml(html) {
     return html.replace(/__BASE_PATH__/g, '/');
   },
@@ -50,6 +52,12 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true,
+  },
+  // npm run preview : build de production servi en local (service worker,
+  // notifications). localhost est un contexte sécurisé : pas besoin d'HTTPS.
+  preview: {
+    port: 4173,
     host: true,
   },
 });

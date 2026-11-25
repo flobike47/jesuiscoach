@@ -28,6 +28,14 @@ export const DEMO_USER: AuthUser = {
   athleteId: 'demo-0',
 };
 
+/** Compte démo côté athlète (`Bearer demo-athlete`) : Julie, coachée par le compte démo. */
+export const DEMO_ATHLETE: AuthUser = {
+  id: '00000000-0000-4000-8000-00000000d3e1',
+  role: 'athlete',
+  name: 'Julie',
+  athleteId: 'demo-1',
+};
+
 /**
  * Routes protégées : /api/* sauf /api/public/*. Le jeton est une session de
  * l'app (sessions.ts), créée après la connexion Intervals.icu.
@@ -44,8 +52,8 @@ export function registerAuth(app: FastifyInstance) {
       return reply;
     }
 
-    if (config.demoMode && token === 'demo') {
-      req.user = DEMO_USER;
+    if (config.demoMode && (token === 'demo' || token === 'demo-athlete')) {
+      req.user = token === 'demo' ? DEMO_USER : DEMO_ATHLETE;
       return;
     }
 

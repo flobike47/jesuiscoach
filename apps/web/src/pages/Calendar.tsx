@@ -1,22 +1,32 @@
 import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
-import { Cell, Page, Placeholder, Section } from '@/components/ios';
+import { Cell, Page, Placeholder, Section, Sheet } from '@/components/ios';
 import { Spinner } from '@/components/common/PageLoader';
-import { useCalendar, useTeam } from '@/hooks/useCoach';
+import { useCalendar, useEditEvent, useTeam } from '@/hooks/useCoach';
 import { formatDuration } from '@/lib/format';
+import type { PlannedEvent } from '@/types';
 
-/** Écran 6 : semaine d'un athlète — séances prévues et sorties réalisées. */
+/** Écran 6 (coach) : semaine d'un athlète de l'équipe, au choix. */
 export default function Calendar() {
-  const team = useTeam();
+  return <CalendarView />;
+}
+
+/**
+ * Semaine d'un athlète — séances prévues et sorties réalisées. Sans
+ * `fixed`, le coach choisit l'athlète ; avec, c'est l'athlète lui-même (« Plan »).
+ */
+export function CalendarView({ fixed }: { fixed?: { id: string; title: string } }) {
+  const team = useTeam(!fixed);
   const athletes = useMemo(() => [...(team.data?.athletes ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'fr')), [team.data]);
   const [picked, setPicked] = useState<string | null>(null);
-  const athleteId = picked ?? athletes[0]?.id;
+  const athleteId = fixed?.id ?? picked ?? athletes[0]?.id;
   const [weekStart, setWeekStart] = useState(() => startOfWeek(dayjs()));
   const from = weekStart.format('YYYY-MM-DD');
   const to = weekStart.add(6, 'day').format('YYYY-MM-DD');
   const cal = useCalendar(athleteId, from, to);
   const today = dayjs().format('YYYY-MM-DD');
+  const [editing, setEditing] = useState<PlannedEvent | null>(null);
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = weekStart.add(i, 'day');
@@ -30,9 +40,9 @@ export default function Calendar() {
 
   return (
     <Page
-      title={athletes.find((a) => a.id === athleteId)?.name ?? 'Calendrier'}
+      title={fixed?.title ?? athletes.find((a) => a.id === athleteId)?.name ?? 'Calendrier'}
       header={
-        <select
+        !fixed && <select
           aria-label="Athlète"
           value={athleteId ?? ''}
           onChange={(e) => setPicked(e.target.value)}
@@ -120,6 +130,9 @@ export default function Calendar() {
                     }
                     title={e.name ?? 'Séance'}
                     subtitle={made ? 'Séance faite' : missed ? 'Séance manquée' : 'Prévue'}
+                    // Une séance passée et faite ne se déplace plus.
+                    onClick={!made && e.id != null ? () => setEditing(e) : undefined}
+                    chevron={!made && e.id != null}
                   />
                 );
               })}
@@ -136,6 +149,9 @@ export default function Calendar() {
                 ))}
             </Section>
           ))}
+      {editing && athleteId && (
+        <EditEventSheet key={String(editing.id)} athleteId={athleteId} event={editing} weekStart={weekStart} onClose={() => setEditing(null)} />
+      )}
     </Page>
   );
 }
@@ -153,4 +169,94 @@ function Dot({ planned, done, past }: { planned: boolean; done: boolean; past: b
   else if (planned) color = 'var(--tint)';
   else if (done) color = 'var(--label-3)';
   return <span aria-hidden style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: color }} />;
+}
+
+/** Feuille d'une séance prévue : la déplacer dans la semaine (ou à une date) ou la supprimer. */
+function EditEventSheet({ athleteId, event, weekStart, onClose }: { athleteId: string; event: PlannedEvent; weekStart: dayjs.Dayjs; onClose: () => void }) {
+  const { move, remove } = useEditEvent();
+  const current = event.start_date_local.slice(0, 10);
+  const [date, setDate] = useState(current);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const busy = move.isPending || remove.isPending;
+  const eventId = String(event.id);
+
+  const save = async () => {
+    setError(null);
+    if (date === current) return onClose();
+    try {
+      await move.mutateAsync({ athleteId, eventId, date });
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const destroy = async () => {
+    if (!confirmDelete) return setConfirmDelete(true);
+    setError(null);
+    try {
+      await remove.mutateAsync({ athleteId, eventId });
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title={event.name ?? 'Séance'}
+      action={
+        <button type="button" onClick={save} disabled={busy} style={{ color: 'var(--tint)', fontWeight: 600, minHeight: 44 }}>
+          {move.isPending ? 'Envoi…' : 'OK'}
+        </button>
+      }
+    >
+      <h3 className="section-header">Déplacer au</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, textAlign: 'center' }} role="radiogroup" aria-label="Jour de la semaine">
+        {Array.from({ length: 7 }, (_, i) => {
+          const d = weekStart.add(i, 'day');
+          const key = d.format('YYYY-MM-DD');
+          const on = key === date;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={d.format('dddd D MMMM')}
+              onPointerDown={() => setDate(key)}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setDate(key)}
+              className="pressable"
+              style={{ minHeight: 56, borderRadius: 10, background: on ? 'var(--tint)' : 'var(--fill)', color: on ? '#fff' : undefined }}
+            >
+              <div className="caption" style={{ opacity: 0.8 }}>{d.format('dd').slice(0, 1).toUpperCase()}</div>
+              <div style={{ fontWeight: 600 }} className="tabular-nums">{d.date()}</div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="group" style={{ marginTop: 12 }}>
+        <input type="date" className="field" aria-label="Autre date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
+      </div>
+      <p className="section-footer">La séance est déplacée dans Intervals.icu, puis sur la montre à la prochaine synchro Garmin.</p>
+
+      <div className="group" style={{ marginTop: 28 }}>
+        <button type="button" className="cell" onClick={destroy} disabled={busy} style={{ color: 'var(--red)', justifyContent: 'center' }}>
+          {remove.isPending ? 'Suppression…' : confirmDelete ? 'Confirmer la suppression' : 'Supprimer la séance'}
+        </button>
+      </div>
+      {confirmDelete && !remove.isPending && (
+        <p className="section-footer">La séance disparaîtra du calendrier de l'athlète et de sa montre.</p>
+      )}
+
+      {error && (
+        <p role="alert" className="footnote" style={{ color: 'var(--red)', margin: '12px 4px 0' }}>
+          {error}
+        </p>
+      )}
+    </Sheet>
+  );
 }

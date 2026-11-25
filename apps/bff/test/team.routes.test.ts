@@ -100,3 +100,58 @@ describe('fil et calendrier (mode démo)', () => {
     expect((await get('from=2026-11-29&to=2026-11-23')).statusCode).toBe(400);
   });
 });
+
+describe('calendrier : déplacer et supprimer (mode démo)', () => {
+  const calendar = async () =>
+    (await app.inject({ method: 'GET', url: '/api/athletes/demo-3/calendar?from=2026-11-01&to=2026-12-31', headers: auth('token-a') })).json();
+
+  it('déplace puis supprime une séance envoyée', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/workouts',
+      headers: auth('token-a'),
+      payload: { athleteIds: ['demo-3'], date: '2026-12-02', name: 'À déplacer', description: '- 10m 70%' },
+    });
+    const ev = (await calendar()).events.find((e: { name: string }) => e.name === 'À déplacer');
+    const move = await app.inject({ method: 'PUT', url: `/api/athletes/demo-3/events/${ev.id}`, headers: auth('token-a'), payload: { date: '2026-12-05' } });
+    expect(move.statusCode).toBe(200);
+    expect((await calendar()).events.find((e: { id: string }) => e.id === ev.id).start_date_local).toBe('2026-12-05T00:00:00');
+    const del = await app.inject({ method: 'DELETE', url: `/api/athletes/demo-3/events/${ev.id}`, headers: auth('token-a') });
+    expect(del.statusCode).toBe(200);
+    expect((await calendar()).events.some((e: { id: string }) => e.id === ev.id)).toBe(false);
+  });
+
+  it('valide les entrées et masque les athlètes hors équipe', async () => {
+    const put = (url: string, payload: unknown) => app.inject({ method: 'PUT', url, headers: auth('token-a'), payload: payload as object });
+    expect((await put('/api/athletes/demo-3/events/x1', { date: '5 déc.' })).statusCode).toBe(400);
+    expect((await put('/api/athletes/demo-3/events/a%20b', { date: '2026-12-05' })).statusCode).toBe(400);
+    expect((await put('/api/athletes/i999/events/x1', { date: '2026-12-05' })).statusCode).toBe(404);
+    expect((await put('/api/athletes/demo-3/events/inconnu', { date: '2026-12-05' })).statusCode).toBe(404);
+  });
+});
+
+describe('parcours athlète (mode démo)', () => {
+  const athlete = { authorization: 'Bearer demo-athlete' };
+
+  it("renvoie l'écran Aujourd'hui de l'athlète démo", async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/me/today', headers: athlete });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.name).toBe('Julie');
+    expect(body.week).toHaveLength(7);
+    expect(body.checkin).toBeNull();
+    expect(typeof body.form.fitness).toBe('number');
+  });
+
+  it("enregistre le ressenti et le montre au coach sur la fiche", async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    expect((await app.inject({ method: 'POST', url: '/api/me/checkins', headers: athlete, payload: { day, feeling: 2, note: 'Fatiguée' } })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/api/me/today', headers: athlete })).json().checkin).toMatchObject({ feeling: 2 });
+    const overview = (await app.inject({ method: 'GET', url: '/api/athletes/demo-1/overview', headers: auth('token-a') })).json();
+    expect(overview.checkins[0]).toMatchObject({ day, feeling: 2, note: 'Fatiguée' });
+  });
+
+  it("refuse le tableau équipe à l'athlète", async () => {
+    expect((await app.inject({ method: 'GET', url: '/api/team', headers: athlete })).statusCode).toBe(403);
+  });
+});

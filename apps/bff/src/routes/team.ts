@@ -6,7 +6,7 @@ import { randomToken } from '../lib/crypto.js';
 import { insertInvitation } from '../db/repo.js';
 import { isoDay, summarize } from '../lib/summary.js';
 import { enforceQuota } from '../ratelimit.js';
-import { assertCanView, sourceFor, teamOf } from '../sources.js';
+import { assertCanView, listCheckins, sourceFor, teamOf } from '../sources.js';
 import type { AthleteSummary } from '../types.js';
 import { BadRequest, HttpError, clampArray, validateString } from '../validation.js';
 
@@ -14,6 +14,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (now: Date, n: number) => isoDay(new Date(now.getTime() - n * DAY));
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ATHLETE_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+const EVENT_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 
 class Forbidden extends HttpError {
   constructor() { super(403, 'Réservé au coach'); }
@@ -77,17 +78,18 @@ export async function registerTeamRoutes(app: FastifyInstance) {
     await assertCanView(me, id);
     const now = new Date();
     const src = await sourceFor(id);
-    const [info, wellness, activities, events] = await Promise.all([
+    const [info, wellness, activities, events, checkins] = await Promise.all([
       src.athlete(id),
       src.wellness(id, daysAgo(now, 90), isoDay(now)),
       src.activities(id, daysAgo(now, 30), isoDay(now)),
       src.events(id, daysAgo(now, 7), daysAgo(now, -7)),
+      listCheckins(id, daysAgo(now, 14), isoDay(now)),
     ]);
     const series = wellness
       .filter((w) => w.ctl != null)
       .map((w) => ({ date: w.id, fitness: w.ctl ?? 0, fatigue: w.atl ?? 0, form: Math.round(((w.ctl ?? 0) - (w.atl ?? 0)) * 10) / 10 }));
     const summary = summarize(info, wellness.slice(-14), activities, events, now);
-    return { summary, series, activities };
+    return { summary, series, activities, checkins };
   });
 
   /** Fil d'activité : sorties de toute l'équipe sur 7 jours, la plus récente d'abord. */
@@ -130,6 +132,32 @@ export async function registerTeamRoutes(app: FastifyInstance) {
     const src = await sourceFor(id);
     const [events, activities] = await Promise.all([src.events(id, from, to), src.activities(id, from, to)]);
     return { events, activities };
+  });
+
+  /** Déplace une séance prévue (l'athlète lui-même ou son coach). */
+  app.put<{ Params: { id: string; eventId: string }; Body: { date?: string } }>('/athletes/:id/events/:eventId', async (req) => {
+    const me = requireUser(req);
+    const { id, eventId } = req.params;
+    if (!ATHLETE_ID_RE.test(id) || !EVENT_ID_RE.test(eventId)) throw new BadRequest('id invalide');
+    const date = req.body?.date;
+    if (typeof date !== 'string' || !DATE_RE.test(date)) throw new BadRequest('date invalide (AAAA-MM-JJ)');
+    await assertCanView(me, id);
+    await enforceQuota(me.id, 'editCalendar');
+    const event = await (await sourceFor(id)).moveEvent(id, eventId, date);
+    await invalidateEvents(id);
+    return { event };
+  });
+
+  /** Supprime une séance prévue (l'athlète lui-même ou son coach). */
+  app.delete<{ Params: { id: string; eventId: string } }>('/athletes/:id/events/:eventId', async (req) => {
+    const me = requireUser(req);
+    const { id, eventId } = req.params;
+    if (!ATHLETE_ID_RE.test(id) || !EVENT_ID_RE.test(eventId)) throw new BadRequest('id invalide');
+    await assertCanView(me, id);
+    await enforceQuota(me.id, 'editCalendar');
+    await (await sourceFor(id)).deleteEvent(id, eventId);
+    await invalidateEvents(id);
+    return { ok: true };
   });
 
   /** Invitation à rejoindre l'équipe : lien valable 7 jours, à usage unique. */

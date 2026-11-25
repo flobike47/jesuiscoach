@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance } from 'axios';
 import { runtimeConfig } from '@/lib/runtimeConfig';
 import type { PushTestReport } from '@/lib/push';
-import type { AthleteOverview, AthleteSummary, CalendarRange, FeedItem, Me, PublicStatus } from '@/types';
+import type { Checkin, TodayView, PlannedEvent, AthleteOverview, AthleteSummary, CalendarRange, FeedItem, Me, PublicStatus } from '@/types';
 
 /**
  * Client unique vers le BFF. Toutes les requêtes portent le jeton de session
@@ -98,6 +98,11 @@ async function post<T, B = unknown>(path: string, body: B): Promise<T> {
   return res.data;
 }
 
+async function put<T, B = unknown>(path: string, body: B): Promise<T> {
+  const res = await getClient().put<T>(`/api${path}`, body);
+  return res.data;
+}
+
 async function del<T>(path: string, body?: unknown): Promise<T> {
   const res = await getClient().delete<T>(`/api${path}`, { data: body });
   return res.data;
@@ -119,6 +124,14 @@ export const api = {
     post<AssignResult>('/workouts', body),
   exchangeLoginCode: (code: string) => post<{ token: string }>('/public/auth/exchange', { code }),
   logout: () => post<{ ok: true }>('/auth/logout', {}),
+  today: () => get<TodayView>('/me/today'),
+  saveCheckin: (body: Checkin) => post<{ checkin: Checkin }>('/me/checkins', body),
+  moveEvent: (athleteId: string, eventId: string, date: string) =>
+    put<{ event: PlannedEvent }>(`/athletes/${encodeURIComponent(athleteId)}/events/${encodeURIComponent(eventId)}`, { date }),
+  deleteEvent: (athleteId: string, eventId: string) =>
+    del<{ ok: true }>(`/athletes/${encodeURIComponent(athleteId)}/events/${encodeURIComponent(eventId)}`),
+  /** Mode démo : simule la fin d'une sortie et envoie la notification au coach. */
+  simulateRide: () => post<{ notification: { title: string; body: string }; report: PushTestReport }>('/demo/simulate-ride', {}),
   createInvitation: () => post<{ code: string; expiresAt: string; url: string }>('/invitations', {}),
 
   // -------- Notifications push --------

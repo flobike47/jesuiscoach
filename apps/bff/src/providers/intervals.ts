@@ -60,6 +60,15 @@ export class IntervalsClient {
       })
     ).data;
   }
+
+  /** Déplace un événement du calendrier à une autre date (format attendu : AAAA-MM-JJT00:00:00). */
+  async moveEvent(id: string, eventId: string, date: string): Promise<IntervalsEvent> {
+    return (await this.http.put(`/athlete/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`, { start_date_local: `${date}T00:00:00` })).data;
+  }
+
+  async deleteEvent(id: string, eventId: string): Promise<void> {
+    await this.http.delete(`/athlete/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`);
+  }
 }
 
 /** Échange du code OAuth (à faire dans les 2 minutes qui suivent la redirection). */
