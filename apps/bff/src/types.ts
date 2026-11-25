@@ -16,6 +16,10 @@ export interface IntervalsAthlete {
   }>;
   icu_weight?: number | null;
   icu_ftp?: number | null;
+  /** Réglages de connexion (scope SETTINGS) : sorties Garmin importées directement, séances envoyées à Garmin, Strava relié. */
+  icu_garmin_sync_activities?: boolean | null;
+  icu_garmin_upload_workouts?: boolean | null;
+  strava_authorized?: boolean | null;
 }
 
 export interface IntervalsWellness {
@@ -166,4 +170,22 @@ export interface IntervalsPowerCurve {
 export interface IntervalsPowerCurves {
   list: IntervalsPowerCurve[];
   activities?: Record<string, { id: string; name?: string | null; start_date_local?: string | null }> | null;
+}
+
+/** Séance de la bibliothèque Intervals.icu (`/athlete/{id}/folders` → children). */
+export interface IntervalsLibraryWorkout {
+  id: number | string;
+  name?: string | null;
+  description?: string | null;
+  type?: string | null;
+  moving_time?: number | null;
+  icu_training_load?: number | null;
+}
+
+/** Dossier (FOLDER) ou plan (PLAN) de la bibliothèque Intervals.icu. */
+export interface IntervalsFolder {
+  id: number | string;
+  name?: string | null;
+  type?: string | null;
+  children?: IntervalsLibraryWorkout[] | null;
 }

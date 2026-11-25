@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
+import type { PlanWorkout } from '@/types';
 
 /** Données du coach (via le BFF, jamais d'appel direct à Intervals.icu). */
 
@@ -35,6 +36,38 @@ export function useAssignWorkout() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: api.assignWorkout,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['calendar'] });
+      qc.invalidateQueries({ queryKey: ['team'] });
+    },
+  });
+}
+
+/* ---------- Planification ---------- */
+
+/** Bibliothèque Intervals.icu du coach (déjà en cache 30 min côté serveur). */
+export const useLibrary = () => useQuery({ queryKey: ['library'], queryFn: api.library, staleTime: 10 * 60_000 });
+
+export const usePlans = () => useQuery({ queryKey: ['plans'], queryFn: api.plans });
+
+export function useSavePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id?: string; name: string; workouts: PlanWorkout[] }) =>
+      v.id ? api.updatePlan(v.id, { name: v.name, workouts: v.workouts }) : api.createPlan({ name: v.name, workouts: v.workouts }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['plans'] }),
+  });
+}
+
+export function useDeletePlan() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.deletePlan, onSuccess: () => qc.invalidateQueries({ queryKey: ['plans'] }) });
+}
+
+export function useApplyPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; athleteIds: string[]; startDate: string }) => api.applyPlan(v.id, { athleteIds: v.athleteIds, startDate: v.startDate }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['calendar'] });
       qc.invalidateQueries({ queryKey: ['team'] });

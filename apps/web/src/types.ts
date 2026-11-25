@@ -12,6 +12,13 @@ export interface Me {
   demo: boolean;
 }
 
+/** Réglages de connexion Intervals.icu (« Bien démarrer ») ; null = non lisible. */
+export interface SetupStatus {
+  garminSync: boolean | null;
+  garminUploadWorkouts: boolean | null;
+  stravaLinked: boolean | null;
+}
+
 export interface Alert {
   level: 'high' | 'warn';
   code: 'fatigue' | 'ramp' | 'inactive' | 'missed';
@@ -202,4 +209,37 @@ export interface ActivityView {
   intervals: IntervalView[];
   powerZones: number[] | null;
   hrZones: number[] | null;
+}
+
+/* ---------- Planification (BFF : routes/planning.ts) ---------- */
+
+export interface LibraryWorkout {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface LibraryFolder {
+  id: string;
+  name: string;
+  workouts: LibraryWorkout[];
+}
+
+export interface PlanWorkout {
+  /** 0 = jour de départ du plan. */
+  day: number;
+  name: string;
+  description: string;
+}
+
+export interface TrainingPlan {
+  id: string;
+  name: string;
+  workouts: PlanWorkout[];
+  updatedAt: string;
+}
+
+export interface ApplyPlanResult {
+  total: number;
+  results: Array<{ id: string; ok: boolean; created: number; error?: string }>;
 }

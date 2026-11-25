@@ -1,38 +1,82 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import dayjs from 'dayjs';
-import { Avatar, Cell, Page, Section, Sheet } from '@/components/ios';
-import { useAssignWorkout, useTeam } from '@/hooks/useCoach';
+import { CalendarRange } from 'lucide-react';
+import { Cell, Page, Section, Sheet } from '@/components/ios';
+import { AthletePicker } from '@/components/workout/AthletePicker';
+import { PlanSheet } from '@/components/workout/PlanSheet';
+import { StructureEditor, WorkoutSummary } from '@/components/workout/StructureEditor';
+import { useAssignWorkout, useLibrary, usePlans, useTeam } from '@/hooks/useCoach';
 import { formatDuration } from '@/lib/format';
-import { parseWorkout, TEMPLATES, workoutStats, zoneColor, type Step, type WorkoutTemplate } from '@/lib/workout';
+import { parseWorkout, TEMPLATES, workoutStats, type WorkoutTemplate } from '@/lib/workout';
+import type { TrainingPlan } from '@/types';
 
-/** Écran « Séances » : bibliothèque + éditeur en feuille pour envoyer au calendrier. */
+const NEW_WORKOUT: WorkoutTemplate = { name: 'Nouvelle séance', description: '- 10m ramp 50-75%\n\n- 30m 70%\n\n- 10m 50%' };
+
+/** Écran « Séances » : séances types, bibliothèque Intervals.icu et plans sur plusieurs semaines. */
 export default function Workouts() {
-  const [editing, setEditing] = useState<WorkoutTemplate | null>(null);
+  const [editing, setEditing] = useState<(WorkoutTemplate & { key: string }) | null>(null);
+  const [planOpen, setPlanOpen] = useState<{ plan: TrainingPlan | null } | null>(null);
+  const library = useLibrary();
+  const plans = usePlans();
+  const open = (t: WorkoutTemplate, key: string) => setEditing({ ...t, key });
 
   return (
     <Page title="Séances">
-      <Section header="Bibliothèque" footer="Les % sont relatifs à la FTP de chaque athlète. La séance arrive sur sa montre Garmin via Intervals.icu.">
-        {TEMPLATES.map((t) => {
-          const s = workoutStats(parseWorkout(t.description));
+      <Section header="Plans" footer="Une suite de séances sur plusieurs semaines, envoyée d'un coup dans le calendrier des athlètes.">
+        {(plans.data?.plans ?? []).map((p) => {
+          const weeks = Math.floor(Math.max(0, ...p.workouts.map((w) => w.day)) / 7) + 1;
           return (
             <Cell
-              key={t.name}
-              onClick={() => setEditing(t)}
+              key={p.id}
+              inset={52}
+              leading={<CalendarRange size={20} color="var(--purple)" aria-hidden />}
+              title={p.name}
+              subtitle={`${p.workouts.length} séance${p.workouts.length > 1 ? 's' : ''} · ${weeks} semaine${weeks > 1 ? 's' : ''}`}
+              onClick={() => setPlanOpen({ plan: p })}
               chevron
-              title={t.name}
-              subtitle={
-                <span className="tabular-nums">
-                  {formatDuration(s.seconds)} · charge {s.load} · intensité {s.intensity.toLocaleString('fr-FR')}
-                </span>
-              }
             />
           );
         })}
-        <Cell onClick={() => setEditing({ name: 'Nouvelle séance', description: '- 10m ramp 50-75%\n\n- 30m 70%\n\n- 10m 50%' })} title={<span style={{ color: 'var(--tint)' }}>Créer une séance</span>} />
+        <Cell onClick={() => setPlanOpen({ plan: null })} title={<span style={{ color: 'var(--tint)' }}>Créer un plan</span>} />
       </Section>
 
-      {editing && <WorkoutSheet key={editing.name} template={editing} onClose={() => setEditing(null)} />}
+      <Section header="Séances types" footer="Les % sont relatifs à la FTP de chaque athlète. La séance arrive sur sa montre Garmin via Intervals.icu.">
+        {TEMPLATES.map((t) => (
+          <TemplateCell key={t.name} template={t} onClick={() => open(t, `app-${t.name}`)} />
+        ))}
+        <Cell onClick={() => open(NEW_WORKOUT, `new-${Date.now()}`)} title={<span style={{ color: 'var(--tint)' }}>Créer une séance</span>} />
+      </Section>
+
+      {(library.data?.folders ?? []).map((f) => (
+        <Section key={f.id} header={`Intervals.icu · ${f.name}`}>
+          {f.workouts.map((w) => (
+            <TemplateCell key={w.id} template={w} onClick={() => open(w, `icu-${w.id}`)} />
+          ))}
+        </Section>
+      ))}
+      {library.isError && <p className="section-footer">Bibliothèque Intervals.icu indisponible pour le moment.</p>}
+
+      {editing && <WorkoutSheet key={editing.key} template={editing} onClose={() => setEditing(null)} />}
+      {planOpen && <PlanSheet key={planOpen.plan?.id ?? 'new'} plan={planOpen.plan} onClose={() => setPlanOpen(null)} />}
     </Page>
+  );
+}
+
+function TemplateCell({ template, onClick }: { template: WorkoutTemplate; onClick: () => void }) {
+  const s = workoutStats(parseWorkout(template.description));
+  return (
+    <Cell
+      onClick={onClick}
+      chevron
+      title={template.name}
+      subtitle={
+        s.seconds > 0 ? (
+          <span className="tabular-nums">
+            {formatDuration(s.seconds)} · charge {s.load} · intensité {s.intensity.toLocaleString('fr-FR')}
+          </span>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -44,22 +88,12 @@ function WorkoutSheet({ template, onClose }: { template: WorkoutTemplate; onClos
   const [date, setDate] = useState(dayjs().add(1, 'day').format('YYYY-MM-DD'));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const steps = useMemo(() => parseWorkout(description), [description]);
-  const stats = workoutStats(steps);
   const athletes = team.data?.athletes ?? [];
-
-  const toggle = (id: string) =>
-    setSelected((s) => {
-      const next = new Set(s);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
 
   const send = async () => {
     setError(null);
     if (!name.trim()) return setError('Donne un nom à la séance.');
-    if (steps.length === 0) return setError('La structure ne contient aucun palier lisible (ex. « - 10m 70% »).');
+    if (parseWorkout(description).length === 0) return setError('La structure ne contient aucun palier lisible (ex. « - 10m 70% »).');
     if (selected.size === 0) return setError('Choisis au moins un athlète.');
     try {
       const { results } = await assign.mutateAsync({ athleteIds: [...selected], date, name: name.trim(), description });
@@ -86,77 +120,19 @@ function WorkoutSheet({ template, onClose }: { template: WorkoutTemplate; onClos
         <input className="field" aria-label="Nom de la séance" value={name} onChange={(e) => setName(e.target.value)} style={{ fontWeight: 600 }} />
       </div>
 
-      <div className="card" style={{ marginTop: 12, background: 'var(--cell-2)' }}>
-        <WorkoutProfile steps={steps} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 8 }} className="tabular-nums">
-          <div>
-            <div className="caption secondary">Durée</div>
-            <div style={{ fontWeight: 600 }}>{formatDuration(stats.seconds)}</div>
-          </div>
-          <div>
-            <div className="caption secondary">Charge estimée</div>
-            <div style={{ fontWeight: 600 }}>{stats.load}</div>
-          </div>
-          <div>
-            <div className="caption secondary">Intensité</div>
-            <div style={{ fontWeight: 600 }}>{stats.intensity.toLocaleString('fr-FR')}</div>
-          </div>
-        </div>
+      <div style={{ marginTop: 12 }}>
+        <WorkoutSummary description={description} />
       </div>
 
       <h3 className="section-header">Structure</h3>
-      <div className="group">
-        <textarea className="field" aria-label="Structure de la séance" value={description} onChange={(e) => setDescription(e.target.value)} spellCheck={false} />
-      </div>
-      <p className="section-footer">Une ligne par palier : « - 10m 95-100% », « - 15m ramp 50-75% ». « 3x » répète les paliers suivants jusqu’à la ligne vide.</p>
+      <StructureEditor description={description} onChange={setDescription} />
 
       <h3 className="section-header">Quand</h3>
       <div className="group">
         <input type="date" className="field" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
       </div>
 
-      <h3 className="section-header">
-        Athlètes{' '}
-        <button
-          type="button"
-          style={{ float: 'right', color: 'var(--tint)', textTransform: 'none' }}
-          onClick={() => setSelected(selected.size === athletes.length ? new Set() : new Set(athletes.map((a) => a.id)))}
-        >
-          {selected.size === athletes.length && athletes.length > 0 ? 'Aucun' : 'Tous'}
-        </button>
-      </h3>
-      <div className="group">
-        {athletes.map((a) => (
-          <Cell
-            key={a.id}
-            onClick={() => toggle(a.id)}
-            inset={64}
-            leading={<Avatar name={a.name} />}
-            title={a.name}
-            subtitle={a.ftp ? `FTP ${a.ftp} W` : undefined}
-            detail={
-              <span
-                role="checkbox"
-                aria-checked={selected.has(a.id)}
-                aria-label={a.name}
-                style={{
-                  display: 'grid',
-                  placeItems: 'center',
-                  width: 24,
-                  height: 24,
-                  borderRadius: '50%',
-                  border: selected.has(a.id) ? 'none' : '1.5px solid var(--label-3)',
-                  background: selected.has(a.id) ? 'var(--tint)' : 'transparent',
-                  color: '#fff',
-                  fontSize: 14,
-                }}
-              >
-                {selected.has(a.id) ? '✓' : ''}
-              </span>
-            }
-          />
-        ))}
-      </div>
+      <AthletePicker athletes={athletes} selected={selected} onChange={setSelected} />
 
       {error && (
         <p role="alert" className="footnote" style={{ color: 'var(--red)', margin: '12px 4px 0' }}>
@@ -164,25 +140,5 @@ function WorkoutSheet({ template, onClose }: { template: WorkoutTemplate; onClos
         </p>
       )}
     </Sheet>
-  );
-}
-
-/** Profil de la séance : largeur = durée, hauteur = intensité, couleur = zone. */
-function WorkoutProfile({ steps }: { steps: Step[] }) {
-  const total = steps.reduce((s, x) => s + x.seconds, 0) || 1;
-  const max = Math.max(130, ...steps.map((s) => Math.max(s.from, s.to)));
-  const H = 64;
-  let x = 0;
-  return (
-    <svg viewBox={`0 0 300 ${H}`} width="100%" height={H} role="img" aria-label="Profil de la séance" preserveAspectRatio="none">
-      {steps.map((s, i) => {
-        const w = (s.seconds / total) * 300;
-        const y1 = H - (s.from / max) * H;
-        const y2 = H - (s.to / max) * H;
-        const d = `M${x},${H} L${x},${y1} L${x + w},${y2} L${x + w},${H} Z`;
-        x += w;
-        return <path key={i} d={d} fill={zoneColor((s.from + s.to) / 2)} stroke="var(--cell-2)" strokeWidth={0.6} />;
-      })}
-    </svg>
   );
 }

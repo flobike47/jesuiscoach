@@ -113,7 +113,8 @@ export async function registerIntervalsAuthRoutes(app: FastifyInstance) {
 
       const loginCode = randomToken(24);
       await redis.setex(`login:${loginCode}`, LOGIN_CODE_TTL, user.id);
-      return back(reply, { code: loginCode });
+      // Nouvel athlète invité : le web ouvre l'écran « Bien démarrer ».
+      return back(reply, !existing && user.role === 'athlete' ? { code: loginCode, bienvenue: '1' } : { code: loginCode });
     },
   );
 

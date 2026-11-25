@@ -25,6 +25,7 @@ vi.mock('../src/sources.js', async (orig) => ({
     activity: async () => ({ id: 'x', start_date_local: '' }),
     streams: async () => ({ step: 1, time: [], watts: null, heartrate: null }),
     powerCurves: async () => ({ list: [] }),
+    folders: async () => [],
   }),
 }));
 

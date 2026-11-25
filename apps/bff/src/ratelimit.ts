@@ -26,6 +26,7 @@ export class QuotaExceeded extends Error {
 }
 
 /**
+ * `cost` = nombre d'unités consommées (ex. une par séance écrite dans un plan).
  * `subject` = id de l'entité limitée (user.id, ou `share:<token>` pour les
  * routes publiques).
  *
@@ -33,7 +34,7 @@ export class QuotaExceeded extends Error {
  * avec INCR puis EXPIRE séparés, un échec entre les deux laissait une clé
  * sans expiration → quota bloqué définitivement.
  */
-export async function enforceQuota(subject: string, bucket: QuotaBucket): Promise<void> {
+export async function enforceQuota(subject: string, bucket: QuotaBucket, cost = 1): Promise<void> {
   const { max, windowSec } = QUOTAS[bucket];
   const key = `quota:${bucket}:${subject}`;
 
@@ -41,7 +42,7 @@ export async function enforceQuota(subject: string, bucket: QuotaBucket): Promis
     const res = await redis
       .multi()
       .set(key, 0, 'EX', windowSec, 'NX')
-      .incr(key)
+      .incrby(key, cost)
       .ttl(key)
       .exec();
     if (!res) return; // transaction annulée — passthrough

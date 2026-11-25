@@ -24,6 +24,7 @@ export const TTL = {
   activity: 6 * 60 * 60,           // 6 h — détail d'une sortie (peut être réanalysée juste après l'import)
   streams: 30 * 24 * 60 * 60,      // 30 jours — une sortie ne change plus
   powerCurve: 6 * 60 * 60,         // 6 h
+  library: 30 * 60,                // 30 min — bibliothèque du coach (modifiée dans Intervals.icu)
 } as const;
 
 /**

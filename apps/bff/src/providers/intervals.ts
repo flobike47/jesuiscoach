@@ -1,6 +1,6 @@
 import type { AxiosInstance } from 'axios';
 import { createProviderClient } from './http.js';
-import type { IntervalsActivity, IntervalsActivityDetail, IntervalsAthlete, IntervalsEvent, IntervalsPowerCurves, IntervalsStream, IntervalsWellness, NewWorkoutEvent } from '../types.js';
+import type { IntervalsActivity, IntervalsActivityDetail, IntervalsAthlete, IntervalsEvent, IntervalsFolder, IntervalsPowerCurves, IntervalsStream, IntervalsWellness, NewWorkoutEvent } from '../types.js';
 
 /**
  * Client Intervals.icu (https://intervals.icu/api/v1).
@@ -83,6 +83,11 @@ export class IntervalsClient {
   /** Courbes de puissance vélo sur 90 jours et 1 an (records et modèles). */
   async powerCurves(id: string): Promise<IntervalsPowerCurves> {
     return (await this.http.get(`/athlete/${encodeURIComponent(id)}/power-curves.json`, { params: { type: 'Ride', curves: '90d,1y' } })).data;
+  }
+
+  /** Bibliothèque : dossiers et plans, avec leurs séances (lecture seule, scope LIBRARY:READ). */
+  async folders(id: string): Promise<IntervalsFolder[]> {
+    return (await this.http.get(`/athlete/${encodeURIComponent(id)}/folders`)).data ?? [];
   }
 
   /** Révoque le jeton OAuth de l'app pour cet athlète (et coupe ses webhooks). */

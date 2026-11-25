@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance } from 'axios';
 import { runtimeConfig } from '@/lib/runtimeConfig';
 import type { PushTestReport } from '@/lib/push';
-import type { Checkin, TodayView, PlannedEvent, AthleteOverview, AthleteSummary, CalendarRange, FeedItem, Me, PublicStatus, PowerView, ZonesView, ActivityView } from '@/types';
+import type { Checkin, TodayView, PlannedEvent, AthleteOverview, AthleteSummary, CalendarRange, FeedItem, Me, PublicStatus, PowerView, ZonesView, ActivityView, LibraryFolder, TrainingPlan, PlanWorkout, ApplyPlanResult, SetupStatus } from '@/types';
 
 /**
  * Client unique vers le BFF. Toutes les requêtes portent le jeton de session
@@ -115,6 +115,7 @@ export interface AssignResult {
 export const api = {
   status: () => get<PublicStatus>('/public/status'),
   me: () => get<Me>('/me'),
+  setup: (refresh = false) => get<SetupStatus>('/me/setup', refresh ? { refresh: 1 } : undefined),
   team: () => get<{ athletes: AthleteSummary[]; errors: Array<{ id: string; error: string }> }>('/team'),
   feed: () => get<{ items: FeedItem[] }>('/feed'),
   athleteOverview: (id: string) => get<AthleteOverview>(`/athletes/${encodeURIComponent(id)}/overview`),
@@ -126,6 +127,12 @@ export const api = {
     get<CalendarRange>(`/athletes/${encodeURIComponent(id)}/calendar`, { from, to }),
   assignWorkout: (body: { athleteIds: string[]; date: string; name: string; description: string }) =>
     post<AssignResult>('/workouts', body),
+  library: () => get<{ folders: LibraryFolder[] }>('/library'),
+  plans: () => get<{ plans: TrainingPlan[] }>('/plans'),
+  createPlan: (body: { name: string; workouts: PlanWorkout[] }) => post<TrainingPlan>('/plans', body),
+  updatePlan: (id: string, body: { name: string; workouts: PlanWorkout[] }) => put<TrainingPlan>(`/plans/${encodeURIComponent(id)}`, body),
+  deletePlan: (id: string) => del<{ ok: true }>(`/plans/${encodeURIComponent(id)}`),
+  applyPlan: (id: string, body: { athleteIds: string[]; startDate: string }) => post<ApplyPlanResult>(`/plans/${encodeURIComponent(id)}/apply`, body),
   exchangeLoginCode: (code: string) => post<{ token: string }>('/public/auth/exchange', { code }),
   logout: () => post<{ ok: true }>('/auth/logout', {}),
   deleteAccount: () => del<{ ok: true }>('/me'),
