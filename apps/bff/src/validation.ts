@@ -18,6 +18,10 @@ export class Unauthorized extends HttpError {
   constructor(message = 'Unauthorized') { super(401, message); }
 }
 
+export class Forbidden extends HttpError {
+  constructor(message = 'Réservé au coach') { super(403, message); }
+}
+
 export class NotFound extends HttpError {
   constructor(message = 'Not found') { super(404, message); }
 }
@@ -33,6 +37,9 @@ export class Gone extends HttpError {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Identifiant d'athlète Intervals.icu (même contrainte que users.intervals_athlete_id). */
 export const ATHLETE_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+
+/** Date du calendrier (AAAA-MM-JJ). */
+export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function validateUuid(input: unknown, name = 'id'): string {
   if (typeof input !== 'string' || !UUID_RE.test(input)) throw new BadRequest(`${name} invalide`);

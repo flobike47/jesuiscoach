@@ -9,16 +9,11 @@ import { isoDay, summarize } from '../lib/summary.js';
 import { enforceQuota } from '../ratelimit.js';
 import { assertCanView, listCheckins, sourceFor, teamOf } from '../sources.js';
 import type { AthleteSummary } from '../types.js';
-import { ATHLETE_ID_RE, BadRequest, HttpError, clampArray, validateString } from '../validation.js';
+import { ATHLETE_ID_RE, BadRequest, DATE_RE, Forbidden, HttpError, clampArray, validateString } from '../validation.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (now: Date, n: number) => isoDay(new Date(now.getTime() - n * DAY));
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EVENT_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
-
-class Forbidden extends HttpError {
-  constructor() { super(403, 'Réservé au coach'); }
-}
 
 interface AssignBody {
   athleteIds: string[];

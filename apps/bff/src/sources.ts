@@ -7,7 +7,7 @@ import { checkinsOf, deleteUser, intervalsTokenOf, teamAthleteIds, upsertCheckin
 import { revokeAllSessions } from './sessions.js';
 import type { AuthUser } from './auth.js';
 import { downsampleStreams } from './lib/dashboards.js';
-import type { ActivityStreams, IntervalsActivity, IntervalsActivityDetail, IntervalsAthlete, IntervalsEvent, IntervalsPowerCurves, IntervalsWellness, NewWorkoutEvent } from './types.js';
+import type { ActivityStreams, IntervalsActivity, IntervalsActivityDetail, IntervalsAthlete, IntervalsEvent, IntervalsFolder, IntervalsPowerCurves, IntervalsWellness, NewWorkoutEvent } from './types.js';
 import { HttpError, NotFound } from './validation.js';
 
 /**
@@ -26,6 +26,8 @@ export interface AthleteSource {
   /** Streams déjà réduits pour l'affichage (lib/dashboards.ts). */
   streams(id: string, activityId: string): Promise<ActivityStreams>;
   powerCurves(id: string): Promise<IntervalsPowerCurves>;
+  /** Bibliothèque Intervals.icu (lecture seule). */
+  folders(id: string): Promise<IntervalsFolder[]>;
 }
 
 export class NotConnected extends HttpError {
@@ -76,6 +78,7 @@ function cachedSource(athleteId: string, client: IntervalsClient): AthleteSource
     // Seule la version réduite est gardée (quelques Ko au lieu de centaines).
     streams: (_id, activityId) => cachedJson(k('streams', activityId), TTL.streams, async () => downsampleStreams(await client.streams(activityId))),
     powerCurves: (id) => cachedJson(k('powercurves'), TTL.powerCurve, () => client.powerCurves(id)),
+    folders: (id) => cachedJson(k('folders'), TTL.library, () => client.folders(id)),
   };
 }
 

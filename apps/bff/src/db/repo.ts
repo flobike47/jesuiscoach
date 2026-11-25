@@ -313,3 +313,51 @@ export async function ensureDemoUsers(coach: { id: string; athleteId: string; na
     await tx.query('insert into coach_athletes (coach_id, athlete_id) values ($1, $2) on conflict do nothing', [coach.id, athlete.id]);
   });
 }
+
+/* ---------- Plans d'entraînement (toujours filtrés par coach) ---------- */
+
+export interface PlanRow {
+  id: string;
+  name: string;
+  workouts: Array<{ day: number; name: string; description: string }>;
+  updated_at: Date | string;
+}
+
+const PLAN_COLS = 'id, name, workouts, updated_at';
+
+export async function plansOf(coachId: string): Promise<PlanRow[]> {
+  const { rows } = await db().query<PlanRow>(`select ${PLAN_COLS} from training_plans where coach_id = $1 order by updated_at desc`, [coachId]);
+  return rows;
+}
+
+export async function planOf(coachId: string, planId: string): Promise<PlanRow | null> {
+  const { rows } = await db().query<PlanRow>(`select ${PLAN_COLS} from training_plans where coach_id = $1 and id = $2`, [coachId, planId]);
+  return rows[0] ?? null;
+}
+
+/**
+ * Crée un plan si le coach en a moins de `max` (une seule instruction :
+ * pas de « compter puis insérer » en deux temps). null = limite atteinte.
+ */
+export async function insertPlan(coachId: string, name: string, workouts: PlanRow['workouts'], max: number): Promise<PlanRow | null> {
+  const { rows } = await db().query<PlanRow>(
+    `insert into training_plans (coach_id, name, workouts)
+     select $1, $2, $3::jsonb where (select count(*) from training_plans where coach_id = $1) < $4
+     returning ${PLAN_COLS}`,
+    [coachId, name, JSON.stringify(workouts), max],
+  );
+  return rows[0] ?? null;
+}
+
+export async function updatePlan(coachId: string, planId: string, name: string, workouts: PlanRow['workouts']): Promise<PlanRow | null> {
+  const { rows } = await db().query<PlanRow>(
+    `update training_plans set name = $3, workouts = $4::jsonb, updated_at = now()
+     where coach_id = $1 and id = $2 returning ${PLAN_COLS}`,
+    [coachId, planId, name, JSON.stringify(workouts)],
+  );
+  return rows[0] ?? null;
+}
+
+export async function deletePlan(coachId: string, planId: string): Promise<boolean> {
+  return affected(await db().query('delete from training_plans where coach_id = $1 and id = $2', [coachId, planId])) > 0;
+}

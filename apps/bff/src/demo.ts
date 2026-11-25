@@ -7,6 +7,7 @@ import type {
   IntervalsActivityDetail,
   IntervalsAthlete,
   IntervalsEvent,
+  IntervalsFolder,
   IntervalsInterval,
   IntervalsPowerCurves,
   IntervalsStream,
@@ -329,5 +330,31 @@ export class DemoSource {
       list: [curve('90d', () => 1, recent), curve('1y', yearFactor, rides)],
       activities: Object.fromEntries(rides.map((x) => [x.id, { id: x.id, name: x.name, start_date_local: x.start_date_local }])),
     };
+  }
+
+  /** Bibliothèque fictive du coach démo : deux dossiers de séances. */
+  async folders(): Promise<IntervalsFolder[]> {
+    return [
+      {
+        id: 101,
+        name: 'Hiver : bases',
+        type: 'FOLDER',
+        children: [
+          { id: 1011, name: 'Endurance 1 h 30 + cadence', type: 'Ride', description: 'Échauffement\n- 10m ramp 50-65%\n\n- 70m 65-72%\n\n- 10m 55%' },
+          { id: 1012, name: 'Tempo 2×20', type: 'Ride', description: 'Échauffement\n- 15m ramp 50-75%\n\n2x\n- 20m 80-85%\n- 5m 55%\n\n- 10m 50%' },
+          { id: 1013, name: 'Course à pied', type: 'Run', description: '- 40m Z2 Pace' },
+        ],
+      },
+      {
+        id: 102,
+        name: 'Printemps : intensité',
+        type: 'FOLDER',
+        children: [
+          { id: 1021, name: 'Seuil 2×15', type: 'Ride', description: 'Échauffement\n- 15m ramp 50-75%\n\n2x\n- 15m 98-102%\n- 5m 55%\n\n- 10m 50%' },
+          { id: 1022, name: '30/30 × 12', type: 'Ride', description: 'Échauffement\n- 15m ramp 50-75%\n\n12x\n- 30s 130%\n- 30s 50%\n\n- 15m 55%' },
+          { id: 1023, name: 'Pignon fixe en cadence', type: 'Ride', description: '- 45m 70% 95rpm' },
+        ],
+      },
+    ];
   }
 }
