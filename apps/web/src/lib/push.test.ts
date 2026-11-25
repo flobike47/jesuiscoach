@@ -222,7 +222,9 @@ describe('service worker : requêtes interceptées', () => {
   /** Renvoie true si le service worker prend la main sur la requête (respondWith). */
   function intercepts(path: string, mode = 'cors') {
     const { listeners, scope } = loadServiceWorker();
-    const respondWith = vi.fn();
+    // On ne teste que la décision d'interception : la réponse (cache) n'existe
+    // pas dans ce faux environnement, sa promesse est absorbée.
+    const respondWith = vi.fn((p: Promise<unknown>) => p.catch(() => undefined));
     listeners.fetch({ request: { method: 'GET', url: new URL(path, scope).href, mode }, respondWith });
     return respondWith.mock.calls.length > 0;
   }
