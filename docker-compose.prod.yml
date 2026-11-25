@@ -7,11 +7,13 @@
 #   2. Sur la Pi, place ce fichier + un `.env.prod` à côté.
 #   3. `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d`
 #
-# Caddy global (sur la Pi, hors stack) fait la terminaison TLS :
-#   coach.tondomaine.com      → 127.0.0.1:8180 (web)
-#   api-coach.tondomaine.com  → 127.0.0.1:4100 (bff)
+# Une seule adresse publique (Cloudflare Tunnel ou Caddy global de la Pi,
+# terminaison TLS) → 127.0.0.1:8180 (web). Le Caddy du conteneur web sert
+# l'app et relaie /api/* au BFF par le réseau interne :
+#   https://jesuiscoach.fb-cloud.fr/        → web
+#   https://jesuiscoach.fb-cloud.fr/api/…   → bff
 # Ports hôte distincts d'investhelper (8080 / 4000) : les deux stacks
-# tournent sur le même Pi.
+# tournent sur le même Pi. 4100 (BFF direct) ne sert qu'au diagnostic.
 # =============================================================================
 
 services:
@@ -97,7 +99,7 @@ services:
       # Mot de passe : lettres et chiffres seulement (il est placé dans une URL).
       DATABASE_URL: postgres://jesuiscoach:${POSTGRES_PASSWORD}@postgres:5432/jesuiscoach
 
-      PUBLIC_API_URL: ${PUBLIC_API_URL}         # https://api-coach.tondomaine.com (callback OAuth)
+      PUBLIC_API_URL: ${PUBLIC_API_URL}         # https://jesuiscoach.fb-cloud.fr (callback OAuth)
       DEMO_MODE: ${DEMO_MODE:-false}
       SYNC_INTERVAL_MIN: ${SYNC_INTERVAL_MIN:-30}
 
@@ -131,6 +133,8 @@ services:
       # rebuild d'image — restart suffit.
       BASE_PATH: ${BASE_PATH:-/}                # ex: /jesuiscoach/ si servi sous sous-chemin
       BFF_URL: ${BFF_URL}
+    depends_on:
+      - bff
     ports:
       - "127.0.0.1:8180:80"
     networks:

@@ -4,13 +4,21 @@
 # remplace `:80` par ton domaine (`tondomaine.com`) et expose 443.
 
 :80 {
-    root * /srv
-
     encode zstd gzip
 
-    # SPA fallback : toute route inconnue tombe sur index.html → React Router prend le relais
-    try_files {path} /index.html
-    file_server
+    # API sur la même adresse que l'app (https://…/api/…) : relayée au BFF par
+    # le réseau interne de la stack. Un seul nom d'hôte côté tunnel / proxy,
+    # pas de CORS. BFF_UPSTREAM (défaut bff:4000) = service du compose.
+    handle /api/* {
+        reverse_proxy {$BFF_UPSTREAM:bff:4000}
+    }
+
+    handle {
+        root * /srv
+        # SPA fallback : toute route inconnue tombe sur index.html → React Router prend le relais
+        try_files {path} /index.html
+        file_server
+    }
 
     # Cache long pour les assets versionnés Vite (hash dans le nom)
     @hashed path /assets/*
