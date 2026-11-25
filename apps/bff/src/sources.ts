@@ -6,7 +6,8 @@ import { IntervalsClient } from './providers/intervals.js';
 import { checkinsOf, deleteUser, intervalsTokenOf, teamAthleteIds, upsertCheckin, type CheckinRow } from './db/repo.js';
 import { revokeAllSessions } from './sessions.js';
 import type { AuthUser } from './auth.js';
-import type { IntervalsActivity, IntervalsAthlete, IntervalsEvent, IntervalsWellness, NewWorkoutEvent } from './types.js';
+import { downsampleStreams } from './lib/dashboards.js';
+import type { ActivityStreams, IntervalsActivity, IntervalsActivityDetail, IntervalsAthlete, IntervalsEvent, IntervalsPowerCurves, IntervalsWellness, NewWorkoutEvent } from './types.js';
 import { HttpError, NotFound } from './validation.js';
 
 /**
@@ -21,6 +22,10 @@ export interface AthleteSource {
   createWorkout(id: string, workout: NewWorkoutEvent): Promise<IntervalsEvent>;
   moveEvent(id: string, eventId: string, date: string): Promise<IntervalsEvent>;
   deleteEvent(id: string, eventId: string): Promise<void>;
+  activity(id: string, activityId: string): Promise<IntervalsActivityDetail>;
+  /** Streams déjà réduits pour l'affichage (lib/dashboards.ts). */
+  streams(id: string, activityId: string): Promise<ActivityStreams>;
+  powerCurves(id: string): Promise<IntervalsPowerCurves>;
 }
 
 export class NotConnected extends HttpError {
@@ -67,6 +72,10 @@ function cachedSource(athleteId: string, client: IntervalsClient): AthleteSource
     createWorkout: (id, w) => client.createWorkout(id, w),
     moveEvent: (id, eventId, date) => client.moveEvent(id, eventId, date),
     deleteEvent: (id, eventId) => client.deleteEvent(id, eventId),
+    activity: (_id, activityId) => cachedJson(k('activity', activityId), TTL.activity, () => client.activity(activityId)),
+    // Seule la version réduite est gardée (quelques Ko au lieu de centaines).
+    streams: (_id, activityId) => cachedJson(k('streams', activityId), TTL.streams, async () => downsampleStreams(await client.streams(activityId))),
+    powerCurves: (id) => cachedJson(k('powercurves'), TTL.powerCurve, () => client.powerCurves(id)),
   };
 }
 

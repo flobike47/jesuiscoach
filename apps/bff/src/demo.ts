@@ -1,6 +1,18 @@
 import { isoDay } from './lib/summary.js';
 import type { CheckinRow } from './db/repo.js';
-import type { IntervalsActivity, IntervalsAthlete, IntervalsEvent, IntervalsWellness, NewWorkoutEvent } from './types.js';
+import { downsampleStreams } from './lib/dashboards.js';
+import type {
+  ActivityStreams,
+  IntervalsActivity,
+  IntervalsActivityDetail,
+  IntervalsAthlete,
+  IntervalsEvent,
+  IntervalsInterval,
+  IntervalsPowerCurves,
+  IntervalsStream,
+  IntervalsWellness,
+  NewWorkoutEvent,
+} from './types.js';
 
 /**
  * Données fictives stables pour 10 cyclistes (mode démo, DEMO_MODE=true).
@@ -11,6 +23,30 @@ import type { IntervalsActivity, IntervalsAthlete, IntervalsEvent, IntervalsWell
 const NAMES = ['Florian', 'Julie', 'Paul', 'Sarah', 'Thomas', 'Léa', 'Hugo', 'Camille', 'Maxime', 'Inès'];
 const RIDE_NAMES = ['Sortie endurance', 'Sweet spot 3×12', 'Sortie club', 'Col du coin', 'Récupération', 'Seuil 3×10', 'VO2max 5×4'];
 const DAY = 24 * 60 * 60 * 1000;
+const POWER_ZONES = [55, 75, 90, 105, 120, 150, 999];
+const HR_ZONES = [130, 148, 160, 170, 178, 185, 195];
+
+/**
+ * Temps par zone d'une sortie démo, déduit de son intensité (sans tirage
+ * aléatoire : le reste de la démo ne change pas). Plus l'intensité est
+ * haute, plus le temps glisse vers les zones hautes.
+ */
+function demoZones(seconds: number, intensity: number) {
+  const t = Math.min(1, Math.max(0, (intensity - 0.6) / 0.3));
+  const power = [0.35 - 0.15 * t, 0.4 - 0.15 * t, 0.12 + 0.05 * t, 0.07 + 0.12 * t, 0.03 + 0.08 * t, 0.02 + 0.03 * t, 0.01 + 0.02 * t];
+  const hr = [0.3 - 0.15 * t, 0.4 - 0.1 * t, 0.15 + 0.05 * t, 0.1 + 0.12 * t, 0.05 + 0.08 * t, 0, 0];
+  return {
+    icu_zone_times: power.map((w, i) => ({ id: `Z${i + 1}`, secs: Math.round(w * seconds) })),
+    icu_hr_zone_times: hr.map((w) => Math.round(w * seconds)),
+  };
+}
+
+/** Graine stable tirée d'un identifiant (même sortie démo → mêmes courbes). */
+function seedOf(id: string): number {
+  let h = 2166136261;
+  for (const c of id) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return h >>> 0;
+}
 
 /** PRNG déterministe (mulberry32) : la démo est identique à chaque démarrage. */
 function rng(seed: number) {
@@ -71,6 +107,7 @@ function simulate(k: number, now: Date): DemoAthlete {
         icu_weighted_avg_watts: Math.round(ftp * intensity),
         icu_intensity: Math.round(intensity * 1000) / 10,
         average_heartrate: 125 + Math.floor(r() * 33),
+        ...demoZones(Math.round(hours * 3600), intensity),
       });
     }
     ctl += (load - ctl) / 42;
@@ -86,7 +123,12 @@ function simulate(k: number, now: Date): DemoAthlete {
   });
 
   return {
-    info: { id: `demo-${k}`, name: NAMES[k], sportSettings: [{ types: ['Ride', 'VirtualRide'], ftp }] },
+    info: {
+      id: `demo-${k}`,
+      name: NAMES[k],
+      icu_weight: 62 + k * 2,
+      sportSettings: [{ types: ['Ride', 'VirtualRide'], ftp, power_zones: POWER_ZONES, hr_zones: HR_ZONES, sweet_spot_min: 84, sweet_spot_max: 97 }],
+    },
     wellness,
     activities,
     events,
@@ -131,6 +173,7 @@ export class DemoSource {
       icu_weighted_avg_watts: Math.round(ftp * intensity),
       icu_intensity: Math.round(intensity * 1000) / 10,
       average_heartrate: 145,
+      ...demoZones(Math.round(hours * 3600), intensity),
     };
     a.activities.push(activity);
     return { name: a.info.name ?? athleteId, activity };
@@ -177,5 +220,114 @@ export class DemoSource {
     this.event(id, eventId);
     const a = this.get(id);
     a.events = a.events.filter((e) => String(e.id) !== eventId);
+  }
+
+  /* ---------- Tableaux de bord avancés ---------- */
+
+  private activityOf(id: string, activityId: string): { a: DemoAthlete; activity: IntervalsActivity } {
+    const a = this.get(id);
+    const activity = a.activities.find((x) => x.id === activityId);
+    if (!activity) throw Object.assign(new Error('Sortie introuvable'), { statusCode: 404 });
+    return { a, activity };
+  }
+
+  /** Séance fictive : échauffement, blocs selon le nom (« 3×10 », « 5×4 »…), retour au calme. */
+  private demoRide(id: string, activityId: string) {
+    const { a, activity } = this.activityOf(id, activityId);
+    const ftp = a.info.sportSettings?.[0]?.ftp ?? 250;
+    const r = rng(seedOf(activityId));
+    const STEP = 5; // un point toutes les 5 s
+    const n = Math.max(60, Math.round((activity.moving_time ?? 3600) / STEP));
+    const blocks = /(\d)×(\d+)/.exec(activity.name ?? '');
+    const reps = blocks ? Number(blocks[1]) : 0;
+    const minutes = blocks ? Number(blocks[2]) : 0;
+    const target = /VO2/.test(activity.name ?? '') ? 1.15 : /Sweet/.test(activity.name ?? '') ? 0.9 : 1.0;
+    const work: Array<[number, number]> = [];
+    let cursor = Math.round((15 * 60) / STEP);
+    for (let i = 0; i < reps && cursor < n; i++) {
+      const len = Math.round((minutes * 60) / STEP);
+      work.push([cursor, Math.min(n - 1, cursor + len)]);
+      cursor += len + Math.round(((minutes >= 8 ? 5 : minutes) * 60) / STEP);
+    }
+    const watts: number[] = [];
+    const heartrate: number[] = [];
+    let hr = 105;
+    for (let i = 0; i < n; i++) {
+      const inWork = work.some(([s, e]) => i >= s && i < e);
+      const base = inWork ? target : i < 180 / STEP ? 0.5 + (i * STEP) / 600 : 0.62;
+      const w = Math.max(0, Math.round(ftp * base * (0.92 + r() * 0.16)));
+      hr += (100 + (w / ftp) * 70 - hr) * 0.08;
+      watts.push(w);
+      heartrate.push(Math.round(hr));
+    }
+    const avg = (xs: number[]) => Math.round(xs.reduce((s, x) => s + x, 0) / Math.max(1, xs.length));
+    const intervals: IntervalsInterval[] = work.map(([s, e]) => ({
+      type: 'WORK',
+      start_index: s,
+      end_index: e,
+      moving_time: (e - s) * STEP,
+      average_watts: avg(watts.slice(s, e)),
+      weighted_average_watts: avg(watts.slice(s, e)) + 3,
+      average_heartrate: avg(heartrate.slice(s, e)),
+      average_cadence: 88 + Math.floor(r() * 8),
+      zone: target >= 1.1 ? 5 : target >= 0.95 ? 4 : 3,
+      intensity: Math.round(target * 100),
+    }));
+    const streams: IntervalsStream[] = [
+      { type: 'time', data: Array.from({ length: n }, (_, i) => i * STEP) },
+      { type: 'watts', data: watts },
+      { type: 'heartrate', data: heartrate },
+    ];
+    return { a, activity, intervals, streams, r };
+  }
+
+  async activity(id: string, activityId: string): Promise<IntervalsActivityDetail> {
+    const { activity, intervals, r } = this.demoRide(id, activityId);
+    return {
+      ...activity,
+      icu_athlete_id: id,
+      icu_average_watts: Math.round((activity.icu_weighted_avg_watts ?? 200) * 0.93),
+      total_elevation_gain: Math.round(150 + r() * 900),
+      decoupling: Math.round((1 + r() * 6) * 10) / 10,
+      icu_intervals: intervals,
+    };
+  }
+
+  async streams(id: string, activityId: string): Promise<ActivityStreams> {
+    return downsampleStreams(this.demoRide(id, activityId).streams);
+  }
+
+  async powerCurves(id: string): Promise<IntervalsPowerCurves> {
+    const a = this.get(id);
+    const k = this.athletes.indexOf(a);
+    const ftp = a.info.sportSettings?.[0]?.ftp ?? 250;
+    const weight = a.info.icu_weight ?? 70;
+    const cp = ftp * 1.03;
+    const wPrime = 15000 + k * 800;
+    const pMax = ftp * 3.4;
+    const secs = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 420, 600, 900, 1200, 1800, 2700, 3600, 5400, 7200, 10800, 14400];
+    // Modèle à 3 paramètres (CP, W′, Pmax) puis lente décroissance au-delà de 20 min.
+    const short = (t: number) => cp + wPrime / (t + wPrime / (pMax - cp));
+    const model = (t: number) => (t <= 1200 ? short(t) : short(1200) * (1 - 0.07 * Math.log(t / 1200)));
+    const rides = [...a.activities].reverse();
+    const recent = rides.slice(0, 20);
+    const curve = (id90: '90d' | '1y', factor: (t: number) => number, pool: IntervalsActivity[]) => {
+      const watts = secs.map((t) => Math.round(model(t) * factor(t)));
+      return {
+        id: id90,
+        secs,
+        watts,
+        watts_per_kg: watts.map((w) => Math.round((w / weight) * 100) / 100),
+        activity_id: secs.map((_, i) => pool[i % Math.max(1, pool.length)]?.id ?? ''),
+        weight,
+        powerModels: [{ type: 'ECP', criticalPower: Math.round(cp * factor(1200)), wPrime, pMax: Math.round(pMax * factor(1)), ftp: Math.round(cp * factor(1200) * 0.98) }],
+      };
+    };
+    // 1 an un peu au-dessus de 90 jours, sauf certains records récents (20 min).
+    const yearFactor = (t: number) => (t === 1200 && k % 2 === 0 ? 1 : 1.04);
+    return {
+      list: [curve('90d', () => 1, recent), curve('1y', yearFactor, rides)],
+      activities: Object.fromEntries(rides.map((x) => [x.id, { id: x.id, name: x.name, start_date_local: x.start_date_local }])),
+    };
   }
 }

@@ -1,6 +1,6 @@
 import type { AxiosInstance } from 'axios';
 import { createProviderClient } from './http.js';
-import type { IntervalsActivity, IntervalsAthlete, IntervalsEvent, IntervalsWellness, NewWorkoutEvent } from '../types.js';
+import type { IntervalsActivity, IntervalsActivityDetail, IntervalsAthlete, IntervalsEvent, IntervalsPowerCurves, IntervalsStream, IntervalsWellness, NewWorkoutEvent } from '../types.js';
 
 /**
  * Client Intervals.icu (https://intervals.icu/api/v1).
@@ -68,6 +68,21 @@ export class IntervalsClient {
 
   async deleteEvent(id: string, eventId: string): Promise<void> {
     await this.http.delete(`/athlete/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`);
+  }
+
+  /** Détail d'une sortie avec ses intervalles. */
+  async activity(activityId: string): Promise<IntervalsActivityDetail> {
+    return (await this.http.get(`/activity/${encodeURIComponent(activityId)}`, { params: { intervals: true } })).data;
+  }
+
+  /** Streams d'une sortie (un point par seconde) ; les types absents sont omis. */
+  async streams(activityId: string): Promise<IntervalsStream[]> {
+    return (await this.http.get(`/activity/${encodeURIComponent(activityId)}/streams.json`, { params: { types: 'time,watts,heartrate' } })).data ?? [];
+  }
+
+  /** Courbes de puissance vélo sur 90 jours et 1 an (records et modèles). */
+  async powerCurves(id: string): Promise<IntervalsPowerCurves> {
+    return (await this.http.get(`/athlete/${encodeURIComponent(id)}/power-curves.json`, { params: { type: 'Ride', curves: '90d,1y' } })).data;
   }
 
   /** Révoque le jeton OAuth de l'app pour cet athlète (et coupe ses webhooks). */

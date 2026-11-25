@@ -33,6 +33,9 @@ function fakeSource(activities: IntervalsActivity[], form = { ctl: 60, atl: 65 }
     createWorkout: unused,
     moveEvent: unused,
     deleteEvent: unused,
+    activity: unused,
+    streams: unused,
+    powerCurves: unused,
   };
 }
 

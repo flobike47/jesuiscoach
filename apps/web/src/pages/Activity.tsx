@@ -63,7 +63,7 @@ export default function Activity() {
 function FeedCard({ item }: { item: FeedItem }) {
   const a = item.activity;
   return (
-    <Link to={`/athletes/${encodeURIComponent(item.athleteId)}`} className="card pressable" style={{ display: 'block', color: 'inherit' }}>
+    <Link to={`/athletes/${encodeURIComponent(item.athleteId)}/sorties/${encodeURIComponent(a.id)}`} className="card pressable" style={{ display: 'block', color: 'inherit' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <Avatar name={item.athleteName} />
         <div style={{ flex: 1, minWidth: 0 }}>

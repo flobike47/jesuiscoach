@@ -103,3 +103,103 @@ export interface CalendarRange {
   /** Séances réalisées (appariées par Intervals.icu, sinon sortie du même jour). */
   doneEventIds: string[];
 }
+
+/* ---------- Tableaux de bord avancés (BFF : lib/dashboards.ts) ---------- */
+
+export type CurveRange = '90d' | '1y';
+
+export interface CurvePoint {
+  secs: number;
+  watts: number;
+}
+
+export interface PowerRecord {
+  secs: number;
+  watts: number;
+  wkg: number | null;
+  activityId: string | null;
+  activityName: string | null;
+  date: string | null;
+  /** Record de l'année établi dans les 90 derniers jours. */
+  yearBest: boolean;
+}
+
+export interface PowerModel {
+  ftp: number | null;
+  cp: number | null;
+  wPrime: number | null;
+  pMax: number | null;
+}
+
+export interface PowerView {
+  ftp: number | null;
+  curves: Record<CurveRange, CurvePoint[]>;
+  records: Record<CurveRange, PowerRecord[]>;
+  models: Record<CurveRange, PowerModel | null>;
+}
+
+export interface ZoneRange {
+  name: string;
+  from: number;
+  to: number | null;
+}
+
+export interface ZonesWeek {
+  week: string;
+  power: number[];
+  hr: number[];
+  movingTime: number;
+}
+
+export interface ZonesView {
+  weeks: ZonesWeek[];
+  ftp: number | null;
+  powerZones: ZoneRange[];
+  hrZones: ZoneRange[];
+  sweetSpot: { from: number; to: number } | null;
+  ridesWithPower: number;
+  ridesWithHr: number;
+  rides: number;
+}
+
+export interface ActivityStreams {
+  step: number;
+  time: number[];
+  watts: Array<number | null> | null;
+  heartrate: Array<number | null> | null;
+}
+
+export interface IntervalView {
+  label: string;
+  start: number;
+  end: number;
+  duration: number;
+  watts: number | null;
+  weightedWatts: number | null;
+  heartrate: number | null;
+  cadence: number | null;
+  zone: number | null;
+}
+
+export interface ActivityView {
+  activity: {
+    id: string;
+    name: string;
+    date: string;
+    type: string | null;
+    movingTime: number | null;
+    distance: number | null;
+    elevation: number | null;
+    load: number | null;
+    weightedWatts: number | null;
+    averageWatts: number | null;
+    intensity: number | null;
+    heartrate: number | null;
+    decoupling: number | null;
+    ftp: number | null;
+  };
+  streams: ActivityStreams;
+  intervals: IntervalView[];
+  powerZones: number[] | null;
+  hrZones: number[] | null;
+}

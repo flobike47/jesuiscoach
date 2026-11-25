@@ -3,7 +3,18 @@
 export interface IntervalsAthlete {
   id: string;
   name?: string;
-  sportSettings?: Array<{ types?: string[]; ftp?: number | null }>;
+  sportSettings?: Array<{
+    types?: string[];
+    ftp?: number | null;
+    /** Bornes hautes des zones de puissance, en % de la FTP (dernière = 999). */
+    power_zones?: number[] | null;
+    /** Bornes hautes des zones cardio, en bpm. */
+    hr_zones?: number[] | null;
+    /** Sweet spot, en % de la FTP. */
+    sweet_spot_min?: number | null;
+    sweet_spot_max?: number | null;
+  }>;
+  icu_weight?: number | null;
   icu_ftp?: number | null;
 }
 
@@ -36,6 +47,14 @@ export interface IntervalsActivity {
   compliance?: number | null;
   /** Temps par zone de puissance : Z1…Z7 et SS (sweet spot), en secondes. */
   icu_zone_times?: Array<{ id: string; secs: number }> | null;
+  /** Temps par zone cardio, en secondes (une valeur par zone). */
+  icu_hr_zone_times?: Array<number | { id: string; secs: number }> | null;
+  /** Athlète propriétaire de la sortie (contrôle d'accès du détail). */
+  icu_athlete_id?: string | null;
+  icu_ftp?: number | null;
+  average_cadence?: number | null;
+  /** Dérive cardiaque (Pw:Hr), en %. */
+  decoupling?: number | null;
   /** Origine : 'STRAVA' = coquille vide non détaillée par l'API. */
   source?: string | null;
 }
@@ -79,4 +98,68 @@ export interface AthleteSummary {
   plannedDone: number;
   plannedTotal: number;
   alerts: Alert[];
+}
+
+/** Intervalle détecté par Intervals.icu dans une sortie (`/activity/{id}?intervals=true`). */
+export interface IntervalsInterval {
+  /** WORK ou RECOVERY. */
+  type?: string | null;
+  label?: string | null;
+  /** Indices dans les streams de la sortie. */
+  start_index: number;
+  end_index: number;
+  moving_time?: number | null;
+  elapsed_time?: number | null;
+  average_watts?: number | null;
+  weighted_average_watts?: number | null;
+  average_heartrate?: number | null;
+  average_cadence?: number | null;
+  zone?: number | null;
+  /** En % de la FTP. */
+  intensity?: number | null;
+  training_load?: number | null;
+}
+
+export interface IntervalsActivityDetail extends IntervalsActivity {
+  icu_intervals?: IntervalsInterval[] | null;
+}
+
+/** Un stream de `/activity/{id}/streams.json` (un point par seconde enregistrée). */
+export interface IntervalsStream {
+  type: string;
+  data: Array<number | null> | null;
+}
+
+/** Courbes de puissance réduites à ce que l'app affiche (cache léger). */
+export interface ActivityStreams {
+  /** Nombre de points d'origine regroupés par point (pour placer les intervalles). */
+  step: number;
+  time: number[];
+  watts: Array<number | null> | null;
+  heartrate: Array<number | null> | null;
+}
+
+export interface IntervalsPowerModel {
+  type: string;
+  criticalPower?: number | null;
+  wPrime?: number | null;
+  pMax?: number | null;
+  ftp?: number | null;
+}
+
+/** Une courbe de `/athlete/{id}/power-curves.json` (90d, 1y…). */
+export interface IntervalsPowerCurve {
+  id: string;
+  secs: number[];
+  watts?: number[] | null;
+  values?: number[] | null;
+  watts_per_kg?: number[] | null;
+  activity_id?: string[] | null;
+  powerModels?: IntervalsPowerModel[] | null;
+  weight?: number | null;
+}
+
+export interface IntervalsPowerCurves {
+  list: IntervalsPowerCurve[];
+  activities?: Record<string, { id: string; name?: string | null; start_date_local?: string | null }> | null;
 }

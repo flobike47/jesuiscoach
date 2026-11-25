@@ -23,6 +23,9 @@ export function documentThemeFor(theme: ResolvedTheme): DocumentTheme {
 }
 
 /** Couleurs fixes des indicateurs (les mêmes partout : graphiques, chiffres, légendes). */
+/** Couleurs des zones Z1…Z7 (mêmes conventions qu'Intervals.icu : gris → violet). */
+export const ZONE_COLORS = ['var(--gray)', 'var(--blue)', 'var(--green)', 'var(--yellow)', 'var(--orange)', 'var(--red)', 'var(--purple)'] as const;
+
 export const METRIC_COLORS = {
   fitness: 'var(--blue)',
   fatigue: 'var(--pink)',
