@@ -71,6 +71,19 @@ describe('synchro des sorties', () => {
     expect((await targetB()).initialized).toBe(true);
   });
 
+  it("à la première synchro, notifie quand même une sortie importée après l'inscription", async () => {
+    // B s'est inscrit le 24 à 10 h ; sa première synchro arrive avec une sortie importée à 12 h.
+    await db.query(`update users set created_at = '2026-11-24T10:00:00Z' where id = $1`, [USER_B]);
+    const before = ride('a1', '2026-11-23', { created: '2026-11-23T11:00:00Z' });
+    const after = ride('a2', '2026-11-24', { created: '2026-11-24T12:00:00Z' });
+    const n = await syncAthlete(await targetB(), fakeSource([after, before]), notify, NOW);
+    expect(n).toBe(1);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith([USER_A], expect.objectContaining({ tag: 'ride-a2' }));
+    expect(await rows('seen_activities')).toHaveLength(2);
+    expect((await targetB()).initialized).toBe(true);
+  });
+
   it('notifie le coach une seule fois par nouvelle sortie', async () => {
     await syncAthlete(await targetB(), fakeSource([ride('a1', '2026-11-23')]), notify, NOW);
     const source = fakeSource([ride('a1', '2026-11-23'), ride('a2', '2026-11-24')]);
