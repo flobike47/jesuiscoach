@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import {
   Cell,
@@ -147,23 +148,35 @@ function AvailabilityForm({
           .sort((a, b) => a.weekday - b.weekday)
           .map((d) => (
             <div key={d.weekday}>
-              <Cell
-                title={DAY_NAMES[d.weekday]}
-                subtitle={d.available ? describeDay(d) : "Repos"}
-                detail={
-                  <ToggleSwitch
-                    label={`${DAY_NAMES[d.weekday]} disponible`}
-                    checked={d.available}
-                    onChange={(v) => setDay(d.weekday, { available: v })}
-                  />
-                }
-                onClick={
-                  d.available
-                    ? () => setOpenDay(openDay === d.weekday ? null : d.weekday)
-                    : undefined
-                }
-                chevron={d.available}
-              />
+              {/* Pas de <Cell onClick> ici : la ligne contient un interrupteur,
+                  et un bouton ne peut pas en contenir un autre. */}
+              <div className="cell" style={{ gap: 8 }}>
+                <button
+                  type="button"
+                  disabled={!d.available}
+                  aria-expanded={d.available ? openDay === d.weekday : undefined}
+                  onClick={() => setOpenDay(openDay === d.weekday ? null : d.weekday)}
+                  style={{ flex: 1, minWidth: 0, minHeight: 44, display: "flex", alignItems: "center", gap: 8, textAlign: "left", color: "inherit", cursor: d.available ? "pointer" : "default" }}
+                >
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block" }}>{DAY_NAMES[d.weekday]}</span>
+                    <span className="footnote secondary">{d.available ? describeDay(d) : "Repos"}</span>
+                  </span>
+                  {d.available && (
+                    <ChevronRight
+                      size={18}
+                      color="var(--label-3)"
+                      aria-hidden
+                      style={{ transform: openDay === d.weekday ? "rotate(90deg)" : "none", transition: "transform 150ms ease-out" }}
+                    />
+                  )}
+                </button>
+                <ToggleSwitch
+                  label={`${DAY_NAMES[d.weekday]} disponible`}
+                  checked={d.available}
+                  onChange={(v) => setDay(d.weekday, { available: v })}
+                />
+              </div>
               {d.available && openDay === d.weekday && (
                 <DayDetails
                   day={d}
