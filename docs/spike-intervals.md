@@ -70,3 +70,19 @@ normalisée : moyenne de l'intensité **à la puissance 4**, puis racine 4e ; ch
   `paired_event_id` / `compliance` quand ils sont présents (à confirmer).
 - **Zones et FTP par athlète** : lire `sportSettings` du groupe vélo
   (`power_zones` en % de `ftp`) plutôt que des seuils fixes.
+
+## Écriture des réglages (fiche profil)
+
+- `PUT /athlete/{id}/sport-settings/{Ride|Run|Swim}?recalcHrZones=true` avec un
+  corps partiel `{ ftp?, lthr?, max_hr?, threshold_pace? }` : seuls les champs
+  envoyés changent. Scope `SETTINGS:WRITE`.
+- `threshold_pace` est en **mètres par seconde**, quelle que soit `pace_units`.
+  Exemple réel : natation `0.8333333` avec `SECS_100M` = 2:00/100 m. Conversions
+  dans `apps/bff/src/lib/profile.ts` (`thresholdSecsOf`, `thresholdPaceOf`).
+- `PUT /athlete/{id}` (poids, FC repos, sexe, taille, date de naissance) : scope
+  `SETTINGS:WRITE`. La forme du jour passe par `PUT /athlete/{id}/wellness/{AAAA-MM-JJ}`
+  (`weight`, `restingHR`) : scope `WELLNESS:WRITE`.
+- Un compte connecté avant l'ajout de ces scopes n'a que `SETTINGS:READ` et
+  `WELLNESS:READ` : l'app enregistre quand même, signale « reconnexion nécessaire »
+  et n'appelle pas l'écriture.
+- Les valeurs sans équivalent chez Intervals.icu (VMA, tests physiques) restent dans l'app.
