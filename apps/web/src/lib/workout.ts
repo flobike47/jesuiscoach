@@ -20,9 +20,9 @@ export interface Step {
 
 export interface WorkoutStats {
   seconds: number;
-  /** Charge estimée (équivalent intensité² × heures × 100). */
+  /** Charge estimée : intensité² × heures × 100 (comme Intervals.icu). */
   load: number;
-  /** Intensité moyenne pondérée (≈ puissance pondérée / FTP). */
+  /** Intensité : puissance « normalisée » de la séance / FTP. */
   intensity: number;
 }
 
@@ -81,18 +81,27 @@ export function parseWorkout(text: string): Step[] {
   return steps;
 }
 
+/** Moyenne de x⁴ sur une rampe linéaire de a à b (intégrale exacte). */
+function meanFourth(a: number, b: number): number {
+  if (Math.abs(b - a) < 1e-9) return a ** 4;
+  return (b ** 5 - a ** 5) / (5 * (b - a));
+}
+
+/**
+ * Durée, intensité et charge estimées, avec la même méthode qu'Intervals.icu
+ * (vérifié au spike du 25/11/2026 : même séance → 39 min, intensité 0,78,
+ * charge 40) : moyenne de l'intensité à la puissance 4, puis racine 4e — la
+ * logique de la puissance normalisée, qui pèse davantage les efforts intenses.
+ */
 export function workoutStats(steps: Step[]): WorkoutStats {
   let seconds = 0;
   let weighted = 0;
   for (const s of steps) {
     seconds += s.seconds;
-    // Intensité² moyenne sur la rampe (intégrale exacte d'une droite au carré).
-    const a = s.from / 100;
-    const b = s.to / 100;
-    weighted += s.seconds * ((a * a + a * b + b * b) / 3);
+    weighted += s.seconds * meanFourth(s.from / 100, s.to / 100);
   }
   const hours = seconds / 3600;
-  const intensity = seconds ? Math.sqrt(weighted / seconds) : 0;
+  const intensity = seconds ? (weighted / seconds) ** 0.25 : 0;
   return { seconds, load: Math.round(hours * intensity * intensity * 100), intensity: Math.round(intensity * 100) / 100 };
 }
 

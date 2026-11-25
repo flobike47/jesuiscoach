@@ -42,6 +42,14 @@ describe('workoutStats', () => {
     expect(workoutStats(parseWorkout('- 1h 100%'))).toEqual({ seconds: 3600, load: 100, intensity: 1 });
   });
 
+  it("retrouve le calcul d'Intervals.icu sur une séance de référence", () => {
+    // Séance créée sur Intervals.icu au spike : 2340 s, intensité 78,4 %, charge 40.
+    const ref = workoutStats(parseWorkout('Échauffement\n- 10m ramp 50-75%\n\n3x\n- 5m 95%\n- 3m 55%\n\n- 5m 50%'));
+    expect(ref.seconds).toBe(2340);
+    expect(ref.load).toBe(40);
+    expect(Math.abs(ref.intensity - 0.784)).toBeLessThan(0.01);
+  });
+
   it('estime le seuil 3×10 dans des ordres de grandeur réalistes', () => {
     const s = workoutStats(parseWorkout(TEMPLATES[2].description));
     expect(s.seconds).toBe(70 * 60);

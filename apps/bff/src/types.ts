@@ -26,8 +26,18 @@ export interface IntervalsActivity {
   distance?: number | null;
   icu_training_load?: number | null;
   icu_weighted_avg_watts?: number | null;
+  /** En pourcentage de la FTP (65.3 = 0,653). */
   icu_intensity?: number | null;
   average_heartrate?: number | null;
+  icu_average_watts?: number | null;
+  total_elevation_gain?: number | null;
+  /** Séance prévue appariée par Intervals.icu, et sa conformité (%). */
+  paired_event_id?: number | null;
+  compliance?: number | null;
+  /** Temps par zone de puissance : Z1…Z7 et SS (sweet spot), en secondes. */
+  icu_zone_times?: Array<{ id: string; secs: number }> | null;
+  /** Origine : 'STRAVA' = coquille vide non détaillée par l'API. */
+  source?: string | null;
 }
 
 export interface IntervalsEvent {
