@@ -48,6 +48,15 @@ export function alertNotification(athleteName: string, athleteId: string, alert:
   };
 }
 
+/**
+ * Moment où la sortie est arrivée dans Intervals.icu : `created`, sinon le
+ * départ (UTC, puis heure locale lue comme UTC : quelques heures d'écart au pire).
+ */
+function importedAt(a: IntervalsActivity): number {
+  const t = Date.parse(a.created ?? a.start_date ?? `${a.start_date_local}Z`);
+  return Number.isNaN(t) ? 0 : t;
+}
+
 /** Synchronise un athlète ; renvoie le nombre de nouvelles sorties notifiées. */
 export async function syncAthlete(target: SyncTarget, source: AthleteSource, notify: Notify, now = new Date()): Promise<number> {
   const id = target.intervals_athlete_id;
@@ -55,12 +64,18 @@ export async function syncAthlete(target: SyncTarget, source: AthleteSource, not
   const activities = await source.activities(id, isoDay(new Date(now.getTime() - WINDOW_DAYS * DAY)), today);
   const fresh = new Set(await markActivitiesSeen(target.id, activities.map((a) => String(a.id))));
 
-  // Première synchro : historique et alertes en cours mémorisés sans rien notifier.
+  // Première synchro : l'historique et les alertes en cours sont mémorisés sans
+  // rien notifier (pas de rafale à l'inscription)… sauf les sorties importées
+  // après la création du compte : celles-là sont bien nouvelles.
   if (!target.initialized) {
+    const signup = new Date(target.created_at).getTime();
+    const afterSignup = activities.filter((a) => fresh.has(String(a.id)) && importedAt(a) > signup);
+    const coaches = afterSignup.length ? await coachesOf(target.id) : [];
+    for (const a of afterSignup) if (coaches.length) await notify(coaches, rideNotification(target.name, id, a));
     const inactive = summarize({ id }, [], activities, [], now).alerts.filter((a) => a.code === 'inactive');
     await updateActiveAlerts(target.id, inactive.map((a) => a.code));
     await recordSync(target.id, null);
-    return 0;
+    return afterSignup.length;
   }
 
   const coaches = await coachesOf(target.id);

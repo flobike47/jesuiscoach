@@ -55,6 +55,10 @@ export interface IntervalsActivity {
   average_cadence?: number | null;
   /** Dérive cardiaque (Pw:Hr), en %. */
   decoupling?: number | null;
+  /** Départ en UTC (ISO avec Z). */
+  start_date?: string | null;
+  /** Import dans Intervals.icu (UTC). */
+  created?: string | null;
   /** Origine : 'STRAVA' = coquille vide non détaillée par l'API. */
   source?: string | null;
 }

@@ -181,12 +181,14 @@ export interface SyncTarget {
   intervals_athlete_id: string;
   name: string;
   initialized: boolean;
+  /** Création du compte : une sortie importée après est nouvelle, même à la première synchro. */
+  created_at: Date | string;
 }
 
 /** Athlètes à synchroniser : ceux qui ont connecté Intervals.icu. */
 export async function syncTargets(): Promise<SyncTarget[]> {
   const { rows } = await db().query<SyncTarget>(
-    `select u.id, u.intervals_athlete_id, u.name, (s.user_id is not null) as initialized
+    `select u.id, u.intervals_athlete_id, u.name, u.created_at, (s.user_id is not null) as initialized
      from users u join intervals_tokens t on t.user_id = u.id
      left join sync_state s on s.user_id = u.id
      order by u.id`,
@@ -197,7 +199,7 @@ export async function syncTargets(): Promise<SyncTarget[]> {
 /** Cible de synchro d'un athlète précis (webhook), ou null s'il n'est pas connecté. */
 export async function syncTargetOf(athleteId: string): Promise<SyncTarget | null> {
   const { rows } = await db().query<SyncTarget>(
-    `select u.id, u.intervals_athlete_id, u.name, (s.user_id is not null) as initialized
+    `select u.id, u.intervals_athlete_id, u.name, u.created_at, (s.user_id is not null) as initialized
      from users u join intervals_tokens t on t.user_id = u.id
      left join sync_state s on s.user_id = u.id
      where u.intervals_athlete_id = $1`,
