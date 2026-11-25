@@ -5,6 +5,8 @@ import { redis } from '../cache.js';
 import { randomToken } from '../lib/crypto.js';
 import { insertInvitation } from '../db/repo.js';
 import { matchPlan } from '../lib/plan.js';
+import { validateWorkoutCheck } from '../lib/care.js';
+import { warningsOfAthlete } from './care.js';
 import { validateSport } from '../lib/sport.js';
 import { isoDay, summarize } from '../lib/summary.js';
 import { enforceQuota } from '../ratelimit.js';
@@ -22,6 +24,12 @@ interface AssignBody {
   name: string;
   description: string;
   sport?: unknown;
+  /** Contrôle des avertissements (routes/care.ts) : durée estimée, puissance, effort au-dessus du seuil. */
+  durationSec?: unknown;
+  usesPower?: unknown;
+  highIntensity?: unknown;
+  /** Athlètes pour lesquels l'envoi malgré un blocage (blessure) a été confirmé. */
+  force?: unknown;
 }
 
 export async function registerTeamRoutes(app: FastifyInstance) {
@@ -185,10 +193,21 @@ export async function registerTeamRoutes(app: FastifyInstance) {
     const team = new Set(await teamOf(me));
     const targets = clampArray(body.athleteIds, 50).filter((id): id is string => typeof id === 'string' && team.has(id));
     if (targets.length === 0) throw new BadRequest('Aucun athlète de ton équipe dans la sélection');
+    // Avertissements « bloquants » (blessure en cours) : pas d'envoi sans `force` pour cet athlète.
+    const check = validateWorkoutCheck({ ...workout, durationSec: body.durationSec, usesPower: body.usesPower, highIntensity: body.highIntensity });
+    const forced = new Set(Array.isArray(body.force) ? clampArray(body.force, 50).filter((x): x is string => typeof x === 'string') : []);
+    const checked = await Promise.all(targets.map(async (id) => ({ id, warnings: await warningsOfAthlete(id, check) })));
+    const blocked = new Map<string, string>();
+    for (const { id, warnings } of checked) {
+      const block = warnings.find((w) => w.level === 'block');
+      if (block && !forced.has(id)) blocked.set(id, block.title);
+    }
     await enforceQuota(me.id, 'assignWorkout');
 
     const results = await Promise.all(
       targets.map(async (id) => {
+        const blockedBy = blocked.get(id);
+        if (blockedBy) return { id, ok: false as const, blocked: true as const, error: blockedBy };
         try {
           await (await sourceFor(id)).createWorkout(id, workout);
           await invalidateEvents(id);
