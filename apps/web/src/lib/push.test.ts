@@ -217,3 +217,28 @@ describe('service worker : notifications', () => {
     expect(self.clients.openWindow).not.toHaveBeenCalled();
   });
 });
+
+describe('service worker : requêtes interceptées', () => {
+  /** Renvoie true si le service worker prend la main sur la requête (respondWith). */
+  function intercepts(path: string, mode = 'cors') {
+    const { listeners, scope } = loadServiceWorker();
+    // On ne teste que la décision d'interception : la réponse (cache) n'existe
+    // pas dans ce faux environnement, sa promesse est absorbée.
+    const respondWith = vi.fn((p: Promise<unknown>) => p.catch(() => undefined));
+    listeners.fetch({ request: { method: 'GET', url: new URL(path, scope).href, mode }, respondWith });
+    return respondWith.mock.calls.length > 0;
+  }
+
+  it("ne met jamais l'API en cache (même origine, servie par Caddy)", () => {
+    expect(intercepts('api/team')).toBe(false);
+    expect(intercepts('api/public/status')).toBe(false);
+    expect(intercepts('api')).toBe(false);
+  });
+
+  it("garde la coquille et les assets de l'app", () => {
+    expect(intercepts('assets/index-abc.js')).toBe(true);
+    expect(intercepts('athletes/demo-1', 'navigate')).toBe(true);
+    // Une page dont le nom commence par « api » n'est pas l'API
+    expect(intercepts('apiculture.png')).toBe(true);
+  });
+});

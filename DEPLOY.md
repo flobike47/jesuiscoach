@@ -53,12 +53,12 @@ Portainer pourra ensuite pull les images privées automatiquement.
 |---|---|---|
 | `BFF_IMAGE` | compose | `registry.example.com/jesuiscoach-bff:latest` |
 | `WEB_IMAGE` | compose | `registry.example.com/jesuiscoach-web:latest` |
-| `CORS_ORIGIN` | BFF | `https://coach.tondomaine.com` |
-| `APP_URL` | BFF | optionnelle, `https://coach.tondomaine.com/jesuiscoach/` : lien des notifications push. Par défaut la première origine de `CORS_ORIGIN` ; à renseigner si l'app est servie sous un `BASE_PATH` |
-| **`BFF_URL`** | **web (runtime)** | **`https://api-coach.tondomaine.com`** |
+| `CORS_ORIGIN` | BFF | `https://jesuiscoach.fb-cloud.fr` |
+| `APP_URL` | BFF | optionnelle, `https://jesuiscoach.fb-cloud.fr/` : lien des notifications push. Par défaut la première origine de `CORS_ORIGIN` ; à renseigner si l'app est servie sous un `BASE_PATH` |
+| **`BFF_URL`** | **web (runtime)** | **`https://jesuiscoach.fb-cloud.fr`** |
 | `POSTGRES_PASSWORD` | Postgres + BFF | lettres et chiffres (⚠️ secret) |
 | `BACKUP_DIR` | sauvegardes | `/mnt/ssd/backups/jesuiscoach` (dossier hôte) |
-| `PUBLIC_API_URL` | BFF | `https://api-coach.tondomaine.com` (callback OAuth) |
+| `PUBLIC_API_URL` | BFF | `https://jesuiscoach.fb-cloud.fr` (callback OAuth) |
 | `INTERVALS_CLIENT_ID`, `INTERVALS_CLIENT_SECRET` | BFF | app OAuth Intervals.icu (⚠️ secret) |
 | `COACH_ATHLETE_IDS` | BFF | `i123456` : ton ID Intervals.icu (rôle coach) |
 | `TOKEN_ENCRYPTION_KEY` | BFF | 32 octets base64 (⚠️ secret, ne plus jamais la changer) |
@@ -116,7 +116,7 @@ Teste la procédure une fois avant d'en avoir besoin.
 ### App OAuth Intervals.icu
 
 1. Connecté avec **ton** compte Intervals.icu (celui du coach) : https://intervals.icu/oauth/apply
-2. Redirect URI : `https://api-coach.tondomaine.com/api/public/auth/intervals/callback`
+2. Redirect URI : `https://jesuiscoach.fb-cloud.fr/api/public/auth/intervals/callback`
 3. L'app reste « Pending » jusqu'à validation manuelle par Intervals.icu. Ensuite,
    **Settings → Apps → Manage App** donne `client_id` et `client_secret`.
 4. Ton ID d'athlète (ex. `i123456`, visible dans l'URL de ton profil) va dans
@@ -164,56 +164,41 @@ Repo → Settings → Secrets and variables → Actions :
 > Les `VITE_*` ne sont **plus** nécessaires côté CI : la config web est
 > runtime (injectée par Portainer via env vars du conteneur), pas build-time.
 
-## 6. TLS via Caddy ou Cloudflare Tunnel
+## 6. HTTPS via Cloudflare Tunnel (ou Caddy)
 
-Le compose bind les ports sur `127.0.0.1` (jamais exposés au LAN) :
-- `127.0.0.1:8180` → web (Caddy interne du conteneur)
-- `127.0.0.1:4100` → BFF
+Une seule adresse publique : le conteneur web sert l'app et relaie `/api/*`
+au BFF par le réseau interne de la stack. Le compose ne publie que sur
+`127.0.0.1` (jamais sur le LAN) :
+- `127.0.0.1:8180` → web (app + `/api/*`) — **la seule cible du tunnel**
+- `127.0.0.1:4100` → BFF direct, pour le diagnostic uniquement
 
-Configure ton reverse proxy host (hors Portainer) :
-
-**Option A — Caddy** (`/etc/caddy/Caddyfile`) :
-
-```caddy
-coach.tondomaine.com {
-    reverse_proxy 127.0.0.1:8180
-}
-
-api-coach.coach.tondomaine.com {
-    reverse_proxy 127.0.0.1:4100
-}
-```
-
-```bash
-sudo systemctl reload caddy
-```
-
-**Option B — Cloudflare Tunnel** (recommandé, pas d'IP publique exposée) :
-
-```bash
-cloudflared tunnel login
-cloudflared tunnel create jesuiscoach
-```
-
-Édite `~/.cloudflared/config.yml` :
+**Cloudflare Tunnel** (celui d'investhelper suffit) — ajoute une règle dans
+`~/.cloudflared/config.yml` (ou dans le tableau de bord Zero Trust si le
+tunnel y est géré), **avant** la règle finale `http_status:404` :
 
 ```yaml
-tunnel: <uuid>
-credentials-file: /home/pi/.cloudflared/<uuid>.json
-
 ingress:
-  - hostname: coach.tondomaine.com
+  # … règles d'investhelper …
+  - hostname: jesuiscoach.fb-cloud.fr
     service: http://localhost:8180
-  - hostname: api-coach.tondomaine.com
-    service: http://localhost:4100
   - service: http_status:404
 ```
 
 ```bash
-cloudflared tunnel route dns jesuiscoach coach.tondomaine.com
-cloudflared tunnel route dns jesuiscoach api-coach.tondomaine.com
-sudo cloudflared service install
+cloudflared tunnel route dns <nom-du-tunnel> jesuiscoach.fb-cloud.fr
+sudo systemctl restart cloudflared
 ```
+
+**Caddy global sur la Pi** (alternative) :
+
+```caddy
+jesuiscoach.fb-cloud.fr {
+    reverse_proxy 127.0.0.1:8180
+}
+```
+
+Variables correspondantes : `CORS_ORIGIN`, `BFF_URL` et `PUBLIC_API_URL` =
+`https://jesuiscoach.fb-cloud.fr`.
 
 ## 7. Vérifications
 
@@ -226,8 +211,8 @@ curl http://localhost:8180/
 # → HTML du SPA
 
 # Depuis ton browser
-https://coach.tondomaine.com
-https://api-coach.tondomaine.com/health
+https://jesuiscoach.fb-cloud.fr
+https://jesuiscoach.fb-cloud.fr/api/public/status
 ```
 
 Dans Portainer, regarde les logs en direct (Containers → bff → Logs) — tu dois voir :
@@ -248,7 +233,7 @@ Ou via webhook custom (si tu veux scripter).
 
 ## 9. Monitoring (suggéré)
 
-- **Uptime** : UptimeRobot / Better Stack qui ping `https://api-coach.tondomaine.com/health`
+- **Uptime** : UptimeRobot / Better Stack qui ping `https://jesuiscoach.fb-cloud.fr/api/public/status`
 - **Logs persistés** : Portainer → Container settings → Restart policy = `unless-stopped` (déjà dans le compose), et active la rotation log Docker
 - **Métriques** : Portainer affiche CPU/RAM live par conteneur
 

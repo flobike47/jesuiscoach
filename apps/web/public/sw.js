@@ -20,9 +20,9 @@
  * Chemins relatifs à l'emplacement du SW : l'app peut être servie sous un
  * sous-chemin (BASE_PATH).
  */
-const VERSION = 'v1';
-const SHELL_CACHE = `ih-shell-${VERSION}`;
-const ASSET_CACHE = 'ih-assets';
+const VERSION = 'v2';
+const SHELL_CACHE = `jc-shell-${VERSION}`;
+const ASSET_CACHE = 'jc-assets';
 const MAX_ASSETS = 80;
 
 const SCOPE = new URL('./', self.location).pathname;
@@ -44,7 +44,7 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k.startsWith('ih-shell-') && k !== SHELL_CACHE)
+            .filter((k) => k.startsWith('jc-shell-') && k !== SHELL_CACHE)
             .map((k) => caches.delete(k)),
         ),
       )
@@ -104,6 +104,9 @@ self.addEventListener('fetch', (event) => {
 
   const path = url.pathname.slice(SCOPE.length);
   if (path === 'version.json') return;
+  // API servie sur la même origine (Caddy relaie /api/ au BFF) : jamais en
+  // cache — données périmées, ou celles d'un autre compte après déconnexion.
+  if (path === 'api' || path.startsWith('api/')) return;
 
   if (request.mode === 'navigate') {
     // Toutes les routes de la SPA retombent sur la coquille en cache
