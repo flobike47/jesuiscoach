@@ -42,7 +42,7 @@ export class IntervalsClient {
   }
 
   async activities(id: string, oldest: string, newest: string): Promise<IntervalsActivity[]> {
-    return (await this.http.get(`/athlete/${encodeURIComponent(id)}/activities`, { params: { oldest, newest } })).data ?? [];
+    return usableActivities((await this.http.get(`/athlete/${encodeURIComponent(id)}/activities`, { params: { oldest, newest } })).data ?? []);
   }
 
   async events(id: string, oldest: string, newest: string): Promise<IntervalsEvent[]> {
@@ -69,6 +69,17 @@ export class IntervalsClient {
   async deleteEvent(id: string, eventId: string): Promise<void> {
     await this.http.delete(`/athlete/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`);
   }
+}
+
+/**
+ * Retire les sorties que l'API ne détaille pas. Les sorties importées depuis
+ * Strava ne reviennent que sous forme de coquille ({ id, start_date_local,
+ * source: 'STRAVA', _note: 'STRAVA activities are not available via the API' }) :
+ * sans type ni mesures, elles produiraient des notifications et des lignes
+ * vides. Constaté au spike du 25/11/2026 (10 sorties sur 120 en un an).
+ */
+export function usableActivities(list: IntervalsActivity[]): IntervalsActivity[] {
+  return list.filter((a) => Boolean(a.type) && a.source !== 'STRAVA');
 }
 
 /** Échange du code OAuth (à faire dans les 2 minutes qui suivent la redirection). */
