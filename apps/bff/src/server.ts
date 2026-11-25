@@ -9,6 +9,7 @@ import { registerTeamRoutes } from './routes/team.js';
 import { registerAthleteRoutes } from './routes/athlete.js';
 import { registerDemoRoutes } from './routes/demo.js';
 import { registerIntervalsAuthRoutes } from './routes/intervalsAuth.js';
+import { registerAccountRoutes } from './routes/account.js';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -132,6 +133,7 @@ export async function buildServer() {
   await app.register(registerDemoRoutes, { prefix: '/api' });
   await app.register(registerPushRoutes, { prefix: '/api' });
   await app.register(registerIntervalsAuthRoutes, { prefix: '/api' });
+  await app.register(registerAccountRoutes, { prefix: '/api' });
 
   return app;
 }

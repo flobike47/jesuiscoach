@@ -18,6 +18,8 @@ interface AuthCtx {
   completeSignIn: (code: string) => Promise<void>;
   signInDemo: (role?: 'coach' | 'athlete') => void;
   signOut: () => Promise<void>;
+  /** Suppression définitive du compte ; lève une erreur si le serveur refuse (on reste connecté). */
+  deleteAccount: () => Promise<void>;
 }
 
 const Context = createContext<AuthCtx | undefined>(undefined);
@@ -84,6 +86,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         Promise.allSettled([disableDevicePush(), api.logout()]),
         new Promise((resolve) => setTimeout(resolve, 3000)),
       ]);
+      setSession(null);
+    },
+    deleteAccount: async () => {
+      // Désabonnement de l'appareil au mieux : le serveur efface de toute façon les abonnements.
+      await Promise.race([disableDevicePush().catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 3000))]);
+      await api.deleteAccount();
       setSession(null);
     },
   };

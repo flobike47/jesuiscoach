@@ -4,16 +4,16 @@ import { config } from '../config.js';
 import { redis } from '../cache.js';
 import { randomToken } from '../lib/crypto.js';
 import { insertInvitation } from '../db/repo.js';
+import { matchPlan } from '../lib/plan.js';
 import { isoDay, summarize } from '../lib/summary.js';
 import { enforceQuota } from '../ratelimit.js';
 import { assertCanView, listCheckins, sourceFor, teamOf } from '../sources.js';
 import type { AthleteSummary } from '../types.js';
-import { BadRequest, HttpError, clampArray, validateString } from '../validation.js';
+import { ATHLETE_ID_RE, BadRequest, HttpError, clampArray, validateString } from '../validation.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (now: Date, n: number) => isoDay(new Date(now.getTime() - n * DAY));
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const ATHLETE_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const EVENT_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 
 class Forbidden extends HttpError {
@@ -106,13 +106,11 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           src.activities(id, daysAgo(now, 7), isoDay(now)),
           src.events(id, daysAgo(now, 7), isoDay(now)),
         ]);
-        const planned = new Map(events.filter((e) => e.category === 'WORKOUT').map((e) => [e.start_date_local.slice(0, 10), e.name ?? 'Séance prévue']));
-        return activities.map((a) => ({
-          athleteId: id,
-          athleteName: info.name ?? id,
-          activity: a,
-          plannedName: planned.get(a.start_date_local.slice(0, 10)) ?? null,
-        }));
+        const { eventOfActivity } = matchPlan(events, activities);
+        return activities.map((a) => {
+          const planned = eventOfActivity.get(String(a.id));
+          return { athleteId: id, athleteName: info.name ?? id, activity: a, plannedName: planned ? (planned.name ?? 'Séance prévue') : null };
+        });
       }),
     );
     const items = rows.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
@@ -131,7 +129,10 @@ export async function registerTeamRoutes(app: FastifyInstance) {
     await assertCanView(me, id);
     const src = await sourceFor(id);
     const [events, activities] = await Promise.all([src.events(id, from, to), src.activities(id, from, to)]);
-    return { events, activities };
+    const { activityOf } = matchPlan(events, activities);
+    // Séances réalisées, par id : le web n'a plus à deviner « une sortie le même jour ».
+    const doneEventIds = [...activityOf.keys()].filter((e) => e.id != null).map((e) => String(e.id));
+    return { events, activities, doneEventIds };
   });
 
   /** Déplace une séance prévue (l'athlète lui-même ou son coach). */

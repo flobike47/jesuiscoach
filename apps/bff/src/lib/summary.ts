@@ -1,3 +1,4 @@
+import { matchPlan } from './plan.js';
 import type {
   Alert,
   AthleteSummary,
@@ -77,10 +78,10 @@ export function summarize(
   const lastRide = rides.map((a) => dayOf(a.start_date_local)).sort().at(-1) ?? null;
   const daysSinceRide = lastRide ? Math.round((Date.parse(today) - Date.parse(lastRide)) / DAY) : null;
 
-  // Conformité : une séance prévue est « faite » s'il y a une sortie vélo le même jour.
-  const rideDays = new Set(rides.map((a) => dayOf(a.start_date_local)));
+  // Conformité : séances passées réalisées (appariement Intervals.icu, sinon même jour).
+  const { activityOf } = matchPlan(events, activities);
   const pastPlan = events.filter((e) => e.category === 'WORKOUT' && dayOf(e.start_date_local) >= weekAgo && dayOf(e.start_date_local) < today);
-  const plannedDone = pastPlan.filter((e) => rideDays.has(dayOf(e.start_date_local))).length;
+  const plannedDone = pastPlan.filter((e) => activityOf.has(e)).length;
 
   const base = {
     id: info.id,

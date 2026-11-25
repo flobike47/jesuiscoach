@@ -100,4 +100,6 @@ export interface FeedItem {
 export interface CalendarRange {
   events: PlannedEvent[];
   activities: Activity[];
+  /** Séances réalisées (appariées par Intervals.icu, sinon sortie du même jour). */
+  doneEventIds: string[];
 }

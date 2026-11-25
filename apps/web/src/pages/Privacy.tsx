@@ -111,8 +111,9 @@ export default function Privacy() {
         <H2>Tes droits</H2>
         <P>
           Tu peux demander l'accès à tes données, leur rectification, leur suppression ou leur export, et t'opposer à leur
-          traitement, en écrivant à <Mail />. Réponse sous 30 jours ; la suppression efface ton compte, ton jeton, tes
-          ressentis et tes abonnements aux notifications.
+          traitement, en écrivant à <Mail />. Réponse sous 30 jours. Tu peux aussi supprimer ton compte toi-même (Réglages →
+          Supprimer mon compte) : cela efface ton compte, ton jeton, tes ressentis et tes abonnements aux notifications, et
+          coupe l'accès de l'app à Intervals.icu.
         </P>
         <P>
           Tu peux aussi couper l'accès à tout moment depuis Intervals.icu (Settings → Apps) : l'application ne peut alors
@@ -211,8 +212,9 @@ export default function Privacy() {
         <H2>Your rights</H2>
         <P>
           You can request access to, correction, deletion or export of your data, and object to its processing, by writing
-          to <Mail />. Answer within 30 days; deletion removes your account, token, check-ins and notification
-          subscriptions.
+          to <Mail />. Answer within 30 days. You can also delete your account yourself (Settings → Delete my account):
+          this removes your account, token, check-ins and notification subscriptions, and revokes the app's access to
+          Intervals.icu.
         </P>
         <P>
           You can also revoke access at any time from Intervals.icu (Settings → Apps): the app can then no longer read or

@@ -43,6 +43,9 @@ export const config = {
   // Intervals est désactivée (routes en 503) et seul le mode démo fonctionne.
   intervalsClientId: opt('INTERVALS_CLIENT_ID'),
   intervalsClientSecret: opt('INTERVALS_CLIENT_SECRET'),
+  // Secret des webhooks (page « Manage App » d'Intervals.icu). Sans lui, la route
+  // webhook répond 404 et seule la synchro périodique prévient le coach.
+  intervalsWebhookSecret: opt('INTERVALS_WEBHOOK_SECRET'),
   // URL publique du BFF (callback OAuth + webhooks), ex. https://api.tondomaine.com
   publicApiUrl: process.env.PUBLIC_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`,
   // Clé AES-256-GCM (32 octets en base64) qui chiffre les jetons Intervals en base.
