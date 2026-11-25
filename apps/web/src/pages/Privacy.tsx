@@ -59,6 +59,21 @@ export default function Privacy() {
               suppression du compte.
             </>,
             <>
+              <strong>Profil saisi dans l'app</strong> : date de naissance, sexe, taille, poids, valeurs physiologiques
+              (FTP, fréquence cardiaque seuil, VMA) et résultats de tests. Les valeurs qui ont un équivalent dans Intervals.icu
+              y sont envoyées pour calculer tes zones ; une fois envoyées, elles y restent selon ses propres règles.
+            </>,
+            <>
+              <strong>Disponibilités et matériel</strong> : jours et durées d'entraînement, lieu et créneau préférés,
+              exceptions (vacances, déplacement), capteur de puissance, ceinture cardio, home trainer, accès piscine. Ces
+              données restent dans l'app et ne sont jamais envoyées à Intervals.icu.
+            </>,
+            <>
+              <strong>Données de santé</strong> : blessures et limitations (titre, dates, sports à éviter, note). Elles
+              sont saisies volontairement, visibles uniquement par toi et ton coach, jamais transmises à un tiers ni à
+              Intervals.icu, et effacées avec ton compte.
+            </>,
+            <>
               <strong>Notifications</strong> : adresse d'abonnement fournie par ton navigateur (Apple, Google, Mozilla ou
               Microsoft) et type d'appareil, jusqu'à ce que tu les désactives.
             </>,
@@ -82,13 +97,19 @@ export default function Privacy() {
           Les données servent uniquement à faire fonctionner le coaching : afficher ta forme et tes sorties, prévenir ton
           coach d'une nouvelle sortie ou d'une alerte (fatigue, inactivité), et synchroniser les séances avec ta montre via
           Intervals.icu. La base légale est ton consentement, donné en connectant ton compte Intervals.icu ; les journaux
-          techniques relèvent de l'intérêt légitime (sécurité du service).
+          techniques relèvent de l'intérêt légitime (sécurité du service). Les données de profil et de santé sont saisies
+          volontairement : ton consentement explicite est la base légale, et tu peux le retirer à tout moment en effaçant
+          la donnée ou ton compte.
         </P>
 
         <H2>Qui voit tes données</H2>
         <List
           items={[
-            <>Toi, et le coach qui t'a invité dans son équipe. Les autres athlètes ne voient pas tes données.</>,
+            <>
+              Toi, et le coach qui t'a invité dans son équipe. Les autres athlètes ne voient pas tes données. Ton coach peut
+              consulter et modifier ta fiche profil (disponibilités, matériel, blessures) : la dernière modification est
+              signalée sur ta fiche (« Modifié par ton coach le… »).
+            </>,
             <>
               Aucune vente, aucune publicité, aucun outil de mesure d'audience, aucun traitement par intelligence
               artificielle.
@@ -112,8 +133,8 @@ export default function Privacy() {
         <P>
           Tu peux demander l'accès à tes données, leur rectification, leur suppression ou leur export, et t'opposer à leur
           traitement, en écrivant à <Mail />. Réponse sous 30 jours. Tu peux aussi supprimer ton compte toi-même (Réglages →
-          Supprimer mon compte) : cela efface ton compte, ton jeton, tes ressentis et tes abonnements aux notifications, et
-          coupe l'accès de l'app à Intervals.icu.
+          Supprimer mon compte) : cela efface ton compte, ton jeton, tes ressentis, ta fiche profil (disponibilités, matériel,
+          exceptions, blessures) et tes abonnements aux notifications, et coupe l'accès de l'app à Intervals.icu.
         </P>
         <P>
           Tu peux aussi couper l'accès à tout moment depuis Intervals.icu (Settings → Apps) : l'application ne peut alors
@@ -164,6 +185,21 @@ export default function Privacy() {
               deletion.
             </>,
             <>
+              <strong>Profile entered in the app</strong>: date of birth, sex, height, weight, physiological values (FTP,
+              threshold heart rate, maximal aerobic speed (VMA)) and test results. Values that have an equivalent in
+              Intervals.icu are sent there to compute your zones; once sent, they stay there under its own rules.
+            </>,
+            <>
+              <strong>Availability and equipment</strong>: training days and durations, preferred place and time slot,
+              exceptions (holidays, travel), power meter, heart-rate strap, smart trainer, pool access. This data stays in
+              the app and is never sent to Intervals.icu.
+            </>,
+            <>
+              <strong>Health data</strong>: injuries and limitations (title, dates, sports to avoid, note). They are
+              entered voluntarily, visible only to you and your coach, never passed on to a third party or to
+              Intervals.icu, and deleted with your account.
+            </>,
+            <>
               <strong>Notifications</strong>: subscription endpoint provided by your browser (Apple, Google, Mozilla or
               Microsoft) and device type, until you turn them off.
             </>,
@@ -187,13 +223,18 @@ export default function Privacy() {
           Data is used only to run the coaching features: showing your fitness and rides, notifying your coach of a new
           ride or alert (fatigue, inactivity), and syncing workouts to your watch through Intervals.icu. The legal basis is
           your consent, given by connecting your Intervals.icu account; technical logs rely on legitimate interest
-          (service security).
+          (service security). Profile and health data are entered voluntarily: your explicit consent is the legal basis, and
+          you can withdraw it at any time by deleting the data or your account.
         </P>
 
         <H2>Who can see your data</H2>
         <List
           items={[
-            <>You, and the coach who invited you to their team. Other athletes cannot see your data.</>,
+            <>
+              You, and the coach who invited you to their team. Other athletes cannot see your data. Your coach can view and
+              change your profile sheet (availability, equipment, injuries); the last change is shown on your sheet ("Changed
+              by your coach on…").
+            </>,
             <>No selling, no advertising, no analytics, no artificial intelligence processing.</>,
             <>
               Technical providers: <strong>Intervals.icu</strong> (data source), <strong>Cloudflare</strong> (encrypted
@@ -213,8 +254,8 @@ export default function Privacy() {
         <P>
           You can request access to, correction, deletion or export of your data, and object to its processing, by writing
           to <Mail />. Answer within 30 days. You can also delete your account yourself (Settings → Delete my account):
-          this removes your account, token, check-ins and notification subscriptions, and revokes the app's access to
-          Intervals.icu.
+          this removes your account, token, check-ins, profile sheet (availability, equipment, exceptions, injuries) and
+          notification subscriptions, and revokes the app's access to Intervals.icu.
         </P>
         <P>
           You can also revoke access at any time from Intervals.icu (Settings → Apps): the app can then no longer read or
