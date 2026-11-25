@@ -137,7 +137,12 @@ function simulate(k: number, now: Date): DemoAthlete {
       coros_sync_activities: k === 5,
       coros_upload_workouts: false,
       strava_authorized: k % 3 === 0,
-      sportSettings: [{ types: ['Ride', 'VirtualRide'], ftp, power_zones: POWER_ZONES, hr_zones: HR_ZONES, sweet_spot_min: 84, sweet_spot_max: 97 }],
+      // Le groupe vélo reste en premier (les lectures démo prennent sportSettings[0] pour la FTP).
+      sportSettings: [
+        { types: ['Ride', 'VirtualRide'], ftp, power_zones: POWER_ZONES, hr_zones: HR_ZONES, sweet_spot_min: 84, sweet_spot_max: 97 },
+        { types: ['Run', 'TrailRun'], lthr: 172, max_hr: 191, threshold_pace: 1000 / 280 },
+        { types: ['Swim', 'OpenWaterSwim'], threshold_pace: 100 / 115 },
+      ],
     },
     wellness,
     activities,
@@ -230,6 +235,43 @@ export class DemoSource {
     this.event(id, eventId);
     const a = this.get(id);
     a.events = a.events.filter((e) => String(e.id) !== eventId);
+  }
+
+  /* ---------- Écritures de la fiche profil (en mémoire) ---------- */
+
+  async updateSportSettings(id: string, sport: 'Ride' | 'Run' | 'Swim', patch: { ftp?: number; lthr?: number; max_hr?: number; threshold_pace?: number }): Promise<void> {
+    const info = this.get(id).info;
+    const types = sport === 'Ride' ? ['Ride', 'VirtualRide'] : sport === 'Run' ? ['Run', 'TrailRun'] : ['Swim', 'OpenWaterSwim'];
+    info.sportSettings ??= [];
+    let group = info.sportSettings.find((g) => g.types?.includes(sport));
+    if (!group) {
+      group = { types };
+      info.sportSettings.push(group);
+    }
+    if (patch.ftp !== undefined) group.ftp = patch.ftp;
+    if (patch.lthr !== undefined) group.lthr = patch.lthr;
+    if (patch.max_hr !== undefined) group.max_hr = patch.max_hr;
+    if (patch.threshold_pace !== undefined) group.threshold_pace = patch.threshold_pace;
+  }
+
+  async updateAthleteProfile(id: string, patch: { icu_weight?: number | null; icu_resting_hr?: number | null; sex?: string | null; height?: number | null; icu_date_of_birth?: string | null }): Promise<void> {
+    const info = this.get(id).info;
+    if (patch.icu_weight !== undefined) info.icu_weight = patch.icu_weight;
+    if (patch.icu_resting_hr !== undefined) info.icu_resting_hr = patch.icu_resting_hr;
+    if (patch.sex !== undefined) info.sex = patch.sex;
+    if (patch.height !== undefined) info.height = patch.height;
+    if (patch.icu_date_of_birth !== undefined) info.icu_date_of_birth = patch.icu_date_of_birth;
+  }
+
+  async updateWellness(id: string, day: string, patch: { weight?: number; restingHR?: number }): Promise<void> {
+    const a = this.get(id);
+    let w = a.wellness.find((x) => x.id === day);
+    if (!w) {
+      w = { id: day };
+      a.wellness.push(w);
+    }
+    if (patch.weight !== undefined) w.weight = patch.weight;
+    if (patch.restingHR !== undefined) w.restingHR = patch.restingHR;
   }
 
   /* ---------- Tableaux de bord avancés ---------- */

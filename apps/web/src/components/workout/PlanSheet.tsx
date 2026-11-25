@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
-import { ChevronDown, Minus, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { NumberStepper } from '@/components/common/NumberStepper';
 import { Cell, Sheet } from '@/components/ios';
 import { useApplyPlan, useDeletePlan, useLibrary, useSavedWorkouts, useSavePlan, useTeam } from '@/hooks/useCoach';
 import { formatDuration } from '@/lib/format';
@@ -199,23 +200,15 @@ function PlanItem({
             onChange={(e) => onChange({ name: e.target.value })}
             style={{ background: 'var(--fill)', borderRadius: 10, minHeight: 40, fontWeight: 600 }}
           />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="secondary" style={{ flex: 1 }}>
-              Jour
-            </span>
-            <span className="tabular-nums" style={{ fontWeight: 600 }} aria-live="polite">
-              {dayLabel(item.day, null)}
-            </span>
-            <div style={{ display: 'flex', background: 'var(--fill)', borderRadius: 9, overflow: 'hidden' }}>
-              <button type="button" aria-label="Jour précédent" disabled={item.day <= 0} onClick={() => onChange({ day: item.day - 1 })} style={{ width: 46, height: 34, display: 'grid', placeItems: 'center', opacity: item.day <= 0 ? 0.35 : 1 }}>
-                <Minus size={18} aria-hidden />
-              </button>
-              <span aria-hidden style={{ width: 0.5, background: 'var(--separator)', margin: '7px 0' }} />
-              <button type="button" aria-label="Jour suivant" disabled={item.day >= MAX_DAY} onClick={() => onChange({ day: item.day + 1 })} style={{ width: 46, height: 34, display: 'grid', placeItems: 'center', opacity: item.day >= MAX_DAY ? 0.35 : 1 }}>
-                <Plus size={18} aria-hidden />
-              </button>
-            </div>
-          </div>
+          <NumberStepper
+            label="Jour du plan"
+            value={item.day + 1}
+            min={1}
+            max={MAX_DAY + 1}
+            step={1}
+            format={(v) => dayLabel(v - 1, null)}
+            onChange={(v) => onChange({ day: v - 1 })}
+          />
           <StructureEditor description={item.description} sport={sport} onChange={(description) => onChange({ description })} />
           <button type="button" className="pressable" onClick={onDelete} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--red)', minHeight: 36, justifySelf: 'start' }}>
             <Trash2 size={16} aria-hidden />

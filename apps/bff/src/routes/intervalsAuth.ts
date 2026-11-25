@@ -22,7 +22,7 @@ import { BadRequest, HttpError } from '../validation.js';
  * munies d'une invitation valide peuvent créer un compte.
  */
 
-export const OAUTH_SCOPES = 'ACTIVITY:READ,WELLNESS:READ,CALENDAR:WRITE,LIBRARY:READ,SETTINGS:READ';
+export const OAUTH_SCOPES = 'ACTIVITY:READ,WELLNESS:WRITE,CALENDAR:WRITE,LIBRARY:READ,SETTINGS:WRITE';
 const STATE_TTL = 10 * 60;
 const INVITE_RE = /^[A-Za-z0-9_-]{8,64}$/;
 

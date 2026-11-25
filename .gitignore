@@ -159,3 +159,6 @@ vite.config.ts.timestamp-*
 
 # Claude Code : réglages locaux (peuvent contenir des secrets)
 .claude/settings.local.json
+
+# macOS
+.DS_Store

@@ -26,6 +26,9 @@ vi.mock('../src/sources.js', async (orig) => ({
     streams: async () => ({ step: 1, time: [], watts: null, heartrate: null }),
     powerCurves: async () => ({ list: [] }),
     folders: async () => [],
+    updateSportSettings: async () => undefined,
+    updateAthleteProfile: async () => undefined,
+    updateWellness: async () => undefined,
   }),
 }));
 

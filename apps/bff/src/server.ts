@@ -11,6 +11,8 @@ import { registerDemoRoutes } from './routes/demo.js';
 import { registerIntervalsAuthRoutes } from './routes/intervalsAuth.js';
 import { registerAccountRoutes } from './routes/account.js';
 import { registerDashboardRoutes } from './routes/dashboards.js';
+import { registerProfileRoutes } from './routes/profile.js';
+import { registerCareRoutes } from './routes/care.js';
 import { registerPlanningRoutes } from './routes/planning.js';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -137,6 +139,8 @@ export async function buildServer() {
   await app.register(registerIntervalsAuthRoutes, { prefix: '/api' });
   await app.register(registerAccountRoutes, { prefix: '/api' });
   await app.register(registerDashboardRoutes, { prefix: '/api' });
+  await app.register(registerProfileRoutes, { prefix: '/api' });
+  await app.register(registerCareRoutes, { prefix: '/api' });
   await app.register(registerPlanningRoutes, { prefix: '/api' });
 
   return app;

@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
 import { Cell, Page, Placeholder, Section, Sheet } from '@/components/ios';
 import { Spinner } from '@/components/common/PageLoader';
 import { useCalendar, useEditEvent, useTeam } from '@/hooks/useCoach';
+import { useCare } from '@/hooks/useCare';
+import { dayStatus } from '@/lib/availability';
 import { formatDuration } from '@/lib/format';
 import type { PlannedEvent } from '@/types';
 
@@ -25,6 +27,8 @@ export function CalendarView({ fixed }: { fixed?: { id: string; title: string } 
   const from = weekStart.format('YYYY-MM-DD');
   const to = weekStart.add(6, 'day').format('YYYY-MM-DD');
   const cal = useCalendar(athleteId, from, to);
+  // Jours de repos et exceptions de l'athlète : grisés, sans changer le calendrier.
+  const care = useCare(athleteId);
   const today = dayjs().format('YYYY-MM-DD');
   const [editing, setEditing] = useState<PlannedEvent | null>(null);
 
@@ -71,7 +75,9 @@ export function CalendarView({ fixed }: { fixed?: { id: string; title: string } 
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', gap: 2 }}>
-        {days.map(({ d, key, planned, done }) => (
+        {days.map(({ d, key, planned, done }) => {
+          const status = care.data ? dayStatus(key, care.data) : null;
+          return (
           <div key={key}>
             <div className="caption secondary">{d.format('dd').slice(0, 1).toUpperCase()}</div>
             <div
@@ -82,16 +88,22 @@ export function CalendarView({ fixed }: { fixed?: { id: string; title: string } 
                 lineHeight: '32px',
                 margin: '2px auto',
                 borderRadius: '50%',
-                background: key === today ? 'var(--tint)' : 'transparent',
-                color: key === today ? '#fff' : undefined,
+                background: key === today ? 'var(--tint)' : status ? 'var(--fill)' : 'transparent',
+                color: key === today ? '#fff' : status ? 'var(--label-2)' : undefined,
                 fontWeight: key === today ? 600 : 400,
               }}
             >
               {d.date()}
             </div>
             <Dot planned={planned.length > 0} done={done.length > 0} past={key < today} />
+            {status && (
+              <div className="caption secondary" style={{ fontSize: 10, lineHeight: '12px', marginTop: 2 }} aria-label={`${d.format('dddd')} : ${status}`}>
+                {status === 'repos' ? 'repos' : 'indispo.'}
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {cal.isLoading && (

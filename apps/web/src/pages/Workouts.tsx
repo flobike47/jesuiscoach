@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { Bike, CalendarRange, Footprints, Waves, Trash2 } from 'lucide-react';
 import { Cell, Page, Section, Segmented, Sheet } from '@/components/ios';
 import { AthletePicker } from '@/components/workout/AthletePicker';
 import { PlanSheet } from '@/components/workout/PlanSheet';
 import { StructureEditor, WorkoutSummary } from '@/components/workout/StructureEditor';
-import { useAssignWorkout, useDeleteSavedWorkout, useLibrary, usePlans, useSavedWorkouts, useSaveWorkout, useTeam } from '@/hooks/useCoach';
+import { useDeleteSavedWorkout, useLibrary, usePlans, useSavedWorkouts, useSaveWorkout, useTeam } from '@/hooks/useCoach';
+import { useDebounced, useSendWorkout, useWorkoutCheck } from '@/hooks/useCare';
+import { formatShortDay } from '@/lib/availability';
 import { formatDuration } from '@/lib/format';
 import { parseWorkout, SPORT_LABELS, STARTERS, TEMPLATES, workoutStats, type Sport } from '@/lib/workout';
 import { convertForSport, formatMeters, formatMinutes } from '@/lib/workoutBlocks';
 import type { TrainingPlan } from '@/types';
+import type { CareWarning, WorkoutCheckInput } from '@/services/careApi';
 
 interface Draft {
   key: string;
@@ -120,7 +123,7 @@ function TemplateCell({ name, description, sport, onClick }: { name: string; des
  */
 function WorkoutSheet({ draft, onClose }: { draft: Draft; onClose: () => void }) {
   const team = useTeam();
-  const assign = useAssignWorkout();
+  const assign = useSendWorkout();
   const save = useSaveWorkout();
   const remove = useDeleteSavedWorkout();
   const [savedId, setSavedId] = useState(draft.savedId);
@@ -131,7 +134,33 @@ function WorkoutSheet({ draft, onClose }: { draft: Draft; onClose: () => void })
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** Athlètes pour lesquels l'envoi malgré un blocage (blessure) est confirmé. */
+  const [forced, setForced] = useState<Set<string>>(new Set());
   const athletes = team.data?.athletes ?? [];
+
+  // Avertissements : recalculés quand la date, le sport, la structure ou les athlètes changent (anti-rebond 400 ms).
+  const checkParams = (): WorkoutCheckInput | null => {
+    if (selected.size === 0) return null;
+    const steps = parseWorkout(description);
+    const stats = workoutStats(steps);
+    return {
+      athleteIds: [...selected].sort(),
+      date,
+      sport,
+      durationSec: stats.complete ? stats.seconds : null,
+      usesPower: steps.some((st) => st.target === 'power'),
+      highIntensity: steps.some((st) => Math.max(st.from, st.to) >= 100),
+    };
+  };
+  const paramsKey = JSON.stringify(checkParams());
+  const debouncedKey = useDebounced(paramsKey, 400);
+  const debounced = useMemo(() => (debouncedKey && debouncedKey !== 'null' ? (JSON.parse(debouncedKey) as WorkoutCheckInput) : null), [debouncedKey]);
+  const checkQuery = useWorkoutCheck(debounced);
+  const results = checkQuery.data?.results ?? [];
+  const nameOf = (id: string) => athletes.find((a) => a.id === id)?.name ?? id;
+  /** Athlètes bloqués (un avertissement « block ») et non confirmés : pas d'envoi pour eux. */
+  const blockedIds = new Set(results.filter((r) => r.warnings.some((w) => w.level === 'block') && !forced.has(r.id)).map((r) => r.id));
+  const sendable = [...selected].filter((id) => !blockedIds.has(id));
 
   const check = (): string | null => {
     if (!name.trim()) return 'Donne un nom à la séance.';
@@ -163,10 +192,20 @@ function WorkoutSheet({ draft, onClose }: { draft: Draft; onClose: () => void })
     const invalid = check();
     if (invalid) return setMessage({ ok: false, text: invalid });
     if (selected.size === 0) return setMessage({ ok: false, text: 'Choisis au moins un athlète.' });
+    if (sendable.length === 0) return setMessage({ ok: false, text: 'Aucun envoi possible : confirme l’envoi malgré la blessure, ou retire l’athlète.' });
+    const params = checkParams();
     try {
-      const { results } = await assign.mutateAsync({ athleteIds: [...selected], date, name: name.trim(), description, sport });
-      const failed = results.filter((r) => !r.ok);
-      if (failed.length) setMessage({ ok: false, text: `${failed.length} envoi(s) en échec : ${failed[0].error ?? 'erreur inconnue'}` });
+      const { results: sent } = await assign.mutateAsync({
+        ...params!,
+        athleteIds: sendable,
+        name: name.trim(),
+        description,
+        force: [...forced].filter((id) => selected.has(id)),
+      });
+      const blocked = sent.filter((r) => r.blocked);
+      const failed = sent.filter((r) => !r.ok && !r.blocked);
+      if (blocked.length) setMessage({ ok: false, text: `${blocked.length} athlète(s) non envoyé(s) : blessure en cours. Confirme l’envoi pour eux.` });
+      else if (failed.length) setMessage({ ok: false, text: `${failed.length} envoi(s) en échec : ${failed[0].error ?? 'erreur inconnue'}` });
       else onClose();
     } catch (e) {
       setMessage({ ok: false, text: (e as Error).message });
@@ -215,8 +254,35 @@ function WorkoutSheet({ draft, onClose }: { draft: Draft; onClose: () => void })
         <input type="date" className="field" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
       </div>
       <AthletePicker athletes={athletes} selected={selected} onChange={setSelected} />
-      <button type="button" className="button filled block pressable" style={{ marginTop: 14 }} disabled={assign.isPending} onClick={send}>
-        {assign.isPending ? 'Envoi…' : selected.size ? `Envoyer à ${selected.size} athlète${selected.size > 1 ? 's' : ''}` : 'Envoyer'}
+      {results.some((r) => r.warnings.length) && (
+        <div className="group" style={{ marginTop: 12, padding: 12, display: 'grid', gap: 12 }}>
+          {results
+            .filter((r) => r.warnings.length)
+            .map((r) => (
+              <AthleteWarnings
+                key={r.id}
+                name={nameOf(r.id)}
+                warnings={r.warnings}
+                confirmed={forced.has(r.id)}
+                onConfirm={() => setForced((all) => toggle(all, r.id))}
+              />
+            ))}
+        </div>
+      )}
+      <button
+        type="button"
+        className="button filled block pressable"
+        style={{ marginTop: 14 }}
+        disabled={assign.isPending || (selected.size > 0 && sendable.length === 0)}
+        onClick={send}
+      >
+        {assign.isPending
+          ? 'Envoi…'
+          : selected.size === 0
+            ? 'Envoyer'
+            : sendable.length === 0
+              ? 'Aucun envoi possible'
+              : `Envoyer à ${sendable.length} athlète${sendable.length > 1 ? 's' : ''}`}
       </button>
       <p className="section-footer">« Enregistrer » garde la séance dans « Mes séances » sans l’envoyer.</p>
 
@@ -239,5 +305,41 @@ function WorkoutSheet({ draft, onClose }: { draft: Draft; onClose: () => void })
         </button>
       )}
     </Sheet>
+  );
+}
+
+function toggle(set: Set<string>, id: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+/** Avertissements d'un athlète : orange (à vérifier), rouge (envoi bloqué sans confirmation). */
+function AthleteWarnings({ name, warnings, confirmed, onConfirm }: { name: string; warnings: CareWarning[]; confirmed: boolean; onConfirm: () => void }) {
+  const blocking = warnings.some((w) => w.level === 'block');
+  return (
+    <div style={{ display: 'grid', gap: 6 }}>
+      <span className="footnote secondary" style={{ fontWeight: 600 }}>
+        {name}
+      </span>
+      {warnings.map((w, i) => (
+        <p key={i} role={w.level === 'block' ? 'alert' : 'status'} className="footnote" style={{ margin: 0, color: w.level === 'block' ? 'var(--red)' : 'var(--orange)' }}>
+          <strong>{w.title}</strong> — {w.detail}
+          {w.suggestDate && ` Le ${formatShortDay(w.suggestDate)} conviendrait mieux.`}
+        </p>
+      ))}
+      {blocking && (
+        <button
+          type="button"
+          aria-pressed={confirmed}
+          onClick={onConfirm}
+          className="pressable"
+          style={{ justifySelf: 'start', minHeight: 44, color: confirmed ? 'var(--green)' : 'var(--tint)', fontWeight: 600 }}
+        >
+          {confirmed ? `Envoi confirmé pour ${name}` : `Envoyer quand même à ${name}`}
+        </button>
+      )}
+    </div>
   );
 }

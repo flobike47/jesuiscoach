@@ -108,6 +108,9 @@ async function del<T>(path: string, body?: unknown): Promise<T> {
   return res.data;
 }
 
+/** Appels bruts, pour les modules d'API séparés (services/profileApi.ts, services/careApi.ts). */
+export { get, post, put, del };
+
 export interface AssignResult {
   results: Array<{ id: string; ok: boolean; error?: string }>;
 }

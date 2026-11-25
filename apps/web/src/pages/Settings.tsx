@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Bike, Link2, ListChecks, LogOut, Moon, Repeat, Shield, Trash2 } from 'lucide-react';
+import { Bell, Bike, Link2, ListChecks, LogOut, Moon, Repeat, Shield, Trash2, UserRound } from 'lucide-react';
 import { inviteMessage } from '@/lib/onboarding';
 import { Cell, Page, Section, Segmented, Sheet } from '@/components/ios';
 import { useAuth } from '@/lib/auth';
@@ -90,6 +90,7 @@ export default function Settings() {
     <Page title="Réglages">
       <Section>
         <Cell title={me.data?.name ?? '…'} subtitle={me.data ? `${me.data.role === 'coach' ? 'Coach' : 'Athlète'}${demo ? ' · démo' : ''}` : undefined} />
+        <Cell inset={52} leading={<UserRound size={20} color="var(--blue)" aria-hidden />} title="Mon profil" subtitle="Physiologie, disponibilités, santé" to="/profil" chevron />
         {me.data?.role === 'athlete' && (
           <Cell inset={52} leading={<ListChecks size={20} color="var(--green)" aria-hidden />} title="Bien démarrer" subtitle="Montre reliée, séances sur la montre, notifications" to="/bien-demarrer" chevron />
         )}

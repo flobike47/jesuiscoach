@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import dayjs from 'dayjs';
-import { AlertTriangle, BarChart3, Clock, TrendingUp, Zap } from 'lucide-react';
+import { AlertTriangle, BarChart3, Clock, TrendingUp, UserRound, Zap } from 'lucide-react';
 import { Avatar, Cell, Page, Placeholder, Section, Segmented } from '@/components/ios';
 import { Spinner } from '@/components/common/PageLoader';
 import { useAthleteOverview } from '@/hooks/useCoach';
@@ -76,6 +76,7 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
           </div>
 
           <Section header="Analyse">
+            <Cell inset={52} leading={<UserRound size={20} color="var(--indigo)" aria-hidden />} title="Profil" subtitle="Physiologie, disponibilités, santé" to={`/athletes/${encodeURIComponent(id!)}/profil`} chevron />
             <Cell inset={52} leading={<Zap size={20} color="var(--blue)" aria-hidden />} title="Puissance" subtitle="Courbe, records, FTP estimée" to={`/athletes/${encodeURIComponent(id!)}/puissance`} chevron />
             <Cell inset={52} leading={<BarChart3 size={20} color="var(--green)" aria-hidden />} title="Zones" subtitle="Temps par zone, semaine par semaine" to={`/athletes/${encodeURIComponent(id!)}/zones`} chevron />
           </Section>

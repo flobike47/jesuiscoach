@@ -90,6 +90,31 @@ export class IntervalsClient {
     return (await this.http.get(`/athlete/${encodeURIComponent(id)}/folders`)).data ?? [];
   }
 
+  /**
+   * Réglages d'un sport (scope SETTINGS:WRITE). Corps partiel : seuls les
+   * champs envoyés changent. `recalcHrZones` recalcule les zones cardio.
+   */
+  async updateSportSettings(
+    id: string,
+    sport: 'Ride' | 'Run' | 'Swim',
+    patch: { ftp?: number; lthr?: number; max_hr?: number; threshold_pace?: number },
+  ): Promise<void> {
+    await this.http.put(`/athlete/${encodeURIComponent(id)}/sport-settings/${sport}`, patch, { params: { recalcHrZones: true } });
+  }
+
+  /** Profil de l'athlète (poids, FC repos, sexe, taille, naissance ; scope SETTINGS:WRITE). Un null efface le champ. */
+  async updateAthleteProfile(
+    id: string,
+    patch: { icu_weight?: number | null; icu_resting_hr?: number | null; sex?: string | null; height?: number | null; icu_date_of_birth?: string | null },
+  ): Promise<void> {
+    await this.http.put(`/athlete/${encodeURIComponent(id)}`, patch);
+  }
+
+  /** Forme d'un jour (poids, FC repos ; scope WELLNESS:WRITE). `day` au format AAAA-MM-JJ. */
+  async updateWellness(id: string, day: string, patch: { weight?: number; restingHR?: number }): Promise<void> {
+    await this.http.put(`/athlete/${encodeURIComponent(id)}/wellness/${day}`, patch);
+  }
+
   /** Révoque le jeton OAuth de l'app pour cet athlète (et coupe ses webhooks). */
   async disconnect(): Promise<void> {
     await this.http.delete('/disconnect-app');

@@ -4,8 +4,16 @@ export interface IntervalsAthlete {
   id: string;
   name?: string;
   sportSettings?: Array<{
+    id?: number | null;
     types?: string[];
     ftp?: number | null;
+    /** FC seuil (bpm). */
+    lthr?: number | null;
+    /** FC max (bpm). */
+    max_hr?: number | null;
+    /** Allure seuil en mètres par seconde, quelle que soit `pace_units`. */
+    threshold_pace?: number | null;
+    pace_units?: string | null;
     /** Bornes hautes des zones de puissance, en % de la FTP (dernière = 999). */
     power_zones?: number[] | null;
     /** Bornes hautes des zones cardio, en bpm. */
@@ -15,6 +23,14 @@ export interface IntervalsAthlete {
     sweet_spot_max?: number | null;
   }>;
   icu_weight?: number | null;
+  /** FC de repos (bpm). */
+  icu_resting_hr?: number | null;
+  /** « M » ou « F ». */
+  sex?: string | null;
+  /** Taille en cm. */
+  height?: number | null;
+  /** AAAA-MM-JJ. */
+  icu_date_of_birth?: string | null;
   icu_ftp?: number | null;
   /** Réglages de connexion (scope SETTINGS) : sorties Garmin importées directement, séances envoyées à Garmin, Strava relié. */
   icu_garmin_sync_activities?: boolean | null;
@@ -36,6 +52,8 @@ export interface IntervalsWellness {
   rampRate?: number | null;
   hrv?: number | null;
   restingHR?: number | null;
+  /** Poids du jour (kg), saisi dans la fiche profil. */
+  weight?: number | null;
 }
 
 export interface IntervalsActivity {
