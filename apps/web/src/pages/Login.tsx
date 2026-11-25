@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
-import { Activity } from 'lucide-react';
 import { api } from '@/services/api';
 import { useAuth } from '@/lib/auth';
 
@@ -35,9 +34,7 @@ export default function Login() {
       }}
     >
       <div>
-        <div style={{ width: 72, height: 72, borderRadius: 18, background: 'var(--blue)', display: 'grid', placeItems: 'center', color: '#fff' }}>
-          <Activity size={40} strokeWidth={2.2} aria-hidden />
-        </div>
+        <img src="logo.svg" alt="" width={72} height={72} style={{ display: 'block', borderRadius: 16 }} />
         <h1 className="large-title" style={{ marginTop: 24 }}>
           Je suis coach
         </h1>

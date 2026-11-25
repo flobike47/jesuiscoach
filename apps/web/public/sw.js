@@ -20,13 +20,13 @@
  * Chemins relatifs à l'emplacement du SW : l'app peut être servie sous un
  * sous-chemin (BASE_PATH).
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL_CACHE = `jc-shell-${VERSION}`;
 const ASSET_CACHE = 'jc-assets';
 const MAX_ASSETS = 80;
 
 const SCOPE = new URL('./', self.location).pathname;
-const SHELL = ['./', 'config.js', 'manifest.webmanifest', 'favicon.svg', 'icons/icon-192.png'];
+const SHELL = ['./', 'config.js', 'manifest.webmanifest', 'favicon.svg', 'logo.svg', 'icons/icon-192.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
