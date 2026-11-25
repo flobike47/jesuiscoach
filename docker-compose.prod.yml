@@ -16,11 +16,21 @@
 # tournent sur le même Pi. 4100 (BFF direct) ne sert qu'au diagnostic.
 # =============================================================================
 
+# Journaux Docker : rotation automatique (3 fichiers de 10 Mo par conteneur).
+# Sans elle, les logs (adresses IP, requêtes) grossiraient indéfiniment —
+# la politique de confidentialité s'engage sur cet effacement automatique.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # Postgres : la base de l'app, sur le Pi. Jamais exposé hors du réseau interne.
   # Données sur un SSD de préférence (une carte SD s'use vite sous Postgres).
   postgres:
     image: postgres:16-alpine
+    logging: *logging
     restart: unless-stopped
     environment:
       POSTGRES_DB: jesuiscoach
@@ -41,6 +51,7 @@ services:
   # reste en .tmp et est nettoyé au passage suivant.
   postgres-backup:
     image: postgres:16-alpine
+    logging: *logging
     restart: unless-stopped
     environment:
       PGHOST: postgres
@@ -70,6 +81,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    logging: *logging
     restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
@@ -85,6 +97,7 @@ services:
 
   bff:
     image: ${BFF_IMAGE:-jesuiscoach-bff:latest}
+    logging: *logging
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -120,12 +133,13 @@ services:
     ports:
       # Bind sur l'interface locale uniquement — c'est le reverse proxy
       # (Caddy/Nginx sur l'host) qui expose en HTTPS vers l'extérieur.
-      - "127.0.0.1:4100:4000"
+      - "4100:4000"
     networks:
       - internal
 
   web:
     image: ${WEB_IMAGE:-jesuiscoach-web:latest}
+    logging: *logging
     restart: unless-stopped
     environment:
       # Injectées dans /config.js + <base href> de /index.html au boot
@@ -136,7 +150,7 @@ services:
     depends_on:
       - bff
     ports:
-      - "127.0.0.1:8180:80"
+      - "8180:80"
     networks:
       - internal
 
