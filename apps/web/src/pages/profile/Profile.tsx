@@ -4,6 +4,7 @@ import { IdentityRow } from './Identity';
 import { PhysiologyRow, ProfileSuggestions } from './Physiology';
 import { AvailabilityRow } from './Availability';
 import { EquipmentRow, HealthRow } from './Health';
+import { GoalsRow } from './Goals';
 
 /**
  * Fiche profil de l'athlète (A1 : identité et physiologie ; A2 :
@@ -19,6 +20,7 @@ export default function Profile() {
       <Section>
         <IdentityRow athleteId={athleteId} base={base} />
         <PhysiologyRow athleteId={athleteId} base={base} />
+        <GoalsRow athleteId={athleteId} base={base} />
       </Section>
       <Section footer={self ? 'Visible par toi et ton coach.' : 'Visible par l’athlète et toi. Tes modifications lui sont signalées.'}>
         <AvailabilityRow athleteId={athleteId} base={base} />

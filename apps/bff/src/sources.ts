@@ -7,7 +7,7 @@ import { checkinsOf, deleteUser, intervalsTokenOf, teamAthleteIds, upsertCheckin
 import { revokeAllSessions } from './sessions.js';
 import type { AuthUser } from './auth.js';
 import { downsampleStreams } from './lib/dashboards.js';
-import type { ActivityStreams, IntervalsActivity, IntervalsActivityDetail, IntervalsAthlete, IntervalsEvent, IntervalsFolder, IntervalsPowerCurves, IntervalsWellness, NewWorkoutEvent } from './types.js';
+import type { ActivityStreams, CalendarEventPatch, IntervalsActivity, IntervalsActivityDetail, IntervalsAthlete, IntervalsEvent, IntervalsFolder, IntervalsPowerCurves, IntervalsStream, IntervalsWellness, NewCalendarEvent, NewWorkoutEvent } from './types.js';
 import { HttpError, NotFound } from './validation.js';
 
 /**
@@ -22,6 +22,11 @@ export interface AthleteSource {
   createWorkout(id: string, workout: NewWorkoutEvent): Promise<IntervalsEvent>;
   moveEvent(id: string, eventId: string, date: string): Promise<IntervalsEvent>;
   deleteEvent(id: string, eventId: string): Promise<void>;
+  /** Phase C : événement quelconque (séance, compétition, note) et modification partielle. */
+  createEvent(id: string, ev: NewCalendarEvent): Promise<IntervalsEvent>;
+  updateEvent(id: string, eventId: string, patch: CalendarEventPatch): Promise<IntervalsEvent>;
+  /** Phase D : streams complets d'une sortie, sans cache (stockés ensuite par l'app). */
+  rawStreams(id: string, activityId: string): Promise<IntervalsStream[]>;
   activity(id: string, activityId: string): Promise<IntervalsActivityDetail>;
   /** Streams déjà réduits pour l'affichage (lib/dashboards.ts). */
   streams(id: string, activityId: string): Promise<ActivityStreams>;
@@ -78,6 +83,9 @@ function cachedSource(athleteId: string, client: IntervalsClient): AthleteSource
     createWorkout: (id, w) => client.createWorkout(id, w),
     moveEvent: (id, eventId, date) => client.moveEvent(id, eventId, date),
     deleteEvent: (id, eventId) => client.deleteEvent(id, eventId),
+    createEvent: (id, ev) => client.createEvent(id, ev),
+    updateEvent: (id, eventId, patch) => client.updateEvent(id, eventId, patch),
+    rawStreams: (_id, activityId) => client.rawStreams(activityId),
     activity: (_id, activityId) => cachedJson(k('activity', activityId), TTL.activity, () => client.activity(activityId)),
     // Seule la version réduite est gardée (quelques Ko au lieu de centaines).
     streams: (_id, activityId) => cachedJson(k('streams', activityId), TTL.streams, async () => downsampleStreams(await client.streams(activityId))),

@@ -3,6 +3,7 @@ import type { CheckinRow } from './db/repo.js';
 import { downsampleStreams } from './lib/dashboards.js';
 import type {
   ActivityStreams,
+  CalendarEventPatch,
   IntervalsActivity,
   IntervalsActivityDetail,
   IntervalsAthlete,
@@ -12,6 +13,7 @@ import type {
   IntervalsPowerCurves,
   IntervalsStream,
   IntervalsWellness,
+  NewCalendarEvent,
   NewWorkoutEvent,
 } from './types.js';
 
@@ -231,6 +233,27 @@ export class DemoSource {
     ev.start_date_local = `${date}T00:00:00`;
     return ev;
   }
+  async createEvent(id: string, e: NewCalendarEvent): Promise<IntervalsEvent> {
+    const ev: IntervalsEvent = {
+      id: `demo-ev-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      category: e.category,
+      ...(e.sport ? { type: e.sport } : {}),
+      start_date_local: `${e.date}T00:00:00`,
+      name: e.name,
+      ...(e.description != null ? { description: e.description } : {}),
+    };
+    this.get(id).events.push(ev);
+    return ev;
+  }
+  async updateEvent(id: string, eventId: string, patch: CalendarEventPatch): Promise<IntervalsEvent> {
+    const ev = this.event(id, eventId);
+    if (patch.date) ev.start_date_local = `${patch.date}T00:00:00`;
+    if (patch.name != null) ev.name = patch.name;
+    if (patch.description != null) ev.description = patch.description;
+    if (patch.sport) ev.type = patch.sport;
+    if (patch.category) ev.category = patch.category;
+    return ev;
+  }
   async deleteEvent(id: string, eventId: string): Promise<void> {
     this.event(id, eventId);
     const a = this.get(id);
@@ -343,6 +366,13 @@ export class DemoSource {
       decoupling: Math.round((1 + r() * 6) * 10) / 10,
       icu_intervals: intervals,
     };
+  }
+
+  /** Streams complets (un point toutes les 5 s en démo, avec cadence). */
+  async rawStreams(id: string, activityId: string): Promise<IntervalsStream[]> {
+    const { streams } = this.demoRide(id, activityId);
+    const n = streams[0]?.data?.length ?? 0;
+    return [...streams, { type: 'cadence', data: Array.from({ length: n }, (_, i) => 85 + (i % 7)) }];
   }
 
   async streams(id: string, activityId: string): Promise<ActivityStreams> {
