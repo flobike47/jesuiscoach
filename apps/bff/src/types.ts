@@ -51,6 +51,8 @@ export interface IntervalsWellness {
   atl?: number | null;
   rampRate?: number | null;
   hrv?: number | null;
+  /** Durée de la nuit (secondes), si la montre la remonte à Intervals.icu. */
+  sleepSecs?: number | null;
   restingHR?: number | null;
   /** Poids du jour (kg), saisi dans la fiche profil. */
   weight?: number | null;

@@ -202,6 +202,16 @@ function meanFourth(a: number, b: number): number {
  * Les paliers en distance ne comptent pas. 0 si rien de chronométré.
  */
 export function estimatedLoad(blocks: WorkoutBlock[]): number {
+  const { seconds, intensity } = timedIntensity(blocks);
+  return Math.round((seconds / 3600) * intensity * intensity * 100);
+}
+
+/** Intensité estimée (1 = une heure au seuil), même méthode que la charge. 0 si rien de chronométré. */
+export function estimatedIntensity(blocks: WorkoutBlock[]): number {
+  return Math.round(timedIntensity(blocks).intensity * 100) / 100;
+}
+
+function timedIntensity(blocks: WorkoutBlock[]): { seconds: number; intensity: number } {
   let seconds = 0;
   let weighted = 0;
   const add = (s: StepBlock | RampBlock, times: number) => {
@@ -214,7 +224,5 @@ export function estimatedLoad(blocks: WorkoutBlock[]): number {
     if (b.kind === 'repeat') b.steps.forEach((s) => add(s, b.count));
     else add(b, 1);
   }
-  if (!seconds) return 0;
-  const intensity = (weighted / seconds) ** 0.25;
-  return Math.round((seconds / 3600) * intensity * intensity * 100);
+  return { seconds, intensity: seconds ? (weighted / seconds) ** 0.25 : 0 };
 }
