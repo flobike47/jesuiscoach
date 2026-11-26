@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { appFitness, storeOf } from '../activityStore.js';
 import { setupStatus } from '../lib/setup.js';
 import { isoDay, summarize } from '../lib/summary.js';
+import { matchPlan } from '../lib/plan.js';
 import { enforceQuota } from '../ratelimit.js';
 import { listCheckins, saveCheckin, sourceFor } from '../sources.js';
 import { BadRequest } from '../validation.js';
@@ -51,6 +52,7 @@ export async function registerAthleteRoutes(app: FastifyInstance) {
     const id = me.athleteId;
     const now = new Date();
     const today = isoDay(now);
+    const tomorrow = isoDay(new Date(now.getTime() + DAY));
     const monday = mondayOf(now);
     const sunday = new Date(monday.getTime() + 6 * DAY);
     const src = await sourceFor(id);
@@ -58,13 +60,13 @@ export async function registerAthleteRoutes(app: FastifyInstance) {
       src.athlete(id),
       // 90 jours : la forme calculée par l'app part de la wellness de J−90.
       src.wellness(id, isoDay(new Date(now.getTime() - 90 * DAY)), today),
-      src.activities(id, isoDay(monday), isoDay(sunday)),
-      src.events(id, isoDay(monday), isoDay(sunday)),
+      src.activities(id, isoDay(monday), isoDay(new Date(sunday.getTime() + DAY))),
+      src.events(id, isoDay(monday), isoDay(new Date(sunday.getTime() + DAY))),
       listCheckins(id, today, today),
     ]);
     // Charge de l'app quand elle existe (sinon celle d'Intervals.icu), sortie par sortie.
     const store = await storeOf(id, src, now);
-    const stored = new Map((store ? await store.backend.list(isoDay(monday), isoDay(sunday)) : []).map((r) => [r.id, r]));
+    const stored = new Map((store ? await store.backend.list(isoDay(monday), isoDay(new Date(sunday.getTime() + DAY))) : []).map((r) => [r.id, r]));
     const withAppLoad = activities.map((a) => {
       const load = stored.get(String(a.id))?.load;
       return load == null ? a : { ...a, icu_training_load: load };
@@ -82,11 +84,24 @@ export async function registerAthleteRoutes(app: FastifyInstance) {
     });
     const app = store ? await appFitness(store, isoDay(new Date(now.getTime() - 90 * DAY)), today, wellness) : null;
     const summary = summarize(info, app?.wellness ?? wellness, activities, events, now);
+
+    // Appariement des séances du jour avec les sorties (utilise matchPlan)
+    const todayWorkouts = workouts.filter((e) => e.start_date_local.startsWith(today));
+    const todayActivities = withAppLoad.filter((a) => a.start_date_local.startsWith(today));
+    const { activityOf } = matchPlan(todayWorkouts, todayActivities);
+    const doneEventIds = [...activityOf.keys()].filter((e) => e.id != null).map((e) => String(e.id));
+
+    // FTP depuis les réglages de sport (Ride par défaut)
+    const ftp = info.sportSettings?.find((s) => s.types?.includes('Ride'))?.ftp ?? null;
+
     return {
       today,
       name: me.name,
-      workouts: workouts.filter((e) => e.start_date_local.startsWith(today)),
-      activitiesToday: withAppLoad.filter((a) => a.start_date_local.startsWith(today)),
+      ftp,
+      workouts: todayWorkouts,
+      activitiesToday: todayActivities,
+      doneEventIds,
+      tomorrow: workouts.filter((e) => e.start_date_local.startsWith(tomorrow)),
       week,
       form: { fitness: summary.fitness, fatigue: summary.fatigue, form: summary.form },
       checkin: checkins[0] ?? null,

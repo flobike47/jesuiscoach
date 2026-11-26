@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import dayjs from 'dayjs';
-import { Watch, Frown, Meh, Smile, Laugh, Angry, type LucideIcon } from 'lucide-react';
+import { Frown, Meh, Smile, Laugh, Angry, type LucideIcon, Check, Circle, X } from 'lucide-react';
 import { Page, Placeholder, Section, Cell, FormGauge, SkeletonList } from '@/components/ios';
 import { useSaveCheckin, useToday } from '@/hooks/useCoach';
-import { formatDuration, formatKm, formatLoad, dayShort } from '@/lib/format';
+import { formatDuration, formatLoad, dayShort } from '@/lib/format';
+import { TodayWorkoutCard } from '@/components/workout/TodayCard';
 import type { Checkin } from '@/types';
 
 /** « mardi 24 novembre » → « Mardi 24 novembre » (CSS capitalize mettrait une capitale à chaque mot). */
@@ -11,12 +12,26 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Ressenti : 1 = très mal … 5 = en pleine forme. */
 const FEELINGS: Array<{ value: number; label: string; icon: LucideIcon; color: string }> = [
-  { value: 1, label: 'Très mal', icon: Angry, color: 'var(--red)' },
-  { value: 2, label: 'Fatigué', icon: Frown, color: 'var(--orange)' },
+  { value: 1, label: 'Épuisé·e', icon: Angry, color: 'var(--red)' },
+  { value: 2, label: 'Fatigué·e', icon: Frown, color: 'var(--orange)' },
   { value: 3, label: 'Correct', icon: Meh, color: 'var(--yellow)' },
   { value: 4, label: 'Bien', icon: Smile, color: 'var(--green)' },
-  { value: 5, label: 'En pleine forme', icon: Laugh, color: 'var(--teal)' },
+  { value: 5, label: 'En forme', icon: Laugh, color: 'var(--teal)' },
 ];
+
+/** Libellés pour l'effort perçu (RPE). */
+const RPE_LABELS: Record<number, string> = {
+  1: 'Très facile',
+  2: 'Très facile',
+  3: 'Facile',
+  4: 'Facile',
+  5: 'Modéré',
+  6: 'Modéré',
+  7: 'Dur',
+  8: 'Dur',
+  9: 'Très dur',
+  10: 'Maximal',
+};
 
 /** Écran 8 : « Aujourd'hui » de l'athlète. */
 export default function Today() {
@@ -35,40 +50,77 @@ export default function Today() {
               <div className="footnote secondary" style={{ marginTop: 4 }}>Journée libre : repos ou sortie à l'envie.</div>
             </div>
           )}
-          {data.workouts.map((w) => (
-            <div key={String(w.id ?? w.name)} className="card" style={{ background: 'color-mix(in srgb, var(--blue) 18%, var(--cell))', marginBottom: 10 }}>
-              <div className="caption" style={{ color: 'var(--blue)' }}>De ton coach</div>
-              <div className="title-2" style={{ marginTop: 2 }}>{w.name ?? 'Séance'}</div>
-              {w.description && (
-                <pre className="footnote" style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: '8px 0 0', color: 'var(--label-2)' }}>
-                  {w.description}
-                </pre>
-              )}
-              <div className="footnote" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, color: 'var(--label-2)' }}>
-                <Watch size={16} aria-hidden /> Envoyée sur ta montre via Intervals.icu
+
+          {/* Carte séance du jour (ou libre sans séance) */}
+          {data.workouts.length > 0 && (
+            <TodayWorkoutCard
+              workout={data.workouts[0]}
+              activity={data.activitiesToday.length > 0 ? data.activitiesToday[0] : undefined}
+              ftp={data.ftp}
+              sport="Ride"
+            />
+          )}
+
+          {/* Sortie libre sans séance prévue */}
+          {data.workouts.length === 0 && data.activitiesToday.length > 0 && (
+            <div
+              className="card"
+              style={{
+                background: 'color-mix(in srgb, var(--green) 18%, var(--cell))',
+                marginBottom: 12,
+              }}
+            >
+              <div className="caption" style={{ color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Check size={13} strokeWidth={3} aria-hidden /> Sortie libre
+              </div>
+              <div className="title-2" style={{ marginTop: 6, marginBottom: 6 }}>
+                {data.activitiesToday[0].name ?? 'Sortie'}
+              </div>
+              <div className="footnote secondary tabular-nums">
+                {data.activitiesToday[0].moving_time && <>Durée {formatDuration(data.activitiesToday[0].moving_time)}</>}
+                {data.activitiesToday[0].icu_training_load && <> · Charge {formatLoad(data.activitiesToday[0].icu_training_load)}</>}
               </div>
             </div>
-          ))}
-          {data.activitiesToday.map((a) => (
-            <div key={a.id} className="card" style={{ marginBottom: 10 }}>
-              <div className="caption" style={{ color: 'var(--green)' }}>Faite aujourd'hui</div>
-              <div className="headline" style={{ marginTop: 2 }}>{a.name ?? 'Sortie'}</div>
-              <div className="footnote secondary tabular-nums" style={{ marginTop: 2 }}>
-                {formatDuration(a.moving_time)} · {formatKm(a.distance)}
-                {a.icu_training_load != null ? ` · charge ${formatLoad(a.icu_training_load)}` : ''}
-              </div>
-            </div>
-          ))}
+          )}
 
-          <CheckinCard key={data.checkin?.day ?? 'none'} today={data.today} saved={data.checkin} />
+          <CheckinCard
+            key={data.checkin?.day ?? 'none'}
+            today={data.today}
+            saved={data.checkin}
+            hasActivity={data.activitiesToday.length > 0}
+          />
 
-          <Section header="Ma semaine">
-            <div className="cell" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', gap: 4 }}>
-              {data.week.map((d) => (
-                <WeekDay key={d.date} day={d} today={data.today} maxLoad={Math.max(80, ...data.week.map((x) => x.load))} />
+          {/* Demain */}
+          {data.tomorrow.length > 0 && (
+            <Section header="Demain">
+              {data.tomorrow.map((w) => (
+                <div
+                  key={String(w.id ?? w.name)}
+                  className="cell"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 22, width: 56 }} aria-hidden="true">
+                    <span
+                      style={{
+                        flex: 1,
+                        height: 9,
+                        background: 'var(--gray)',
+                        borderRadius: '1.5px',
+                      }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15 }}>{w.name ?? 'Séance'}</div>
+                    <div className="footnote secondary">charge – · durée –</div>
+                  </div>
+                </div>
               ))}
-            </div>
-          </Section>
+            </Section>
+          )}
 
           <Section header="Ma forme">
             <div className="card">
@@ -76,17 +128,26 @@ export default function Today() {
             </div>
             <Cell to="/progres" title="Voir ma progression" />
           </Section>
+
+          <Section header="Ma semaine">
+            <div className="cell" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', gap: 4 }}>
+              {data.week.map((d) => (
+                <WeekDay key={d.date} day={d} today={data.today} />
+              ))}
+            </div>
+          </Section>
         </>
       )}
     </Page>
   );
 }
 
-function CheckinCard({ today, saved }: { today: string; saved: Checkin | null }) {
+export function CheckinCard({ today, saved, hasActivity }: { today: string; saved: Checkin | null; hasActivity: boolean }) {
   const save = useSaveCheckin();
   const [feeling, setFeeling] = useState<number | null>(saved?.feeling ?? null);
   const [rpe, setRpe] = useState<number | null>(saved?.rpe ?? null);
   const [note, setNote] = useState(saved?.note ?? '');
+  const [noteOpen, setNoteOpen] = useState(Boolean(saved?.note));
   const [error, setError] = useState<string | null>(null);
   const dirty = feeling !== (saved?.feeling ?? null) || rpe !== (saved?.rpe ?? null) || note !== (saved?.note ?? '');
 
@@ -100,9 +161,13 @@ function CheckinCard({ today, saved }: { today: string; saved: Checkin | null })
     }
   };
 
+  const header = hasActivity ? "Comment c'était ?" : 'Comment tu te sens ce matin ?';
+  const footer = saved && !dirty ? 'Envoyé à ton coach.' : undefined;
+
   return (
-    <Section header="Comment tu te sens ?" footer={saved && !dirty ? 'Envoyé à ton coach.' : 'Ton coach le voit sur ta fiche.'}>
-      <div className="cell" style={{ justifyContent: 'space-between' }} role="radiogroup" aria-label="Ressenti">
+    <Section header={header} footer={footer}>
+      {/* Visages avec libellés visibles */}
+      <div className="cell" style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'flex-start' }}>
         {FEELINGS.map(({ value, label, icon: Icon, color }) => {
           const on = feeling === value;
           return (
@@ -115,32 +180,145 @@ function CheckinCard({ today, saved }: { today: string; saved: Checkin | null })
               onPointerDown={() => setFeeling(value)}
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setFeeling(value)}
               className="pressable"
-              style={{ width: 52, height: 52, borderRadius: '50%', display: 'grid', placeItems: 'center', background: on ? `color-mix(in srgb, ${color} 22%, transparent)` : 'transparent', color: on ? color : 'var(--label-3)' }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 4,
+                minWidth: 56,
+                background: 'none',
+                border: 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+              }}
             >
-              <Icon size={30} strokeWidth={1.8} />
+              <span
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '50%',
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: on ? `color-mix(in srgb, ${color} 22%, transparent)` : 'var(--fill)',
+                  color: on ? color : 'var(--label-3)',
+                  boxShadow: on ? `inset 0 0 0 2px ${color}` : 'none',
+                }}
+              >
+                <Icon size={26} strokeWidth={1.8} aria-hidden />
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: on ? color : 'var(--label-2)',
+                  fontWeight: on ? 600 : 400,
+                  textAlign: 'center',
+                  marginBottom: 12,
+                }}
+              >
+                {label}
+              </span>
             </button>
           );
         })}
       </div>
-      <div className="cell" style={{ display: 'block' }}>
-        <label htmlFor="rpe" className="footnote secondary" style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Effort perçu de la sortie</span>
-          <span className="tabular-nums" style={{ color: 'var(--label)' }}>{rpe == null ? '–' : `${rpe}/10`}</span>
-        </label>
-        <input id="rpe" type="range" min={1} max={10} step={1} value={rpe ?? 5} onChange={(e) => setRpe(Number(e.target.value))} style={{ width: '100%', accentColor: 'var(--tint)' }} />
-      </div>
-      <textarea
-        className="field"
-        aria-label="Un mot pour ton coach"
-        placeholder="Un mot pour ton coach (sommeil, douleur, motivation…)"
-        maxLength={500}
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        style={{ minHeight: 72, fontFamily: 'inherit', fontSize: 15, borderTop: '0.5px solid var(--separator)' }}
-      />
+
+      {/* Effort perçu (seulement s'il y a une sortie) */}
+      {hasActivity && (
+        <>
+          <div className="cell" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span>Effort perçu</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: rpe ? 'var(--label)' : 'var(--label-2)', fontVariantNumeric: 'tabular-nums' }}>
+              {rpe ? `${rpe} · ${RPE_LABELS[rpe]}` : '–'}
+            </span>
+          </div>
+          <div
+            className="cell"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(10, minmax(0, 1fr))',
+              gap: 4,
+              padding: '10px 16px',
+            }}
+            role="radiogroup"
+            aria-label="Effort perçu de 1 à 10"
+          >
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={rpe === value}
+                onPointerDown={() => setRpe(value)}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setRpe(value)}
+                className="pressable"
+                style={{
+                  minHeight: 44,
+                  borderRadius: 10,
+                  background: rpe === value ? 'var(--orange)' : 'var(--fill)',
+                  color: rpe === value ? 'var(--label)' : 'var(--label-2)',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+          <div className="cell" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--label-2)', padding: '10px 16px' }}>
+            <span>Très facile</span>
+            <span>Maximal</span>
+          </div>
+        </>
+      )}
+
+      {/* Note repliée derrière lien ou dépliée si elle existe */}
+      {hasActivity && (
+        <div className="cell" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {!noteOpen && (
+            <button
+              type="button"
+              onClick={() => setNoteOpen(true)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--tint)',
+                cursor: 'pointer',
+                fontSize: 15,
+                textAlign: 'left',
+                padding: 0,
+              }}
+            >
+              {note ? 'Modifier un mot' : 'Ajouter un mot'}
+            </button>
+          )}
+          {noteOpen && (
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '0.5px solid var(--separator)', paddingTop: 12 }}>
+              <span className="footnote secondary">Un mot pour ton coach</span>
+              <textarea
+                aria-label="Un mot pour ton coach"
+                placeholder="Sommeil, douleur, motivation…"
+                maxLength={500}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                style={{ minHeight: 72, fontFamily: 'inherit', fontSize: 15, background: 'var(--fill)', borderRadius: 10, border: 'none', padding: '10px 12px', resize: 'none' }}
+              />
+            </label>
+          )}
+        </div>
+      )}
+
       {(dirty || !saved) && (
-        <button type="button" className="cell" onClick={submit} disabled={save.isPending} style={{ color: 'var(--tint)', fontWeight: 600, justifyContent: 'center' }}>
-          {save.isPending ? 'Envoi…' : 'Envoyer'}
+        <button
+          type="button"
+          className="cell"
+          onClick={submit}
+          disabled={save.isPending}
+          style={{ color: 'var(--tint)', fontWeight: 600, justifyContent: 'center', minHeight: 48 }}
+        >
+          {save.isPending ? 'Envoi…' : 'Envoyer à ton coach'}
         </button>
       )}
       {error && (
@@ -152,22 +330,52 @@ function CheckinCard({ today, saved }: { today: string; saved: Checkin | null })
   );
 }
 
-function WeekDay({ day, today, maxLoad }: { day: { date: string; planned: string[]; load: number; done: boolean }; today: string; maxLoad: number }) {
+function WeekDay({ day, today }: { day: { date: string; planned: string[]; load: number; done: boolean }; today: string }) {
   const isToday = day.date === today;
   const past = day.date < today;
   const missed = past && day.planned.length > 0 && !day.done;
-  const h = day.done ? Math.max(6, Math.round((day.load / maxLoad) * 44)) : 4;
-  const label = `${dayjs(day.date).format('dddd')} : ${day.done ? `faite, charge ${day.load}` : missed ? 'séance manquée' : day.planned.length ? `prévu ${day.planned.join(', ')}` : 'repos'}`;
+  const isFuture = day.date > today;
+  const hasPlanned = day.planned.length > 0;
+  const isRest = day.planned.length === 0 && !day.done;
+
+  let icon: React.ReactNode = null;
+  let iconColor = 'var(--label-2)';
+  let label = '';
+
+  if (day.done) {
+    icon = <Check size={18} strokeWidth={3} aria-hidden />;
+    iconColor = 'var(--green)';
+    label = `${dayjs(day.date).format('dddd')} : faite, charge ${day.load}`;
+  } else if (missed) {
+    icon = <X size={18} strokeWidth={3} aria-hidden />;
+    iconColor = 'var(--red)';
+    label = `${dayjs(day.date).format('dddd')} : séance manquée`;
+  } else if (hasPlanned && isFuture) {
+    icon = <Circle size={18} strokeWidth={2.4} style={{ strokeDasharray: '3 3' }} aria-hidden />;
+    iconColor = 'var(--blue)';
+    label = `${dayjs(day.date).format('dddd')} : prévue`;
+  } else if (hasPlanned) {
+    icon = <Circle size={18} strokeWidth={3} aria-hidden />;
+    iconColor = 'var(--blue)';
+    label = `${dayjs(day.date).format('dddd')} : prévue`;
+  } else if (isRest) {
+    icon = <span style={{ width: 14, height: 2, background: 'var(--label-2)', borderRadius: 1 }} aria-hidden />;
+    iconColor = 'var(--label-2)';
+    label = `${dayjs(day.date).format('dddd')} : repos`;
+  }
+
   return (
-    <div aria-label={label} role="img">
-      <div style={{ height: 48, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-        {day.planned.length > 0 && !day.done && !past ? (
-          <div style={{ width: 14, height: 24, borderRadius: 4, border: '1.5px dashed var(--tint)' }} />
-        ) : (
-          <div style={{ width: 14, height: h, borderRadius: 4, background: day.done ? 'var(--green)' : missed ? 'var(--red)' : 'var(--fill-2)' }} />
-        )}
+    <div aria-label={label} role="img" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <div style={{ height: 24, display: 'grid', placeItems: 'center', color: isToday ? 'var(--tint)' : iconColor }}>
+        {icon}
       </div>
-      <div className="caption" style={{ marginTop: 4, color: isToday ? 'var(--tint)' : 'var(--label-2)', fontWeight: isToday ? 600 : 400 }}>
+      <div
+        className="caption"
+        style={{
+          color: isToday ? 'var(--tint)' : 'var(--label-2)',
+          fontWeight: isToday ? 600 : 400,
+        }}
+      >
         {dayShort(day.date)}
       </div>
     </div>

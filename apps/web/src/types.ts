@@ -98,8 +98,11 @@ export interface AthleteOverview {
 export interface TodayView {
   today: string;
   name: string;
+  ftp: number | null;
   workouts: PlannedEvent[];
   activitiesToday: Activity[];
+  doneEventIds: string[];
+  tomorrow: PlannedEvent[];
   week: Array<{ date: string; planned: string[]; load: number; done: boolean }>;
   form: { fitness: number; fatigue: number; form: number };
   checkin: Checkin | null;

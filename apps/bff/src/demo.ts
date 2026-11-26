@@ -117,7 +117,22 @@ function simulate(k: number, now: Date): DemoAthlete {
     atl += (load - atl) / 7;
     wellness.push({ id: date, ctl: Math.round(ctl * 10) / 10, atl: Math.round(atl * 10) / 10 });
     if (d <= 7 && [2, 4, 6].includes(day.getUTCDay())) {
-      events.push({ id: `demo-ev-${k}-${d}`, category: 'WORKOUT', type: 'Ride', start_date_local: `${date}T00:00:00`, name: 'Séance prévue' });
+      const names = ['Sweet spot 3×12', 'Seuil 3×10', 'VO2max 5×4'];
+      const descriptions = [
+        '- 15m ramp 50-75%\n\n3x\n- 12m 88-93%\n- 4m 55%\n\n- 10m 50%',
+        '- 20m 60-80%\n\n3x\n- 10m 95-100%\n- 2m 60%\n\n- 15m 50%',
+        '- 15m 50-70%\n\n5x\n- 4m 110-120%\n- 2m 60%\n\n- 10m 50%',
+      ];
+      const idx = Math.floor(r() * 3);
+      const ev = {
+        id: `demo-ev-${k}-${d}`,
+        category: 'WORKOUT' as const,
+        type: 'Ride',
+        start_date_local: `${date}T00:00:00`,
+        name: d === 0 ? names[idx] : 'Séance prévue',
+        description: d === 0 ? descriptions[idx] : undefined,
+      };
+      events.push(ev);
     }
   }
   wellness.forEach((w, i) => {
