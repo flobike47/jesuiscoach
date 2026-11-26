@@ -290,6 +290,10 @@ export function TeamPlanning() {
                 <button
                   key={`${athlete.id}-${day.date}`}
                   type="button"
+                  aria-label={`${athlete.name}, ${dayjs(day.date).format('dddd D MMMM')} : ${
+                    isWorkout ? day.workouts[0].name : kind === 'off' ? 'indisponible' : kind === 'extra' ? 'sortie hors plan' : 'libre'
+                  }`}
+                  aria-pressed={kind === 'free' ? isSelected : undefined}
                   onClick={() => {
                     if (isWorkout) {
                       setEditingEvent({ event: day.workouts[0], athleteId: athlete.id });
@@ -364,7 +368,7 @@ export function TeamPlanning() {
               {selectedCells.length} case{selectedCells.length > 1 ? 's' : ''} sélectionnée{selectedCells.length > 1 ? 's' : ''}
             </div>
             <div style={{ fontSize: 13, color: 'var(--label-2)' }}>
-              {selectionSummary(selectedCells, athletes)}
+              {selectionSummary(selectedCells, cal.data?.athletes ?? [])}
             </div>
           </div>
           <button

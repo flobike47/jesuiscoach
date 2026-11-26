@@ -101,7 +101,7 @@ beforeEach(async () => {
   await db.query('insert into coach_athletes (coach_id, athlete_id) values ($1, $2)', [USER_A, USER_B]);
 });
 
-const call = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, token: 'token-a' | 'token-b' | null, payload?: unknown) =>
+const call = (method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, token: 'token-a' | 'token-b' | null, payload?: unknown) =>
   app.inject({ method, url, headers: token ? auth(token) : {}, ...(payload !== undefined ? { payload: payload as object } : {}) });
 
 const PLAN = {
@@ -247,5 +247,80 @@ describe('routes de planification', () => {
     const res = await call('POST', `/api/plans/${plan.id}/apply`, 'token-a', { athleteIds: ['iB'], startDate: '2026-12-01' });
     expect(res.statusCode).toBe(429);
     expect(writes).toEqual([]);
+  });
+
+  it('ajoute un favori à une séance enregistrée', async () => {
+    const created = await call('POST', '/api/saved-workouts', 'token-a', { name: 'Seuil', description: '- 20m 95%' });
+    const w = created.json();
+    expect(w.favorite).toBe(false);
+    expect(w.sentCount).toBe(0);
+    expect(w.lastSentAt).toBeNull();
+
+    const updated = await call('PATCH', `/api/saved-workouts/${w.id}`, 'token-a', { favorite: true });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({ name: 'Seuil', favorite: true });
+  });
+
+  it('retire un favori', async () => {
+    const created = await call('POST', '/api/saved-workouts', 'token-a', { name: 'Seuil', description: '- 20m 95%' });
+    const w = created.json();
+
+    await call('PATCH', `/api/saved-workouts/${w.id}`, 'token-a', { favorite: true });
+    const removed = await call('PATCH', `/api/saved-workouts/${w.id}`, 'token-a', { favorite: false });
+    expect(removed.json().favorite).toBe(false);
+  });
+
+  it('incrémente le compteur d\'usage', async () => {
+    const created = await call('POST', '/api/saved-workouts', 'token-a', { name: 'Seuil', description: '- 20m 95%' });
+    const w = created.json();
+
+    const used = await call('POST', `/api/saved-workouts/${w.id}/used`, 'token-a', { count: 3 });
+    expect(used.statusCode).toBe(200);
+    expect(used.json()).toMatchObject({ sentCount: 3, lastSentAt: expect.any(String) });
+
+    const used2 = await call('POST', `/api/saved-workouts/${w.id}/used`, 'token-a', { count: 2 });
+    expect(used2.json()).toMatchObject({ sentCount: 5 });
+  });
+
+  it('valide le compteur d\'usage (1-50)', async () => {
+    const created = await call('POST', '/api/saved-workouts', 'token-a', { name: 'Seuil', description: '- 20m 95%' });
+    const w = created.json();
+
+    expect((await call('POST', `/api/saved-workouts/${w.id}/used`, 'token-a', { count: 0 })).statusCode).toBe(400);
+    expect((await call('POST', `/api/saved-workouts/${w.id}/used`, 'token-a', { count: 51 })).statusCode).toBe(400);
+    expect((await call('POST', `/api/saved-workouts/${w.id}/used`, 'token-a', { count: 1.5 })).statusCode).toBe(400);
+    expect((await call('POST', `/api/saved-workouts/${w.id}/used`, 'token-a', { count: 'a' as never })).statusCode).toBe(400);
+  });
+
+  it('trie les séances : favoris d\'abord, puis last_sent_at décroissant, puis updated_at décroissant', async () => {
+    const w1 = (await call('POST', '/api/saved-workouts', 'token-a', { name: 'W1', description: 'desc' })).json();
+    const w2 = (await call('POST', '/api/saved-workouts', 'token-a', { name: 'W2', description: 'desc' })).json();
+    const w3 = (await call('POST', '/api/saved-workouts', 'token-a', { name: 'W3', description: 'desc' })).json();
+
+    // w2 un favori non utilisé, w3 utilisé, w1 ni favori ni utilisé
+    await call('PATCH', `/api/saved-workouts/${w2.id}`, 'token-a', { favorite: true });
+    await call('POST', `/api/saved-workouts/${w3.id}/used`, 'token-a', { count: 2 });
+
+    const list = (await call('GET', '/api/saved-workouts', 'token-a')).json().workouts;
+    expect(list.map((x: any) => x.id)).toEqual([w2.id, w3.id, w1.id]); // w2 (favori), w3 (utilisé), w1 (ancien)
+  });
+
+  it('refuse un usage d\'un autre coach (404)', async () => {
+    const created = await call('POST', '/api/saved-workouts', 'token-a', { name: 'Seuil', description: '- 20m 95%' });
+    const w = created.json();
+    expect((await call('POST', `/api/saved-workouts/${w.id}/used`, 'token-b', { count: 1 })).statusCode).toBe(403);
+  });
+
+  it('refuse une modification favorite d\'un autre coach (404)', async () => {
+    const created = await call('POST', '/api/saved-workouts', 'token-a', { name: 'Seuil', description: '- 20m 95%' });
+    const w = created.json();
+    expect((await call('PATCH', `/api/saved-workouts/${w.id}`, 'token-b', { favorite: true })).statusCode).toBe(403);
+  });
+
+  it('refuse favorite sans valeur', async () => {
+    const created = await call('POST', '/api/saved-workouts', 'token-a', { name: 'Seuil', description: '- 20m 95%' });
+    const w = created.json();
+    expect((await call('PATCH', `/api/saved-workouts/${w.id}`, 'token-a', {})).statusCode).toBe(400);
+    expect((await call('PATCH', `/api/saved-workouts/${w.id}`, 'token-a', { favorite: 'yes' as never })).statusCode).toBe(400);
   });
 });
