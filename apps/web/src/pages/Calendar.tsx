@@ -6,6 +6,7 @@ import { Page, Placeholder, Segmented, Sheet, SkeletonList } from '@/components/
 import { AthletePicker } from '@/components/calendar/AthletePicker';
 import { EditEventSheet, NewEventSheet } from '@/components/calendar/EventSheets';
 import { MonthPanel } from '@/components/calendar/MonthPanel';
+import { TeamPlanning } from '@/components/calendar/TeamPlanning';
 import { useCalendar, useTeam } from '@/hooks/useCoach';
 import { useCare } from '@/hooks/useCare';
 import { useEventMutations } from '@/hooks/useCalendarData';
@@ -46,7 +47,12 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
   const [showCopyWeek, setShowCopyWeek] = useState(false);
   const [copyingWeek, setCopyingWeek] = useState(false);
   const [resyncError, setResyncError] = useState<string | null>(null);
-  const [view, setView] = useState<'semaine' | 'mois'>(() => (searchParams.get('vue') === 'mois' ? 'mois' : 'semaine'));
+  const [view, setView] = useState<'semaine' | 'mois' | 'equipe'>(() => {
+    const v = searchParams.get('vue');
+    if (v === 'mois') return 'mois';
+    if (v === 'equipe') return 'equipe';
+    return 'semaine';
+  });
 
   const events = useMemo(() => (cal.data?.events ?? []) as AppEvent[], [cal.data?.events]);
   const doneIds = useMemo(() => new Set(cal.data?.doneEventIds ?? []), [cal.data?.doneEventIds]);
@@ -113,6 +119,8 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
     setView(newView);
     if (newView === 'mois') {
       setSearchParams((p) => ({ ...Object.fromEntries(p), vue: 'mois' }));
+    } else if (newView === 'equipe') {
+      setSearchParams((p) => ({ ...Object.fromEntries(p), vue: 'equipe' }));
     } else {
       const p = Object.fromEntries(searchParams);
       delete p.vue;
@@ -139,15 +147,23 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
         ) : undefined
       }
       header={
-        !fixed && athletes.length > 0 ? (
+        !fixed && athletes.length > 0 && view !== 'equipe' ? (
           <AthletePicker athletes={athletes} picked={athleteId ?? null} onPick={handlePickAthlete} />
         ) : undefined
       }
     >
-      <Segmented<'semaine' | 'mois'> label="Vue" value={view} onChange={handleViewChange} options={[
-        { value: 'semaine', label: 'Semaine' },
-        { value: 'mois', label: 'Mois' },
-      ]} />
+      <Segmented<'semaine' | 'mois' | 'equipe'> label="Vue" value={view} onChange={handleViewChange} options={
+        fixed
+          ? [
+              { value: 'semaine', label: 'Semaine' },
+              { value: 'mois', label: 'Mois' },
+            ]
+          : [
+              { value: 'semaine', label: 'Semaine' },
+              { value: 'mois', label: 'Mois' },
+              { value: 'equipe', label: 'Équipe' },
+            ]
+      } />
 
       {view === 'semaine' && (
         <>
@@ -378,6 +394,8 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
           />
         ) : null
       )}
+
+      {view === 'equipe' && <TeamPlanning />}
 
       {editing && athleteId && (
         <EditEventSheet key={String(editing.id)} athleteId={athleteId} event={editing} weekStart={weekStart} initialDate={editingInitialDate ?? undefined} onClose={() => { setEditing(null); setEditingInitialDate(null); }} />

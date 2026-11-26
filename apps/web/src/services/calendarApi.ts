@@ -1,5 +1,5 @@
 import { del, get, post, put } from '@/services/api';
-import type { PlannedEvent, Sport } from '@/types';
+import type { PlannedEvent, Sport, Group, TeamCalendar } from '@/types';
 
 /**
  * Calendrier stocké dans l'app (phase C) : séances, compétitions, notes,
@@ -90,4 +90,10 @@ export const calendarApi = {
   createGoal: (athleteId: string, body: GoalInput & { title: string }) => post<Goal>(`${base(athleteId)}/goals`, body),
   updateGoal: (athleteId: string, goalId: string, body: GoalInput) => put<Goal>(`${base(athleteId)}/goals/${encodeURIComponent(goalId)}`, body),
   deleteGoal: (athleteId: string, goalId: string) => del<{ ok: true }>(`${base(athleteId)}/goals/${encodeURIComponent(goalId)}`),
+
+  teamCalendar: (from: string, to: string) => get<TeamCalendar>('/team/calendar', { from, to }),
+  groups: () => get<{ groups: Group[] }>('/groups'),
+  createGroup: (body: { name: string; athleteIds: string[] }) => post<{ group: Group }>('/groups', body),
+  updateGroup: (id: string, body: { name?: string; athleteIds?: string[] }) => put<{ group: Group }>(`/groups/${encodeURIComponent(id)}`, body),
+  deleteGroup: (id: string) => del<{ ok: true }>(`/groups/${encodeURIComponent(id)}`),
 };
