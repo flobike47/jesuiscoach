@@ -94,7 +94,7 @@ async function syncFromWebhook(athleteId: string, notify: Notify, log: FastifyBa
   if (!target) return; // athlète inconnu ou déconnecté : rien à faire
   try {
     await invalidateKeys(`icu:activities:${athleteId}:*`);
-    const rides = await syncAthlete(target, await sourceFor(athleteId), notify);
+    const rides = await syncAthlete(target, await sourceFor(athleteId), notify, undefined, log);
     log.info({ userId: target.id, rides }, 'webhook: synchro faite');
   } catch (err) {
     log.warn({ err, userId: target.id }, 'webhook: synchro en échec');
