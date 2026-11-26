@@ -1,6 +1,6 @@
 import type { AxiosInstance } from 'axios';
 import { createProviderClient } from './http.js';
-import type { IntervalsActivity, IntervalsActivityDetail, IntervalsAthlete, IntervalsEvent, IntervalsFolder, IntervalsPowerCurves, IntervalsStream, IntervalsWellness, NewWorkoutEvent } from '../types.js';
+import type { CalendarEventPatch, IntervalsActivity, IntervalsActivityDetail, IntervalsAthlete, IntervalsEvent, IntervalsFolder, IntervalsPowerCurves, IntervalsStream, IntervalsWellness, NewCalendarEvent, NewWorkoutEvent } from '../types.js';
 
 /**
  * Client Intervals.icu (https://intervals.icu/api/v1).
@@ -61,6 +61,30 @@ export class IntervalsClient {
     ).data;
   }
 
+  /** Crée un événement quelconque : séance, compétition (RACE_A/B/C), note. Renvoie l'événement créé (id numérique). */
+  async createEvent(id: string, ev: NewCalendarEvent): Promise<IntervalsEvent> {
+    return (
+      await this.http.post(`/athlete/${encodeURIComponent(id)}/events`, {
+        category: ev.category,
+        ...(ev.sport ? { type: ev.sport } : {}),
+        start_date_local: `${ev.date}T00:00:00`,
+        name: ev.name,
+        ...(ev.description != null ? { description: ev.description } : {}),
+      })
+    ).data;
+  }
+
+  /** Modifie un événement (seuls les champs envoyés changent, vérifié au spike). */
+  async updateEvent(id: string, eventId: string, patch: CalendarEventPatch): Promise<IntervalsEvent> {
+    const body: Record<string, unknown> = {};
+    if (patch.date) body.start_date_local = `${patch.date}T00:00:00`;
+    if (patch.name != null) body.name = patch.name;
+    if (patch.description != null) body.description = patch.description;
+    if (patch.sport) body.type = patch.sport;
+    if (patch.category) body.category = patch.category;
+    return (await this.http.put(`/athlete/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`, body)).data;
+  }
+
   /** Déplace un événement du calendrier à une autre date (format attendu : AAAA-MM-JJT00:00:00). */
   async moveEvent(id: string, eventId: string, date: string): Promise<IntervalsEvent> {
     return (await this.http.put(`/athlete/${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`, { start_date_local: `${date}T00:00:00` })).data;
@@ -78,6 +102,18 @@ export class IntervalsClient {
   /** Streams d'une sortie (un point par seconde) ; les types absents sont omis. */
   async streams(activityId: string): Promise<IntervalsStream[]> {
     return (await this.http.get(`/activity/${encodeURIComponent(activityId)}/streams.json`, { params: { types: 'time,watts,heartrate' } })).data ?? [];
+  }
+
+  /**
+   * Streams complets d'une sortie (un point par seconde enregistrée), pour les
+   * calculs faits par l'app (phase D). Types absents omis par Intervals.icu.
+   */
+  async rawStreams(activityId: string): Promise<IntervalsStream[]> {
+    return (
+      (await this.http.get(`/activity/${encodeURIComponent(activityId)}/streams.json`, {
+        params: { types: 'time,watts,heartrate,cadence,velocity_smooth,distance,altitude' },
+      })).data ?? []
+    );
   }
 
   /** Courbes de puissance vélo sur 90 jours et 1 an (records et modèles). */

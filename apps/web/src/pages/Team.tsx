@@ -23,6 +23,9 @@ export default function Team() {
 
   return (
     <Page title="Équipe">
+      <Section>
+        <Cell title="Aujourd’hui" subtitle="Séances prévues et sorties de l’équipe" to="/aujourdhui" chevron />
+      </Section>
       <input
         type="search"
         className="field"

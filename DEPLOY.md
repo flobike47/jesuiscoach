@@ -61,6 +61,7 @@ Portainer pourra ensuite pull les images privées automatiquement.
 | `PUBLIC_API_URL` | BFF | `https://jesuiscoach.fb-cloud.fr` (callback OAuth) |
 | `INTERVALS_CLIENT_ID`, `INTERVALS_CLIENT_SECRET` | BFF | app OAuth Intervals.icu (⚠️ secret) |
 | `INTERVALS_WEBHOOK_SECRET` | BFF | secret des webhooks Intervals.icu (Manage App) ; URL `/api/public/webhooks/intervals`, événements `ACTIVITY_ANALYZED`, `CALENDAR_UPDATED`, `SPORT_SETTINGS_UPDATED` (⚠️ secret) |
+| `WAHOO_CLIENT_ID`, `WAHOO_CLIENT_SECRET`, `WAHOO_WEBHOOK_TOKEN` | BFF | app Wahoo (⚠️ secrets) ; optionnelles, voir « App Wahoo » ci-dessous |
 | `COACH_ATHLETE_IDS` | BFF | `i123456` : ton ID Intervals.icu (rôle coach) |
 | `TOKEN_ENCRYPTION_KEY` | BFF | 32 octets base64 (⚠️ secret, ne plus jamais la changer) |
 | `DEMO_MODE` | BFF | `false` en prod |
@@ -128,6 +129,17 @@ Teste la procédure une fois avant d'en avoir besoin.
 
 En attendant la validation, la stack peut tourner avec `DEMO_MODE=true`
 (équipe fictive, aucun appel Intervals.icu).
+
+### App Wahoo (appareils reliés, phase E)
+
+Optionnelle : sans ces variables, la connexion Wahoo répond « Bientôt disponible ».
+1. Demander l'accès sur **developers.wahooligan.com** (validation par Wahoo ; app sandbox puis production, limites distinctes).
+2. Déclarer la **redirect URI** : `https://jesuiscoach.fb-cloud.fr/api/public/devices/wahoo/callback`.
+3. Scopes demandés par l'app : `user_read workouts_read workouts_write plans_write offline_data`.
+4. Déclarer le **webhook** : `https://jesuiscoach.fb-cloud.fr/api/public/webhooks/wahoo` avec un jeton long et aléatoire, à mettre dans `WAHOO_WEBHOOK_TOKEN` (le corps Wahoo le renvoie tel quel ; sans jeton configuré, la route répond 404).
+5. Renseigner `WAHOO_CLIENT_ID` et `WAHOO_CLIENT_SECRET`, puis redéployer la stack (les variables sont lues au démarrage du BFF).
+
+Les jetons Wahoo sont chiffrés avec `TOKEN_ENCRYPTION_KEY` comme les jetons Intervals.icu. Wahoo ne renvoie pas les sorties créées par d'autres apps : seules celles des compteurs Wahoo arrivent.
 
 ## 4. Activer le webhook de redeploy
 

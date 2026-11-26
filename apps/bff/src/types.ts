@@ -100,6 +100,29 @@ export interface IntervalsEvent {
   description?: string;
 }
 
+/** Catégories d'événements utilisées par l'app (schéma Intervals.icu vérifié : WORKOUT, RACE_A/B/C, NOTE, TARGET…). */
+export type CalendarCategory = 'WORKOUT' | 'RACE_A' | 'RACE_B' | 'RACE_C' | 'NOTE';
+
+/** Création d'un événement quelconque (séance, compétition A/B/C, note). */
+export interface NewCalendarEvent {
+  category: CalendarCategory;
+  /** AAAA-MM-JJ */
+  date: string;
+  name: string;
+  description?: string;
+  /** Sport (`type` Intervals.icu) ; absent pour une note. */
+  sport?: 'Ride' | 'Run' | 'Swim';
+}
+
+/** Modification partielle d'un événement (seuls les champs fournis changent). */
+export interface CalendarEventPatch {
+  date?: string;
+  name?: string;
+  description?: string;
+  sport?: 'Ride' | 'Run' | 'Swim';
+  category?: CalendarCategory;
+}
+
 export interface NewWorkoutEvent {
   date: string;
   name: string;

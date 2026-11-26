@@ -48,6 +48,12 @@ export const config = {
   intervalsWebhookSecret: opt('INTERVALS_WEBHOOK_SECRET'),
   // URL publique du BFF (callback OAuth + webhooks), ex. https://api.tondomaine.com
   publicApiUrl: process.env.PUBLIC_API_URL ?? `http://localhost:${process.env.PORT ?? 4000}`,
+  // Wahoo (phase E) : app à demander sur developers.wahooligan.com (validation Wahoo).
+  // Sans client_id / secret, la connexion Wahoo est désactivée (503). Le webhook
+  // refuse toute requête tant que WAHOO_WEBHOOK_TOKEN n'est pas défini (404).
+  wahooClientId: opt('WAHOO_CLIENT_ID'),
+  wahooClientSecret: opt('WAHOO_CLIENT_SECRET'),
+  wahooWebhookToken: opt('WAHOO_WEBHOOK_TOKEN'),
   // Clé AES-256-GCM (32 octets en base64) qui chiffre les jetons Intervals en base.
   // Générer : node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
   tokenEncryptionKey: opt('TOKEN_ENCRYPTION_KEY'),

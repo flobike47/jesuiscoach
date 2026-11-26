@@ -35,3 +35,23 @@ describe('client Intervals.icu', () => {
     expect(http.defaults.headers.common['User-Agent']).toMatch(/^jesuiscoach\//);
   });
 });
+
+describe('écritures du calendrier et streams complets (phases C et D)', () => {
+  it('crée une compétition, modifie partiellement un événement, lit les streams complets', async () => {
+    const calls: Array<{ method: string; url: string; data?: unknown; params?: unknown }> = [];
+    const http = {
+      defaults: { headers: { common: {} as Record<string, string> } },
+      post: async (url: string, data: unknown) => (calls.push({ method: 'post', url, data }), { data: { id: 7, ...(data as object) } }),
+      put: async (url: string, data: unknown) => (calls.push({ method: 'put', url, data }), { data: { id: 7 } }),
+      get: async (url: string, cfg: { params?: unknown }) => (calls.push({ method: 'get', url, params: cfg?.params }), { data: [{ type: 'watts', data: [1] }] }),
+    };
+    const { IntervalsClient } = await import('../src/providers/intervals.js');
+    const client = new IntervalsClient({ kind: 'oauth', accessToken: 't' }, http as never);
+    await client.createEvent('i1', { category: 'RACE_A', date: '2027-05-01', name: 'Marmotte', sport: 'Ride' });
+    await client.updateEvent('i1', '7', { description: '- 10m 70%' });
+    await client.rawStreams('i9');
+    expect(calls[0]).toEqual({ method: 'post', url: '/athlete/i1/events', data: { category: 'RACE_A', type: 'Ride', start_date_local: '2027-05-01T00:00:00', name: 'Marmotte' } });
+    expect(calls[1]).toEqual({ method: 'put', url: '/athlete/i1/events/7', data: { description: '- 10m 70%' } });
+    expect(calls[2]).toMatchObject({ url: '/activity/i9/streams.json', params: { types: 'time,watts,heartrate,cadence,velocity_smooth,distance,altitude' } });
+  });
+});

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { requireUser } from '../auth.js';
 import { invalidateKeys } from '../cache.js';
 import { config } from '../config.js';
+import { appFitness, storeOf } from '../activityStore.js';
 import { setupStatus } from '../lib/setup.js';
 import { isoDay, summarize } from '../lib/summary.js';
 import { enforceQuota } from '../ratelimit.js';
@@ -55,15 +56,23 @@ export async function registerAthleteRoutes(app: FastifyInstance) {
     const src = await sourceFor(id);
     const [info, wellness, activities, events, checkins] = await Promise.all([
       src.athlete(id),
-      src.wellness(id, isoDay(new Date(now.getTime() - 14 * DAY)), today),
+      // 90 jours : la forme calculée par l'app part de la wellness de J−90.
+      src.wellness(id, isoDay(new Date(now.getTime() - 90 * DAY)), today),
       src.activities(id, isoDay(monday), isoDay(sunday)),
       src.events(id, isoDay(monday), isoDay(sunday)),
       listCheckins(id, today, today),
     ]);
+    // Charge de l'app quand elle existe (sinon celle d'Intervals.icu), sortie par sortie.
+    const store = await storeOf(id, src, now);
+    const stored = new Map((store ? await store.backend.list(isoDay(monday), isoDay(sunday)) : []).map((r) => [r.id, r]));
+    const withAppLoad = activities.map((a) => {
+      const load = stored.get(String(a.id))?.load;
+      return load == null ? a : { ...a, icu_training_load: load };
+    });
     const workouts = events.filter((e) => e.category === 'WORKOUT');
     const week = Array.from({ length: 7 }, (_, i) => {
       const date = isoDay(new Date(monday.getTime() + i * DAY));
-      const dayActivities = activities.filter((a) => a.start_date_local.startsWith(date));
+      const dayActivities = withAppLoad.filter((a) => a.start_date_local.startsWith(date));
       return {
         date,
         planned: workouts.filter((e) => e.start_date_local.startsWith(date)).map((e) => e.name ?? 'Séance'),
@@ -71,12 +80,13 @@ export async function registerAthleteRoutes(app: FastifyInstance) {
         done: dayActivities.length > 0,
       };
     });
-    const summary = summarize(info, wellness, activities, events, now);
+    const app = store ? await appFitness(store, isoDay(new Date(now.getTime() - 90 * DAY)), today, wellness) : null;
+    const summary = summarize(info, app?.wellness ?? wellness, activities, events, now);
     return {
       today,
       name: me.name,
       workouts: workouts.filter((e) => e.start_date_local.startsWith(today)),
-      activitiesToday: activities.filter((a) => a.start_date_local.startsWith(today)),
+      activitiesToday: withAppLoad.filter((a) => a.start_date_local.startsWith(today)),
       week,
       form: { fitness: summary.fitness, fatigue: summary.fatigue, form: summary.form },
       checkin: checkins[0] ?? null,
