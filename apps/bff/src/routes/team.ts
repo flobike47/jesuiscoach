@@ -3,6 +3,7 @@ import { requireUser } from '../auth.js';
 import { config } from '../config.js';
 import { randomToken } from '../lib/crypto.js';
 import { insertInvitation } from '../db/repo.js';
+import { appFitness, storeOf } from '../activityStore.js';
 import { matchPlan } from '../lib/plan.js';
 import { isoDay, summarize } from '../lib/summary.js';
 import { assertCanView, listCheckins, sourceFor, teamOf } from '../sources.js';
@@ -11,6 +12,7 @@ import { ATHLETE_ID_RE, BadRequest, Forbidden, HttpError } from '../validation.j
 
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (now: Date, n: number) => isoDay(new Date(now.getTime() - n * DAY));
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
 
 export async function registerTeamRoutes(app: FastifyInstance) {
@@ -37,14 +39,17 @@ export async function registerTeamRoutes(app: FastifyInstance) {
         const src = await sourceFor(id);
         const [info, wellness, activities, events] = await Promise.all([
           src.athlete(id),
-          src.wellness(id, daysAgo(now, 14), isoDay(now)),
+          // 90 jours : la forme calculée par l'app part de la wellness de J−90.
+          src.wellness(id, daysAgo(now, 90), isoDay(now)),
           src.activities(id, daysAgo(now, 28), isoDay(now)),
           src.events(id, daysAgo(now, 7), daysAgo(now, -7)),
         ]);
-        return summarize(info, wellness, activities, events, now);
+        const store = await storeOf(id, src, now);
+        const app = store ? await appFitness(store, daysAgo(now, 90), isoDay(now), wellness) : null;
+        return { ...summarize(info, app?.wellness ?? wellness, activities, events, now), source: app ? ('app' as const) : ('intervals' as const) };
       }),
     );
-    const athletes: AthleteSummary[] = [];
+    const athletes: Array<AthleteSummary & { source: 'app' | 'intervals' }> = [];
     const errors: Array<{ id: string; error: string }> = [];
     results.forEach((r, i) => {
       if (r.status === 'fulfilled') athletes.push(r.value);
@@ -71,11 +76,16 @@ export async function registerTeamRoutes(app: FastifyInstance) {
       src.events(id, daysAgo(now, 7), daysAgo(now, -7)),
       listCheckins(id, daysAgo(now, 14), isoDay(now)),
     ]);
-    const series = wellness
-      .filter((w) => w.ctl != null)
-      .map((w) => ({ date: w.id, fitness: w.ctl ?? 0, fatigue: w.atl ?? 0, form: Math.round(((w.ctl ?? 0) - (w.atl ?? 0)) * 10) / 10 }));
-    const summary = summarize(info, wellness.slice(-14), activities, events, now);
-    return { summary, series, activities, checkins };
+    // Fitness, fatigue et forme calculées par l'app quand ses sorties sont en base ; sinon Intervals.icu.
+    const store = await storeOf(id, src, now);
+    const app = store ? await appFitness(store, daysAgo(now, 90), isoDay(now), wellness) : null;
+    const series = app
+      ? app.days.map((d) => ({ date: d.date, fitness: round1(d.fitness), fatigue: round1(d.fatigue), form: round1(d.form) }))
+      : wellness
+          .filter((w) => w.ctl != null)
+          .map((w) => ({ date: w.id, fitness: w.ctl ?? 0, fatigue: w.atl ?? 0, form: Math.round(((w.ctl ?? 0) - (w.atl ?? 0)) * 10) / 10 }));
+    const summary = summarize(info, (app?.wellness ?? wellness).slice(-14), activities, events, now);
+    return { summary, series, activities, checkins, source: app ? 'app' : 'intervals' };
   });
 
   /** Fil d'activité : sorties de toute l'équipe sur 7 jours, la plus récente d'abord. */
@@ -93,9 +103,14 @@ export async function registerTeamRoutes(app: FastifyInstance) {
           src.events(id, daysAgo(now, 7), isoDay(now)),
         ]);
         const { eventOfActivity } = matchPlan(events, activities);
+        // Charge calculée par l'app quand elle existe (remplace icu_training_load, comme ailleurs).
+        const store = await storeOf(id, src, now);
+        const stored = new Map((store ? await store.backend.list(daysAgo(now, 7), isoDay(now)) : []).map((r) => [r.id, r]));
         return activities.map((a) => {
           const planned = eventOfActivity.get(String(a.id));
-          return { athleteId: id, athleteName: info.name ?? id, activity: a, plannedName: planned ? (planned.name ?? 'Séance prévue') : null };
+          const load = stored.get(String(a.id))?.load;
+          const activity = load == null ? a : { ...a, icu_training_load: load };
+          return { athleteId: id, athleteName: info.name ?? id, activity, plannedName: planned ? (planned.name ?? 'Séance prévue') : null };
         });
       }),
     );
