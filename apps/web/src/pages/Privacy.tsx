@@ -120,8 +120,9 @@ export default function Privacy() {
             </>,
             <>
               Prestataires techniques : <strong>Intervals.icu</strong> (source des données), <strong>Cloudflare</strong>{' '}
-              (acheminement chiffré du trafic vers le serveur) et le service de notifications de ton appareil (contenu des
-              notifications : nom de l'athlète et résumé de la sortie ou de l'alerte).
+              (acheminement chiffré du trafic vers le serveur), le service de notifications de ton appareil (contenu des
+              notifications : nom de l'athlète et résumé de la sortie ou de l'alerte) et, seulement si tu relies ton compteur
+              <strong> Wahoo</strong> directement : Wahoo reçoit tes séances planifiées et te renvoie tes sorties.
             </>,
           ]}
         />
@@ -246,8 +247,9 @@ export default function Privacy() {
             <>No selling, no advertising, no analytics, no artificial intelligence processing.</>,
             <>
               Technical providers: <strong>Intervals.icu</strong> (data source), <strong>Cloudflare</strong> (encrypted
-              routing of traffic to the server) and your device's push notification service (notification content:
-              athlete name and a summary of the ride or alert).
+              routing of traffic to the server), your device's push notification service (notification content:
+              athlete name and a summary of the ride or alert) and, only if you connect your <strong>Wahoo</strong>{' '}
+              computer directly: Wahoo receives your planned workouts and sends back your rides.
             </>,
           ]}
         />
