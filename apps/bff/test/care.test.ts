@@ -226,3 +226,19 @@ describe('validation des entrées', () => {
     expect(() => validateWorkoutCheck({ date: TUESDAY, sport: 'Ride', durationSec: -1 })).toThrow(BadRequest);
   });
 });
+
+describe('availabilityOf', () => {
+  const days = Array.from({ length: 7 }, (_, weekday) => ({ weekday, available: weekday !== 0, maxMinutes: null, slot: 'any' as const, place: 'any' as const }));
+  it('lundi sans sortie habituelle → repos', async () => {
+    const { availabilityOf } = await import('../src/lib/care.js');
+    expect(availabilityOf('2026-11-23', { days, exceptions: [] })).toBe('repos');
+    expect(availabilityOf('2026-11-24', { days, exceptions: [] })).toBeNull();
+  });
+  it('exception → indisponible, bornes incluses', async () => {
+    const { availabilityOf } = await import('../src/lib/care.js');
+    const exceptions = [{ id: 'x', fromDay: '2026-11-25', toDay: '2026-11-27', note: null }];
+    expect(availabilityOf('2026-11-25', { days, exceptions })).toBe('indisponible');
+    expect(availabilityOf('2026-11-27', { days, exceptions })).toBe('indisponible');
+    expect(availabilityOf('2026-11-28', { days, exceptions })).toBeNull();
+  });
+});

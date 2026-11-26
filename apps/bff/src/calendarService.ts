@@ -7,6 +7,10 @@ import { demoSource, sourceFor } from './sources.js';
 import { storeOf, withAppLoad } from './activityStore.js';
 import { CALENDAR_LIMITS, categoryOf, dayStatus, eventJson, importedFields, parisToday, reconcile, type CalendarRow, type CreatedBy, type EventInput, type EventPatch } from './lib/calendar.js';
 import { matchPlan } from './lib/plan.js';
+import { ftpOf, isoDay } from './lib/summary.js';
+import { availabilityOf } from './lib/care.js';
+import { estimatedLoad, estimatedSeconds, parseWorkoutText, type WorkoutSport } from './lib/workoutText.js';
+import { careStoreFor } from './careStore.js';
 import { removeEventFromDevices, syncEventToDevices } from './devices/service.js';
 import { ProviderError } from './providers/http.js';
 import type { CalendarEventPatch, IntervalsActivity, IntervalsEvent } from './types.js';
@@ -322,4 +326,160 @@ export async function teamDay(athleteIds: string[], date: string): Promise<TeamD
       }
     }),
   );
+}
+
+/* ---------- Planning d'équipe : calendrier sur une plage ---------- */
+
+export interface TeamCalendarDay {
+  date: string;
+  availability: 'repos' | 'indisponible' | null;
+  workouts: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    sport: string | null;
+    load: number | null;
+    seconds: number | null;
+    done: boolean;
+  }>;
+  races: Array<{ id: string; name: string; priority: 'A' | 'B' | 'C' | null }>;
+  activities: Array<{ id: string; name: string | null; moving_time: number | null; load: number | null }>;
+}
+
+export interface TeamCalendarAthlete {
+  id: string;
+  name: string;
+  ftp: number | null;
+  form: number | null;
+  groupIds: string[];
+  error: string | null;
+  days: TeamCalendarDay[];
+  load: { planned: number; done: number; usual: number | null };
+}
+
+export interface TeamCalendar {
+  from: string;
+  to: string;
+  athletes: TeamCalendarAthlete[];
+}
+
+/** Calendrier d'équipe sur une plage de dates. */
+export async function teamCalendar(
+  athleteIds: string[],
+  from: string,
+  to: string,
+  getGroupIds: (athleteId: string) => Promise<string[]>,
+): Promise<TeamCalendar> {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const onDay = (d: string | undefined) => {
+    const dayOnly = (d ?? '').slice(0, 10);
+    return dayOnly >= from && dayOnly <= to;
+  };
+
+  // Générer la liste des jours
+  const days: string[] = [];
+  for (let d = new Date(from); d.toISOString().slice(0, 10) <= to; d.setTime(d.getTime() + DAY_MS)) {
+    days.push(isoDay(d));
+  }
+
+  const results = await Promise.allSettled(
+    athleteIds.map(async (id): Promise<TeamCalendarAthlete> => {
+      const name = await nameOf(id).catch(() => id);
+      const groupIds = await getGroupIds(id).catch(() => []);
+
+      try {
+        const src = await sourceFor(id);
+        const [info, { events, activities, doneEventIds }, care] = await Promise.all([
+          src.athlete(id),
+          readCalendar(id, from, to),
+          careStoreFor(id).then(({ store }) => store.read()).catch(() => null),
+        ]);
+
+        // Calculer la charge calculée par l'app pour les activités
+        const store = await storeOf(id, src, now);
+        const shownActivities = await withAppLoad(store, activities.filter((a) => onDay(a.start_date_local)), from, to);
+
+        // Construire le calendrier jour par jour
+        const daysData: TeamCalendarDay[] = days.map((date) => {
+          const dayEvents = events.filter((e) => onDay(e.start_date_local) && (e.start_date_local ?? '').slice(0, 10) === date);
+          const dayActivities = shownActivities.filter((a) => onDay(a.start_date_local) && (a.start_date_local ?? '').slice(0, 10) === date);
+
+          const workouts = dayEvents.filter((e) => e.category === 'WORKOUT').map((e) => {
+            const sport: WorkoutSport = e.type === 'Run' || e.type === 'Swim' ? e.type : 'Ride';
+            const { blocks } = parseWorkoutText(e.description ?? '');
+            return {
+              id: String(e.id),
+              name: e.name ?? 'Séance prévue',
+              description: e.description ?? null,
+              sport: e.type ?? null,
+              load: blocks.length ? estimatedLoad(blocks) : null,
+              seconds: blocks.length ? Math.round(estimatedSeconds(blocks, sport)) : null,
+              done: doneEventIds.includes(String(e.id)),
+            };
+          });
+
+          const races = dayEvents.filter((e) => e.category === 'RACE').map((e) => ({
+            id: String(e.id),
+            name: e.name ?? 'Compétition',
+            priority: (e.racePriority as 'A' | 'B' | 'C' | null) ?? null,
+          }));
+
+          const activitiesData = dayActivities.map((a) => ({
+            id: String(a.id),
+            name: a.name ?? null,
+            moving_time: a.moving_time ?? null,
+            load: a.icu_training_load ?? null,
+          }));
+
+          // Calculer la disponibilité du jour
+          const availability = care ? availabilityOf(date, care) : null;
+
+          return { date, availability, workouts, races, activities: activitiesData };
+        });
+
+        // Calculer les charges
+        const plannedLoad = daysData.reduce((sum, d) => sum + (d.workouts.reduce((s, w) => s + (w.load ?? 0), 0)), 0);
+        const doneLoad = daysData.reduce((sum, d) => sum + (d.activities.reduce((s, a) => s + (a.load ?? 0), 0)), 0);
+
+        // Charge habituelle : moyenne hebdo des 4 semaines précédentes (magasin de l'app, sans appel
+        // à Intervals.icu), ramenée à la durée de la période.
+        const before = new Date(`${from}T12:00:00Z`);
+        const past = store ? await store.backend.list(isoDay(new Date(before.getTime() - 28 * DAY_MS)), isoDay(new Date(before.getTime() - DAY_MS))) : [];
+        const usual = past.length ? Math.round((past.reduce((s, r) => s + (r.load ?? 0), 0) / 4) * (days.length / 7)) : null;
+
+        // La forme vient de /team, déjà chargé par le web : pas de lecture wellness en plus (quota).
+        const form: number | null = null;
+
+        const ftp = ftpOf(info);
+
+        return {
+          id,
+          name,
+          ftp,
+          form,
+          groupIds,
+          error: null,
+          days: daysData,
+          load: { planned: plannedLoad, done: Math.round(doneLoad), usual },
+        };
+      } catch (e) {
+        const errorMsg = e instanceof HttpError ? e.message : 'Données indisponibles';
+        return {
+          id,
+          name,
+          ftp: null,
+          form: null,
+          groupIds,
+          error: shortError(e, errorMsg),
+          days: [],
+          load: { planned: 0, done: 0, usual: null },
+        };
+      }
+    }),
+  );
+
+  const athletes = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+
+  return { from, to, athletes };
 }

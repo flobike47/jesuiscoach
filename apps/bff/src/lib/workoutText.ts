@@ -188,3 +188,33 @@ export function estimatedSeconds(blocks: WorkoutBlock[], sport: WorkoutSport): n
   const one = (s: StepBlock | RampBlock) => s.seconds || s.meters * perMeter;
   return blocks.reduce((total, b) => total + (b.kind === 'repeat' ? b.count * b.steps.reduce((t, s) => t + one(s), 0) : one(b)), 0);
 }
+
+/** Moyenne de x⁴ sur [a, b] (intensité variant linéairement). */
+function meanFourth(a: number, b: number): number {
+  if (Math.abs(b - a) < 1e-9) return a ** 4;
+  return (b ** 5 - a ** 5) / (5 * (b - a));
+}
+
+/**
+ * Charge estimée d'une séance, même méthode que le web (lib/workout.ts,
+ * workoutStats) et qu'Intervals.icu : intensité = racine 4e de la moyenne
+ * des intensités⁴ pondérées par la durée ; charge = heures × intensité² × 100.
+ * Les paliers en distance ne comptent pas. 0 si rien de chronométré.
+ */
+export function estimatedLoad(blocks: WorkoutBlock[]): number {
+  let seconds = 0;
+  let weighted = 0;
+  const add = (s: StepBlock | RampBlock, times: number) => {
+    if (!s.seconds) return;
+    const [a, b] = s.kind === 'step' ? [s.low, s.high] : [s.from, s.to];
+    seconds += s.seconds * times;
+    weighted += s.seconds * times * meanFourth(a / 100, b / 100);
+  };
+  for (const b of blocks) {
+    if (b.kind === 'repeat') b.steps.forEach((s) => add(s, b.count));
+    else add(b, 1);
+  }
+  if (!seconds) return 0;
+  const intensity = (weighted / seconds) ** 0.25;
+  return Math.round((seconds / 3600) * intensity * intensity * 100);
+}
