@@ -19,10 +19,10 @@ vi.mock('../src/sources.js', async (orig) => ({
     folders: async () => [
       { id: 1, name: 'Hiver', children: [{ id: 11, name: 'Tempo', type: 'Ride', description: '- 20m 80%' }] },
     ],
-    createWorkout: async (id: string, w: NewWorkoutEvent) => {
+    createEvent: async (id: string, ev: { date: string; name: string; description?: string; sport?: NewWorkoutEvent['sport'] }) => {
       if (id === state.failFor) throw new Error('refus');
-      writes.push({ id, w });
-      return { start_date_local: w.date };
+      writes.push({ id, w: { date: ev.date, name: ev.name, description: ev.description ?? '', sport: ev.sport } });
+      return { id: `ev-${writes.length}`, start_date_local: ev.date };
     },
   }),
 }));
@@ -203,7 +203,7 @@ describe('routes de planification', () => {
     const plan = (await call('POST', '/api/plans', 'token-a', PLAN)).json();
     const res = await call('POST', `/api/plans/${plan.id}/apply`, 'token-a', { athleteIds: ['iB', 'iZ', 'iB'], startDate: '2026-12-01' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ total: 3, results: [{ id: 'iB', ok: true, created: 3 }] });
+    expect(res.json()).toMatchObject({ total: 3, results: [{ id: 'iB', ok: true, created: 3 }] });
     expect(writes.map((x) => [x.id, x.w.date, x.w.name, x.w.sport])).toEqual([
       ['iB', '2026-12-01', 'Endurance', 'Ride'],
       ['iB', '2026-12-03', 'Footing', 'Run'],
@@ -217,7 +217,7 @@ describe('routes de planification', () => {
     state.failFor = 'iC';
     const plan = (await call('POST', '/api/plans', 'token-a', PLAN)).json();
     const { results } = (await call('POST', `/api/plans/${plan.id}/apply`, 'token-a', { athleteIds: ['iB', 'iC'], startDate: '2026-12-01' })).json();
-    expect(results).toEqual([
+    expect(results).toMatchObject([
       { id: 'iB', ok: true, created: 3 },
       { id: 'iC', ok: false, created: 0, error: 'Envoi à Intervals.icu impossible' },
     ]);

@@ -1,19 +1,18 @@
-import type { FastifyInstance } from 'fastify';
-import { requireUser } from '../auth.js';
-import { redis } from '../cache.js';
-import { matchPlan } from '../lib/plan.js';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { requireUser, type AuthUser } from '../auth.js';
+import { calendarStoreFor, createEvent, readCalendar, removeEvent, resyncEvent, teamDay, updateEvent } from '../calendarService.js';
 import { validateWorkoutCheck } from '../lib/care.js';
 import { warningsOfAthlete } from './care.js';
+import { CALENDAR_LIMITS, eventJson, goalJson, parisToday, validateEventInput, validateEventPatch, validateGoalInput, type GoalInput, type CalendarRow } from '../lib/calendar.js';
 import { validateSport } from '../lib/sport.js';
 import { enforceQuota } from '../ratelimit.js';
-import { assertCanView, sourceFor, teamOf } from '../sources.js';
-import { ATHLETE_ID_RE, BadRequest, DATE_RE, Forbidden, HttpError, clampArray, validateString } from '../validation.js';
+import { assertCanView, teamOf } from '../sources.js';
+import { ATHLETE_ID_RE, BadRequest, Conflict, DATE_RE, Forbidden, NotFound, clampArray, validateString, validateUuid } from '../validation.js';
 
 /**
- * Calendrier des athlètes : lecture (séances prévues + sorties faites),
- * déplacement / suppression d'une séance, envoi d'une séance à l'équipe.
- * Phase C : ce module devient la porte d'entrée du calendrier stocké dans
- * l'app (voir docs/plans/C-calendrier.md).
+ * Calendrier des athlètes (phase C) : séances, compétitions et notes stockées
+ * dans l'app et recopiées vers Intervals.icu ; vue « Aujourd'hui » du coach ;
+ * objectifs. Règles de synchronisation : lib/calendar.ts et calendarService.ts.
  */
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -33,51 +32,84 @@ interface AssignBody {
   force?: unknown;
 }
 
+/** Accès en lecture ou en écriture au calendrier d'un athlète : connecté, id valide, droit de voir (404 sinon). */
+async function access(req: FastifyRequest, id: string): Promise<{ me: AuthUser; by: 'athlete' | 'coach' }> {
+  const me = requireUser(req);
+  if (!ATHLETE_ID_RE.test(id)) throw new BadRequest('id invalide');
+  await assertCanView(me, id);
+  return { me, by: me.athleteId === id ? 'athlete' : 'coach' };
+}
+
+function checkEventId(id: string, eventId: string): void {
+  if (!ATHLETE_ID_RE.test(id) || !EVENT_ID_RE.test(eventId)) throw new BadRequest('id invalide');
+}
+
+const raceJson = (r: CalendarRow) => ({
+  id: r.id,
+  name: r.name,
+  date: r.day,
+  racePriority: r.racePriority,
+  raceDistanceM: r.raceDistanceM,
+  raceGoal: r.raceGoal,
+  syncStatus: r.syncStatus,
+});
+
 export async function registerCalendarRoutes(app: FastifyInstance) {
-  /** Calendrier d'un athlète entre deux dates (séances prévues + sorties faites). */
+  /** Calendrier d'un athlète entre deux dates (séances prévues, compétitions, sorties faites). */
   app.get<{ Params: { id: string }; Querystring: { from?: string; to?: string } }>('/athletes/:id/calendar', async (req) => {
-    const me = requireUser(req);
-    const id = req.params.id;
-    if (!ATHLETE_ID_RE.test(id)) throw new BadRequest('id invalide');
+    const { id } = req.params;
     const { from, to } = req.query;
+    if (!ATHLETE_ID_RE.test(id)) throw new BadRequest('id invalide');
     if (!from || !to || !DATE_RE.test(from) || !DATE_RE.test(to) || from > to) throw new BadRequest('from / to invalides (AAAA-MM-JJ)');
-    if ((Date.parse(to) - Date.parse(from)) / DAY > 62) throw new BadRequest('Période limitée à 62 jours');
-    await assertCanView(me, id);
-    const src = await sourceFor(id);
-    const [events, activities] = await Promise.all([src.events(id, from, to), src.activities(id, from, to)]);
-    const { activityOf } = matchPlan(events, activities);
-    // Séances réalisées, par id : le web n'a plus à deviner « une sortie le même jour ».
-    const doneEventIds = [...activityOf.keys()].filter((e) => e.id != null).map((e) => String(e.id));
-    return { events, activities, doneEventIds };
+    if ((Date.parse(to) - Date.parse(from)) / DAY > CALENDAR_LIMITS.maxRange) throw new BadRequest(`Période limitée à ${CALENDAR_LIMITS.maxRange} jours`);
+    await access(req, id);
+    return readCalendar(id, from, to);
   });
 
-  /** Déplace une séance prévue (l'athlète lui-même ou son coach). */
-  app.put<{ Params: { id: string; eventId: string }; Body: { date?: string } }>('/athletes/:id/events/:eventId', async (req) => {
-    const me = requireUser(req);
-    const { id, eventId } = req.params;
-    if (!ATHLETE_ID_RE.test(id) || !EVENT_ID_RE.test(eventId)) throw new BadRequest('id invalide');
-    const date = req.body?.date;
-    if (typeof date !== 'string' || !DATE_RE.test(date)) throw new BadRequest('date invalide (AAAA-MM-JJ)');
-    await assertCanView(me, id);
+  /** Crée une séance, une compétition (A/B/C) ou une note dans le calendrier de l'athlète. */
+  app.post<{ Params: { id: string }; Body: unknown }>('/athletes/:id/events', async (req, reply) => {
+    const { id } = req.params;
+    const { me, by } = await access(req, id);
+    const input = validateEventInput(req.body);
     await enforceQuota(me.id, 'editCalendar');
-    const event = await (await sourceFor(id)).moveEvent(id, eventId, date);
-    await invalidateEvents(id);
-    return { event };
+    const row = await createEvent(id, input, by);
+    reply.code(201);
+    return { event: eventJson(row) };
   });
 
-  /** Supprime une séance prévue (l'athlète lui-même ou son coach). */
+  /** Modifie une séance / compétition / note (corps partiel). `eventId` : id Intervals.icu ou id de l'app. */
+  app.put<{ Params: { id: string; eventId: string }; Body: unknown }>('/athletes/:id/events/:eventId', async (req) => {
+    const { id, eventId } = req.params;
+    checkEventId(id, eventId);
+    const { me } = await access(req, id);
+    const patch = validateEventPatch(req.body);
+    await enforceQuota(me.id, 'editCalendar');
+    return { event: eventJson(await updateEvent(id, eventId, patch)) };
+  });
+
+  /** Supprime un événement (chez Intervals.icu aussi). Si Intervals.icu refuse, la ligne reste en erreur. */
   app.delete<{ Params: { id: string; eventId: string } }>('/athletes/:id/events/:eventId', async (req) => {
-    const me = requireUser(req);
     const { id, eventId } = req.params;
-    if (!ATHLETE_ID_RE.test(id) || !EVENT_ID_RE.test(eventId)) throw new BadRequest('id invalide');
-    await assertCanView(me, id);
+    checkEventId(id, eventId);
+    const { me } = await access(req, id);
     await enforceQuota(me.id, 'editCalendar');
-    await (await sourceFor(id)).deleteEvent(id, eventId);
-    await invalidateEvents(id);
-    return { ok: true };
+    const result = await removeEvent(id, eventId);
+    return result.removed ? { ok: true } : { ok: false, syncStatus: 'error', error: result.syncError };
   });
 
-  /** Envoi d'une séance au calendrier Intervals.icu de plusieurs athlètes. */
+  /** Renvoie vers Intervals.icu un événement non synchronisé (ou supprimé là-bas). */
+  app.post<{ Params: { id: string; eventId: string } }>('/athletes/:id/events/:eventId/resync', async (req) => {
+    const { id, eventId } = req.params;
+    checkEventId(id, eventId);
+    const { me } = await access(req, id);
+    await enforceQuota(me.id, 'editCalendar');
+    return { event: eventJson(await resyncEvent(id, eventId)) };
+  });
+
+  /**
+   * Envoi d'une séance au calendrier de plusieurs athlètes (coach). Contrôles A2
+   * (blessures : pas d'envoi sans `force`). Un athlète = une ligne, recopiée vers Intervals.icu.
+   */
   app.post<{ Body: AssignBody }>('/workouts', async (req) => {
     const me = requireUser(req);
     if (me.role !== 'coach') throw new Forbidden();
@@ -107,27 +139,87 @@ export async function registerCalendarRoutes(app: FastifyInstance) {
     const results = await Promise.all(
       targets.map(async (id) => {
         const blockedBy = blocked.get(id);
-        if (blockedBy) return { id, ok: false as const, blocked: true as const, error: blockedBy };
+        if (blockedBy) return { id, ok: false as const, blocked: true as const, syncStatus: 'error' as const, error: blockedBy };
         try {
-          await (await sourceFor(id)).createWorkout(id, workout);
-          await invalidateEvents(id);
-          return { id, ok: true as const };
+          const row = await createEvent(id, { kind: 'workout', ...workout, description: workout.description, racePriority: null, raceDistanceM: null, raceGoal: null }, 'coach');
+          return {
+            id,
+            ok: row.syncStatus === 'synced',
+            eventId: row.intervalsId ?? row.id,
+            syncStatus: row.syncStatus,
+            ...(row.syncError ? { error: row.syncError } : {}),
+          };
         } catch (e) {
           req.log.warn({ err: e, athleteId: id }, 'workouts: envoi en échec');
-          return { id, ok: false as const, error: e instanceof HttpError ? e.message : "Envoi à Intervals.icu impossible" };
+          return { id, ok: false as const, syncStatus: 'error' as const, error: e instanceof Error ? e.message : 'Envoi impossible' };
         }
       }),
     );
     return { results };
   });
+
+  /** Vue « Aujourd'hui » du coach : séances prévues, sorties faites et statut de chaque athlète de son équipe. */
+  app.get<{ Querystring: { date?: string } }>('/team/today', async (req) => {
+    const me = requireUser(req);
+    if (me.role !== 'coach') throw new Forbidden();
+    const date = req.query.date ?? parisToday();
+    if (!DATE_RE.test(date) || Number.isNaN(Date.parse(date))) throw new BadRequest('date invalide (AAAA-MM-JJ)');
+    const athletes = await teamDay(clampArray(await teamOf(me), 50), date);
+    return { date, athletes };
+  });
+
+  /** Prochaines compétitions et objectifs de l'athlète. */
+  app.get<{ Params: { id: string } }>('/athletes/:id/goals', async (req) => {
+    const { id } = req.params;
+    await access(req, id);
+    const store = await calendarStoreFor(id);
+    const [races, goals] = await Promise.all([store.races(parisToday()), store.goals()]);
+    return { races: races.map(raceJson), goals: goals.map(goalJson) };
+  });
+
+  app.post<{ Params: { id: string }; Body: unknown }>('/athletes/:id/goals', async (req, reply) => {
+    const { id } = req.params;
+    const { by } = await access(req, id);
+    const input = validateGoalInput(req.body) as GoalInput;
+    const store = await calendarStoreFor(id);
+    if (input.raceId && !(await store.raceExists(input.raceId))) throw new BadRequest('Compétition introuvable');
+    const goal = await store.insertGoal(input, by, CALENDAR_LIMITS.maxGoals);
+    if (!goal) throw new Conflict(`${CALENDAR_LIMITS.maxGoals} objectifs au plus : supprime-en un ancien`);
+    reply.code(201);
+    return goalJson(goal);
+  });
+
+  app.put<{ Params: { id: string; goalId: string }; Body: unknown }>('/athletes/:id/goals/:goalId', async (req) => {
+    const { id } = req.params;
+    const goalId = validateUuid(req.params.goalId, 'goalId');
+    await access(req, id);
+    const store = await calendarStoreFor(id);
+    const current = await store.goal(goalId);
+    if (!current) throw new NotFound('Objectif introuvable');
+    const patch = validateGoalInput(req.body, true);
+    if (patch.raceId && !(await store.raceExists(patch.raceId))) throw new BadRequest('Compétition introuvable');
+    const merged: GoalInput = {
+      title: current.title,
+      metric: current.metric,
+      targetValue: current.targetValue,
+      dueDay: current.dueDay,
+      raceId: current.raceId,
+      achievedOn: current.achievedOn,
+      note: current.note,
+      ...patch,
+    };
+    const goal = await store.updateGoal(goalId, merged);
+    if (!goal) throw new NotFound('Objectif introuvable');
+    return goalJson(goal);
+  });
+
+  app.delete<{ Params: { id: string; goalId: string } }>('/athletes/:id/goals/:goalId', async (req) => {
+    const { id } = req.params;
+    const goalId = validateUuid(req.params.goalId, 'goalId');
+    await access(req, id);
+    const store = await calendarStoreFor(id);
+    if (!(await store.deleteGoal(goalId))) throw new NotFound('Objectif introuvable');
+    return { ok: true };
+  });
 }
 
-/** Le calendrier vient de changer : on jette les plages d'événements en cache. */
-async function invalidateEvents(athleteId: string) {
-  try {
-    const keys = await redis.keys(`icu:events:${athleteId}:*`);
-    if (keys.length) await redis.del(...keys);
-  } catch {
-    /* Redis down : le TTL de 10 min fera le travail */
-  }
-}

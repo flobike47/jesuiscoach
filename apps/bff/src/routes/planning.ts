@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { requireUser, type AuthUser } from '../auth.js';
-import { invalidateKeys } from '../cache.js';
+import { createEvent } from '../calendarService.js';
 import {
   deletePlan,
   deleteSavedWorkout,
@@ -153,21 +153,23 @@ export async function registerPlanningRoutes(app: FastifyInstance) {
     }
     await enforceQuota(me.id, 'assignWorkout', writes);
 
+    // Chaque séance devient une ligne du calendrier de l'athlète, recopiée vers Intervals.icu (quota déjà compté ci-dessus).
+    // Arrêt à la première séance en erreur, comme avant : les suivantes ne partent pas.
     const results = await Promise.all(
       targets.map(async (id) => {
         let created = 0;
         try {
-          const src = await sourceFor(id);
           for (const w of dated) {
-            await src.createWorkout(id, { date: w.date, name: w.name, description: w.description, sport: w.sport ?? 'Ride' });
+            const row = await createEvent(id, { kind: 'workout', date: w.date, name: w.name, description: w.description, sport: w.sport ?? 'Ride', racePriority: null, raceDistanceM: null, raceGoal: null }, 'coach');
+            if (row.syncStatus !== 'synced') {
+              return { id, ok: false as const, created, error: row.syncError ?? 'Envoi à Intervals.icu impossible' };
+            }
             created++;
           }
           return { id, ok: true as const, created };
         } catch (e) {
           req.log.warn({ err: e, athleteId: id, created }, 'plans: application en échec');
           return { id, ok: false as const, created, error: e instanceof HttpError ? e.message : 'Envoi à Intervals.icu impossible' };
-        } finally {
-          await invalidateKeys(`icu:events:${id}:*`);
         }
       }),
     );

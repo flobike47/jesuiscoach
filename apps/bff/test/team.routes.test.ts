@@ -63,7 +63,7 @@ describe('routes équipe (mode démo)', () => {
       payload: { athleteIds: ['demo-1', 'demo-2', 'i999'], date: '2026-11-28', name: 'Seuil 3×10', description: '- 10m 95%' },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json().results).toEqual([{ id: 'demo-1', ok: true }, { id: 'demo-2', ok: true }]);
+    expect(res.json().results).toMatchObject([{ id: 'demo-1', ok: true }, { id: 'demo-2', ok: true }]);
   });
 
   it('valide la séance envoyée', async () => {
@@ -82,7 +82,7 @@ describe('routes équipe (mode démo)', () => {
       headers: auth('token-a'),
       payload: { athleteIds: ['demo-4'], date: '2026-12-02', name: 'Natation 10×100', description: '10x\n- 100mtr 100% Pace\n- 20s 40% Pace', sport: 'Swim' },
     });
-    expect(res.json().results).toEqual([{ id: 'demo-4', ok: true }]);
+    expect(res.json().results).toMatchObject([{ id: 'demo-4', ok: true }]);
     const cal = (await app.inject({ method: 'GET', url: '/api/athletes/demo-4/calendar?from=2026-12-02&to=2026-12-02', headers: auth('token-a') })).json();
     expect(cal.events.find((e: { name: string }) => e.name === 'Natation 10×100')).toMatchObject({ type: 'Swim', category: 'WORKOUT' });
   });

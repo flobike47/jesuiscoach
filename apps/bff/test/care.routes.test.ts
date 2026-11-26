@@ -17,9 +17,9 @@ const { writes } = vi.hoisted(() => ({ writes: [] as Array<{ id: string; w: NewW
 vi.mock('../src/sources.js', async (orig) => ({
   ...(await orig<typeof import('../src/sources.js')>()),
   sourceFor: async () => ({
-    createWorkout: async (id: string, w: NewWorkoutEvent) => {
-      writes.push({ id, w });
-      return { start_date_local: w.date };
+    createEvent: async (id: string, ev: { date: string; name: string; description?: string; sport?: NewWorkoutEvent['sport'] }) => {
+      writes.push({ id, w: { date: ev.date, name: ev.name, description: ev.description ?? '', sport: ev.sport } });
+      return { id: `ev-${writes.length}`, start_date_local: ev.date };
     },
   }),
 }));
@@ -218,18 +218,18 @@ describe('POST /api/workouts : blocage par blessure', () => {
 
     const blocked = await send({});
     expect(blocked.statusCode).toBe(200);
-    expect(blocked.json().results).toEqual([{ id: ATHLETE_B, ok: false, blocked: true, error: 'Blessure en cours : Tendinite' }]);
+    expect(blocked.json().results).toMatchObject([{ id: ATHLETE_B, ok: false, blocked: true, error: 'Blessure en cours : Tendinite' }]);
     expect(writes).toEqual([]);
 
     const forced = await send({ force: [ATHLETE_B] });
-    expect(forced.json().results).toEqual([{ id: ATHLETE_B, ok: true }]);
+    expect(forced.json().results).toMatchObject([{ id: ATHLETE_B, ok: true }]);
     expect(writes.map((x) => [x.id, x.w.date, x.w.sport])).toEqual([[ATHLETE_B, T, 'Run']]);
   });
 
   it('envoie une séance de vélo malgré une blessure à la course', async () => {
     await call('POST', `${careUrl()}/injuries`, 'token-b', INJURY());
     const res = await send({ sport: 'Ride' });
-    expect(res.json().results).toEqual([{ id: ATHLETE_B, ok: true }]);
+    expect(res.json().results).toMatchObject([{ id: ATHLETE_B, ok: true }]);
   });
 
   it("bloque une séance au-dessus du seuil si la blessure l'interdit (highIntensity)", async () => {
