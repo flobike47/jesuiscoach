@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { Avatar, Page, Placeholder, Segmented } from '@/components/ios';
-import { Spinner } from '@/components/common/PageLoader';
+import { Avatar, Page, Placeholder, Segmented, SkeletonList } from '@/components/ios';
 import { useFeed } from '@/hooks/useCoach';
-import { formatDuration, formatKm, relativeDay } from '@/lib/format';
+import { formatDuration, formatKm, relativeDay, formatLoad } from '@/lib/format';
 import type { FeedItem } from '@/types';
 
 type Filter = 'all' | 'planned' | 'unplanned';
@@ -38,11 +37,7 @@ export default function Activity() {
           { value: 'unplanned', label: 'Hors plan' },
         ]}
       />
-      {isLoading && (
-        <div style={{ display: 'grid', placeItems: 'center', padding: 48 }}>
-          <Spinner />
-        </div>
-      )}
+      {isLoading && <SkeletonList rows={4} />}
       {error && <Placeholder title="Fil indisponible">{error.message}</Placeholder>}
       {data && groups.length === 0 && <Placeholder title="Aucune sortie">Rien sur les 7 derniers jours pour ce filtre.</Placeholder>}
 
@@ -80,7 +75,7 @@ function FeedCard({ item }: { item: FeedItem }) {
         <Stat label="Durée" value={formatDuration(a.moving_time)} />
         <Stat label="Distance" value={formatKm(a.distance)} />
         <Stat label="P. pondérée" value={a.icu_weighted_avg_watts ? `${a.icu_weighted_avg_watts} W` : '–'} />
-        <Stat label="Charge" value={a.icu_training_load != null ? String(a.icu_training_load) : '–'} />
+        <Stat label="Charge" value={formatLoad(a.icu_training_load)} />
       </div>
     </Link>
   );

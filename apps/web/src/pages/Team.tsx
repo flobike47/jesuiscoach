@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Avatar, Cell, Page, Placeholder, Rings, Section } from '@/components/ios';
-import { Spinner } from '@/components/common/PageLoader';
+import { Avatar, Cell, Page, Placeholder, Rings, Section, SkeletonList } from '@/components/ios';
 import { useTeam } from '@/hooks/useCoach';
 import type { AthleteSummary } from '@/types';
 import { signed } from '@/lib/format';
@@ -36,11 +35,7 @@ export default function Team() {
         style={{ background: 'var(--fill)', borderRadius: 10, minHeight: 36, padding: '7px 12px' }}
       />
 
-      {isLoading && (
-        <div style={{ display: 'grid', placeItems: 'center', padding: 48 }}>
-          <Spinner />
-        </div>
-      )}
+      {isLoading && <SkeletonList rows={4} />}
       {error && (
         <Placeholder title="Équipe indisponible" action={<button type="button" className="button tinted pressable" onClick={() => refetch()}>Réessayer</button>}>
           {error.message}

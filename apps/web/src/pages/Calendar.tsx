@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { ChevronLeft, ChevronRight, Check, Flag, Plus, RotateCw, X } from 'lucide-react';
-import { Cell, Page, Placeholder, Section, Segmented, Sheet } from '@/components/ios';
-import { Spinner } from '@/components/common/PageLoader';
+import { Cell, Page, Placeholder, Section, Segmented, Sheet, SkeletonList } from '@/components/ios';
 import { NumberStepper } from '@/components/common/NumberStepper';
 import { StructureEditor } from '@/components/workout/StructureEditor';
 import { useCalendar, useTeam } from '@/hooks/useCoach';
@@ -10,7 +9,7 @@ import { useCare } from '@/hooks/useCare';
 import { useEventMutations } from '@/hooks/useCalendarData';
 import { dayStatus } from '@/lib/availability';
 import { PRIORITY_LABEL, formatRaceDistance, needsResync } from '@/lib/calendar';
-import { formatDuration } from '@/lib/format';
+import { formatDuration, dayShort } from '@/lib/format';
 import { SPORT_LABELS, type Sport } from '@/lib/workout';
 import { convertForSport } from '@/lib/workoutBlocks';
 import type { AppEvent, EventInput, EventPatch, RacePriority } from '@/services/calendarApi';
@@ -114,7 +113,7 @@ export function CalendarView({ fixed }: { fixed?: { id: string; title: string } 
           const status = care.data ? dayStatus(key, care.data) : null;
           return (
             <div key={key}>
-              <div className="caption secondary">{d.format('dd').slice(0, 1).toUpperCase()}</div>
+              <div className="caption secondary">{dayShort(key)}</div>
               <div
                 className="tabular-nums"
                 style={{
@@ -141,11 +140,7 @@ export function CalendarView({ fixed }: { fixed?: { id: string; title: string } 
         })}
       </div>
 
-      {cal.isLoading && (
-        <div style={{ display: 'grid', placeItems: 'center', padding: 32 }}>
-          <Spinner />
-        </div>
-      )}
+      {cal.isLoading && <SkeletonList rows={4} avatar={false} />}
       {cal.error && <Placeholder title="Calendrier indisponible">{cal.error.message}</Placeholder>}
       {cal.data && (
         <p className="footnote secondary" style={{ margin: '12px 4px 0' }}>

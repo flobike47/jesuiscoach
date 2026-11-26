@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import dayjs from 'dayjs';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Avatar, Cell, Page, Placeholder, Section } from '@/components/ios';
-import { Spinner } from '@/components/common/PageLoader';
+import { Avatar, Cell, Page, Placeholder, Section, SkeletonList } from '@/components/ios';
 import { useTeamToday } from '@/hooks/useCalendarData';
-import { formatDuration } from '@/lib/format';
+import { formatDuration, formatLoad } from '@/lib/format';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/calendar';
 import type { TeamDayAthlete } from '@/services/calendarApi';
 
@@ -31,11 +30,7 @@ export default function TeamToday() {
         </button>
       </div>
 
-      {isLoading && (
-        <div style={{ display: 'grid', placeItems: 'center', padding: 48 }}>
-          <Spinner />
-        </div>
-      )}
+      {isLoading && <SkeletonList rows={4} />}
       {error && (
         <Placeholder title="Journée indisponible" action={<button type="button" className="button tinted pressable" onClick={() => refetch()}>Réessayer</button>}>
           {(error as Error).message}
@@ -68,7 +63,7 @@ function AthleteDay({ a }: { a: TeamDayAthlete }) {
   const workouts = a.planned.filter((e) => e.category === 'WORKOUT');
   const subtitle = [
     workouts.length ? workouts.map((e) => e.name ?? 'Séance').join(', ') : 'Rien de prévu',
-    a.done.length ? a.done.map((d) => `${formatDuration(d.moving_time)}${d.icu_training_load != null ? ` · charge ${Math.round(d.icu_training_load)}` : ''}`).join(' · ') : null,
+    a.done.length ? a.done.map((d) => `${formatDuration(d.moving_time)}${d.icu_training_load != null ? ` · charge ${formatLoad(d.icu_training_load)}` : ''}`).join(' · ') : null,
   ]
     .filter(Boolean)
     .join(' — ');

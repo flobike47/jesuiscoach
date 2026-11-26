@@ -8,7 +8,7 @@ import { StructureEditor, WorkoutSummary } from '@/components/workout/StructureE
 import { useDeleteSavedWorkout, useLibrary, usePlans, useSavedWorkouts, useSaveWorkout, useTeam } from '@/hooks/useCoach';
 import { useDebounced, useSendWorkout, useWorkoutCheck } from '@/hooks/useCare';
 import { formatShortDay } from '@/lib/availability';
-import { formatDuration } from '@/lib/format';
+import { formatDuration, formatLoad } from '@/lib/format';
 import { parseWorkout, SPORT_LABELS, STARTERS, TEMPLATES, workoutStats, type Sport } from '@/lib/workout';
 import { convertForSport, formatMeters, formatMinutes } from '@/lib/workoutBlocks';
 import type { TrainingPlan } from '@/types';
@@ -103,7 +103,7 @@ function TemplateCell({ name, description, sport, onClick }: { name: string; des
   const s = workoutStats(parseWorkout(description));
   const Icon = SPORT_ICONS[sport];
   const detail = s.complete
-    ? s.seconds > 0 && `${formatDuration(s.seconds)} · charge ${s.load} · intensité ${s.intensity.toLocaleString('fr-FR')}`
+    ? s.seconds > 0 && `${formatDuration(s.seconds)} · charge ${formatLoad(s.load)} · intensité ${s.intensity.toLocaleString('fr-FR')}`
     : `${formatMeters(s.meters)}${s.seconds ? ` + ${formatMinutes(s.seconds)}` : ''}`;
   return (
     <Cell

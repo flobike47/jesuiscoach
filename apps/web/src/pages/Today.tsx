@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import dayjs from 'dayjs';
 import { Watch, Frown, Meh, Smile, Laugh, Angry, type LucideIcon } from 'lucide-react';
-import { Page, Placeholder, Section, Cell } from '@/components/ios';
-import { Spinner } from '@/components/common/PageLoader';
+import { Page, Placeholder, Section, Cell, FormGauge, SkeletonList } from '@/components/ios';
 import { useSaveCheckin, useToday } from '@/hooks/useCoach';
-import { formatDuration, formatKm, formColor, signed } from '@/lib/format';
-import { METRIC_COLORS } from '@/theme';
+import { formatDuration, formatKm, formatLoad, dayShort } from '@/lib/format';
 import type { Checkin } from '@/types';
 
 /** « mardi 24 novembre » → « Mardi 24 novembre » (CSS capitalize mettrait une capitale à chaque mot). */
@@ -26,11 +24,7 @@ export default function Today() {
 
   return (
     <Page title="Aujourd'hui" header={<p className="footnote secondary" style={{ margin: '-8px 0 12px' }}>{capitalize(dayjs().format('dddd D MMMM'))}</p>}>
-      {isLoading && (
-        <div style={{ display: 'grid', placeItems: 'center', padding: 48 }}>
-          <Spinner />
-        </div>
-      )}
+      {isLoading && <SkeletonList rows={4} avatar={false} />}
       {error && <Placeholder title="Données indisponibles">{error.message}</Placeholder>}
 
       {data && (
@@ -61,7 +55,7 @@ export default function Today() {
               <div className="headline" style={{ marginTop: 2 }}>{a.name ?? 'Sortie'}</div>
               <div className="footnote secondary tabular-nums" style={{ marginTop: 2 }}>
                 {formatDuration(a.moving_time)} · {formatKm(a.distance)}
-                {a.icu_training_load != null ? ` · charge ${a.icu_training_load}` : ''}
+                {a.icu_training_load != null ? ` · charge ${formatLoad(a.icu_training_load)}` : ''}
               </div>
             </div>
           ))}
@@ -77,10 +71,8 @@ export default function Today() {
           </Section>
 
           <Section header="Ma forme">
-            <div className="cell" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
-              <Metric label="Fitness" value={Math.round(data.form.fitness)} color={METRIC_COLORS.fitness} />
-              <Metric label="Fatigue" value={Math.round(data.form.fatigue)} color={METRIC_COLORS.fatigue} />
-              <Metric label="Forme" value={signed(data.form.form)} color={formColor(data.form.form)} />
+            <div className="card">
+              <FormGauge form={data.form.form} fitness={data.form.fitness} fatigue={data.form.fatigue} audience="athlete" />
             </div>
             <Cell to="/progres" title="Voir ma progression" />
           </Section>
@@ -176,18 +168,7 @@ function WeekDay({ day, today, maxLoad }: { day: { date: string; planned: string
         )}
       </div>
       <div className="caption" style={{ marginTop: 4, color: isToday ? 'var(--tint)' : 'var(--label-2)', fontWeight: isToday ? 600 : 400 }}>
-        {dayjs(day.date).format('dd').slice(0, 1).toUpperCase()}
-      </div>
-    </div>
-  );
-}
-
-function Metric({ label, value, color }: { label: string; value: string | number; color: string }) {
-  return (
-    <div>
-      <div className="caption secondary">{label}</div>
-      <div className="metric" style={{ color }}>
-        {value}
+        {dayShort(day.date)}
       </div>
     </div>
   );

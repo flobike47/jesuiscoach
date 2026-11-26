@@ -64,3 +64,22 @@ export function formatHours(secs: number): string {
   const m = Math.round((secs % 3600) / 60);
   return m === 60 ? `${h + 1} h` : m ? `${h} h ${String(m).padStart(2, '0')}` : `${h} h`;
 }
+
+/** Charge d'entraînement (nombre entier) → « 84 » ou « – » si null/undefined. */
+export function formatLoad(n: number | null | undefined): string {
+  return n != null ? String(Math.round(n)) : '–';
+}
+
+/** Intensité IF (nombre 0–1) → « 0,83 » (virgule française, 2 décimales) ou « – » si null. */
+export function formatIntensity(n: number | null | undefined): string {
+  if (n == null) return '–';
+  return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Jour court de la semaine à partir d'une ISO date : « lu » (lundi) → « di » (dimanche). */
+export function dayShort(dateIso: string): string {
+  const d = dayjs(dateIso);
+  const dayOfWeek = d.day(); // 0=dimanche, 1=lundi…6=samedi
+  const days = ['di', 'lu', 'ma', 'me', 'je', 've', 'sa'];
+  return days[dayOfWeek];
+}

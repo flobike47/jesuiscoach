@@ -3,10 +3,9 @@ import { useParams } from 'react-router-dom';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import dayjs from 'dayjs';
 import { AlertTriangle, BarChart3, Clock, TrendingUp, UserRound, Zap } from 'lucide-react';
-import { Avatar, Cell, Page, Placeholder, Section, Segmented } from '@/components/ios';
-import { Spinner } from '@/components/common/PageLoader';
+import { Avatar, Cell, Page, Placeholder, Section, Segmented, FormGauge, SkeletonList } from '@/components/ios';
 import { useAthleteOverview } from '@/hooks/useCoach';
-import { formatDuration, formatKm, formColor, relativeDay, signed } from '@/lib/format';
+import { formatDuration, formatKm, relativeDay, formatLoad } from '@/lib/format';
 import { METRIC_COLORS } from '@/theme';
 import type { SeriesPoint } from '@/types';
 
@@ -41,22 +40,17 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
         )
       }
     >
-      {isLoading && (
-        <div style={{ display: 'grid', placeItems: 'center', padding: 48 }}>
-          <Spinner />
-        </div>
-      )}
+      {isLoading && <SkeletonList rows={4} />}
       {error && <Placeholder title="Fiche indisponible">{error.message}</Placeholder>}
 
       {data && (
         <>
           <div className="card">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
-              <Metric label="Fitness" value={Math.round(data.summary.fitness)} color={METRIC_COLORS.fitness} />
-              <Metric label="Fatigue" value={Math.round(data.summary.fatigue)} color={METRIC_COLORS.fatigue} />
-              <Metric label="Forme" value={signed(data.summary.form)} color={formColor(data.summary.form)} />
-            </div>
-            <div style={{ margin: '14px 0 8px' }}>
+            <FormGauge form={data.summary.form} fitness={data.summary.fitness} fatigue={data.summary.fatigue} audience="coach" />
+          </div>
+
+          <div className="card">
+            <div style={{ margin: '0 0 8px' }}>
               <Segmented<Range>
                 label="Période"
                 value={range}
@@ -122,7 +116,7 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
                     {a.icu_weighted_avg_watts ? ` · ${a.icu_weighted_avg_watts} W` : ''}
                   </span>
                 }
-                detail={a.icu_training_load != null ? <span aria-label={`Charge ${a.icu_training_load}`}>{a.icu_training_load}</span> : undefined}
+                detail={formatLoad(a.icu_training_load) !== '–' ? <span aria-label={`Charge ${a.icu_training_load}`}>{formatLoad(a.icu_training_load)}</span> : undefined}
                 to={`/athletes/${encodeURIComponent(id!)}/sorties/${encodeURIComponent(a.id)}`}
                 chevron
               />
@@ -132,17 +126,6 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
         </>
       )}
     </Page>
-  );
-}
-
-function Metric({ label, value, color }: { label: string; value: string | number; color: string }) {
-  return (
-    <div>
-      <div className="caption secondary">{label}</div>
-      <div className="metric" style={{ color }}>
-        {value}
-      </div>
-    </div>
   );
 }
 

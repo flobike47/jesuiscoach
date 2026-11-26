@@ -31,6 +31,12 @@
   --radius: 12px;
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
   --tabbar-h: calc(50px + env(safe-area-inset-bottom, 0px));
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
 }
 
 :root[data-theme='light'] {
@@ -323,6 +329,12 @@ a.cell:active {
   padding: 14px 16px;
 }
 
+.card + .card,
+.card + section,
+section + .card {
+  margin-top: 12px;
+}
+
 /* ---------- Avatar, pastilles ---------- */
 
 .avatar {
@@ -496,6 +508,10 @@ a.cell:active {
 @keyframes fade-in {
   from { opacity: 0; }
 }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 
 /* ---------- Champs ---------- */
 
@@ -571,6 +587,19 @@ textarea.field {
   }
 }
 
+/* ---------- Composants --- */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 7px;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+
 /* ---------- Accessibilité ---------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -586,6 +615,9 @@ textarea.field {
   }
   .pressable:active {
     transform: none;
+  }
+  @keyframes pulse {
+    0%, 100%, 50% { opacity: 1; }
   }
 }
 
