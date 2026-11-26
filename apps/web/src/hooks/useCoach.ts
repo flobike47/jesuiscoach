@@ -67,6 +67,22 @@ export function useDeleteSavedWorkout() {
   return useMutation({ mutationFn: api.deleteSavedWorkout, onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-workouts'] }) });
 }
 
+export function useToggleFavorite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; favorite: boolean }) => api.setSavedFavorite(v.id, v.favorite),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-workouts'] }),
+  });
+}
+
+export function useMarkUsed() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: string; count: number }) => api.markSavedUsed(v.id, v.count),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved-workouts'] }),
+  });
+}
+
 export const usePlans = () => useQuery({ queryKey: ['plans'], queryFn: api.plans });
 
 export function useSavePlan() {

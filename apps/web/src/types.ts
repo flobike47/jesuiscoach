@@ -240,6 +240,9 @@ export interface SavedWorkout {
   sport: Sport;
   description: string;
   updatedAt: string;
+  favorite: boolean;
+  sentCount: number;
+  lastSentAt: string | null;
 }
 
 export interface LibraryFolder {

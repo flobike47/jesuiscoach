@@ -136,6 +136,10 @@ export const api = {
   updateSavedWorkout: (id: string, body: { name: string; sport: Sport; description: string }) =>
     put<SavedWorkout>(`/saved-workouts/${encodeURIComponent(id)}`, body),
   deleteSavedWorkout: (id: string) => del<{ ok: true }>(`/saved-workouts/${encodeURIComponent(id)}`),
+  setSavedFavorite: (id: string, favorite: boolean) =>
+    put<SavedWorkout>(`/saved-workouts/${encodeURIComponent(id)}`, { favorite }),
+  markSavedUsed: (id: string, count: number) =>
+    post<{ ok: true }>(`/saved-workouts/${encodeURIComponent(id)}/used`, { count }),
   plans: () => get<{ plans: TrainingPlan[] }>('/plans'),
   createPlan: (body: { name: string; workouts: PlanWorkout[] }) => post<TrainingPlan>('/plans', body),
   updatePlan: (id: string, body: { name: string; workouts: PlanWorkout[] }) => put<TrainingPlan>(`/plans/${encodeURIComponent(id)}`, body),

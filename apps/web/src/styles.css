@@ -601,6 +601,85 @@ textarea.field {
   white-space: nowrap;
 }
 
+/* ---------- Recherche, puces, cartes défilantes ---------- */
+
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--label);
+  font: inherit;
+  outline: none;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  margin: 10px -16px 0;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 17px;
+  background: var(--cell);
+  color: var(--label);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.chip.active {
+  background: var(--tint);
+  color: #fff;
+}
+.scroller {
+  display: flex;
+  gap: 8px;
+  margin: 0 -16px;
+  padding: 0 16px 4px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.create-card,
+.fav-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 96px;
+  text-align: left;
+}
+.token {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--token);
+  background: color-mix(in srgb, var(--token) 18%, transparent);
+}
+.fav-card {
+  flex: 0 0 156px;
+  scroll-snap-align: start;
+}
+
 /* ---------- Accessibilité ---------- */
 
 @media (prefers-reduced-motion: reduce) {
