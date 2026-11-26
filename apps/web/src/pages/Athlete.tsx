@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import dayjs from 'dayjs';
 import { AlertTriangle, BarChart3, Clock, TrendingUp, UserRound, Zap } from 'lucide-react';
 import { Avatar, Cell, Page, Placeholder, Section, Segmented, FormGauge, SkeletonList } from '@/components/ios';
 import { useAthleteOverview } from '@/hooks/useCoach';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { PullIndicator } from '@/components/common/PullIndicator';
 import { formatDuration, formatKm, relativeDay, formatLoad } from '@/lib/format';
 import { METRIC_COLORS } from '@/theme';
 import type { SeriesPoint } from '@/types';
@@ -20,15 +23,25 @@ export default function Athlete() {
 }
 
 /** Fiche athlète (forme sur 90 jours, alertes, ressentis, sorties récentes). */
-export function AthleteView({ id, back, title }: { id: string | undefined; back?: { to: string; label: string }; title?: string }) {
+export function AthleteView({ id, back, title, account }: { id: string | undefined; back?: { to: string; label: string }; title?: string; account?: boolean }) {
   const { data, isLoading, error } = useAthleteOverview(id);
   const [range, setRange] = useState<Range>('90');
   const name = data?.summary.name ?? 'Athlète';
+  const queryClient = useQueryClient();
+
+  const { pullPosition, isRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['athlete', id] });
+    },
+  });
 
   return (
-    <Page
+    <>
+      <PullIndicator pullPosition={pullPosition} isRefreshing={isRefreshing} />
+      <Page
       title={title ?? name}
       back={back}
+      account={account}
       header={
         data && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -126,6 +139,7 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
         </>
       )}
     </Page>
+    </>
   );
 }
 

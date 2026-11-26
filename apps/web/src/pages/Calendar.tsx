@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { ChevronLeft, ChevronRight, Check, Flag, Plus, RotateCw, X } from 'lucide-react';
 import { Cell, Page, Placeholder, Section, Segmented, Sheet, SkeletonList } from '@/components/ios';
@@ -25,10 +26,11 @@ const SPORTS: Sport[] = ['Ride', 'Run', 'Swim'];
  * Semaine d'un athlète — séances prévues, compétitions, notes et sorties réalisées.
  * Sans `fixed`, le coach choisit l'athlète ; avec, c'est l'athlète lui-même (« Plan »).
  */
-export function CalendarView({ fixed }: { fixed?: { id: string; title: string } }) {
+export function CalendarView({ fixed, account }: { fixed?: { id: string; title: string }; account?: boolean }) {
+  const [searchParams] = useSearchParams();
   const team = useTeam(!fixed);
   const athletes = useMemo(() => [...(team.data?.athletes ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'fr')), [team.data]);
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(() => searchParams.get('athlete'));
   const athleteId = fixed?.id ?? picked ?? athletes[0]?.id;
   const [weekStart, setWeekStart] = useState(() => startOfWeek(dayjs()));
   const from = weekStart.format('YYYY-MM-DD');
@@ -71,6 +73,7 @@ export function CalendarView({ fixed }: { fixed?: { id: string; title: string } 
   return (
     <Page
       title={fixed?.title ?? athletes.find((a) => a.id === athleteId)?.name ?? 'Calendrier'}
+      account={account ?? !fixed}
       actions={
         athleteId ? (
           <button type="button" onClick={() => setAdding(true)} aria-label="Ajouter au calendrier" style={{ color: 'var(--tint)', minWidth: 44, minHeight: 44, display: 'grid', placeItems: 'center' }}>

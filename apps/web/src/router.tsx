@@ -65,6 +65,7 @@ export const router = createBrowserRouter(
             { path: 'athletes/:id/sorties/:activityId', lazy: page(() => import('@/pages/ActivityDetail')) },
             { path: 'activite', lazy: page(() => import('@/pages/Activity')) },
             { path: 'calendrier', lazy: page(() => import('@/pages/Calendar')) },
+            { path: 'equipe', lazy: page(() => import('@/pages/Team')) },
             { path: 'seances', lazy: page(() => import('@/pages/Workouts')) },
             { path: 'reglages', lazy: page(() => import('@/pages/Settings')) },
             { path: 'bien-demarrer', lazy: page(() => import('@/pages/Welcome')) },
@@ -83,7 +84,7 @@ export const router = createBrowserRouter(
             { path: 'athletes/:id/profil/sante', lazy: page(() => import('@/pages/profile/Health')) },
             { path: 'athletes/:id/profil/objectifs', lazy: page(() => import('@/pages/profile/Goals')) },
             { path: 'athletes/:id/profil/appareils', lazy: page(() => import('@/pages/profile/Devices')) },
-            // Phase C : journée de toute l'équipe (coach)
+            // Phase C : accueil du coach et équipe
             { path: 'aujourdhui', lazy: page(() => import('@/pages/TeamToday')) },
             { path: '*', element: <Navigate to="/" replace /> },
           ],

@@ -6,5 +6,5 @@ import { PageLoader } from '@/components/common/PageLoader';
 export default function MyPlan() {
   const me = useMe();
   if (!me.data) return <PageLoader />;
-  return <CalendarView fixed={{ id: me.data.athleteId, title: 'Mon plan' }} />;
+  return <CalendarView fixed={{ id: me.data.athleteId, title: 'Mon plan' }} account />;
 }

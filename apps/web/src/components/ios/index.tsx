@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Check, Circle, X, Diamond, AlertTriangle } from 'lucide-react';
 import { useSheetDrag } from '@/hooks/useSheetDrag';
 import { usePrefersReducedMotion } from '@/components/common/usePrefersReducedMotion';
+import { useMe } from '@/hooks/useCoach';
 import { formZone, gaugePosition } from '@/lib/form';
 import { signed } from '@/lib/format';
 import { METRIC_COLORS } from '@/theme';
@@ -20,6 +21,8 @@ interface PageProps {
   /** Lien retour (« ‹ Équipe »). */
   back?: { to: string; label: string };
   actions?: ReactNode;
+  /** Affiche un lien vers les réglages en haut à droite (avatar avec initiales). */
+  account?: boolean;
   /** Sous le grand titre (avatar, sous-titre…). */
   header?: ReactNode;
   children: ReactNode;
@@ -29,9 +32,10 @@ interface PageProps {
  * Le grand titre défile avec le contenu ; quand il disparaît, le titre
  * compact apparaît dans la barre translucide (comme UINavigationBar).
  */
-export function Page({ title, back, actions, header, children }: PageProps) {
+export function Page({ title, back, actions, account, header, children }: PageProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const [compact, setCompact] = useState(false);
+  const me = useMe();
 
   useEffect(() => {
     const el = titleRef.current;
@@ -40,6 +44,17 @@ export function Page({ title, back, actions, header, children }: PageProps) {
     io.observe(el);
     return () => io.disconnect();
   }, []);
+
+  const finalActions = (
+    <>
+      {actions}
+      {account && me.data && (
+        <Link to="/reglages" aria-label="Réglages" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', background: 'var(--fill-2)', color: 'var(--label)', textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
+          {me.data.name.split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase()}
+        </Link>
+      )}
+    </>
+  );
 
   return (
     <div className="page">
@@ -55,7 +70,7 @@ export function Page({ title, back, actions, header, children }: PageProps) {
         <span className="nav-title" aria-hidden>
           {title}
         </span>
-        <div className="nav-actions">{actions}</div>
+        <div className="nav-actions">{finalActions}</div>
       </div>
       <h1 ref={titleRef} className="large-title" style={{ margin: '4px 0 12px' }}>
         {title}

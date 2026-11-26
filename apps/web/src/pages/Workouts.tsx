@@ -43,7 +43,7 @@ export default function Workouts() {
   const folders = (library.data?.folders ?? []).map((f) => ({ ...f, workouts: f.workouts.filter((w) => w.sport === sport) })).filter((f) => f.workouts.length);
 
   return (
-    <Page title="Séances">
+    <Page title="Séances" account>
       <div style={{ marginBottom: 12 }}>
         <Segmented<Sport>
           label="Sport"

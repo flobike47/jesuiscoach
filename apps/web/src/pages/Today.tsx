@@ -38,7 +38,7 @@ export default function Today() {
   const { data, isLoading, error } = useToday();
 
   return (
-    <Page title="Aujourd'hui" header={<p className="footnote secondary" style={{ margin: '-8px 0 12px' }}>{capitalize(dayjs().format('dddd D MMMM'))}</p>}>
+    <Page title="Aujourd'hui" account header={<p className="footnote secondary" style={{ margin: '-8px 0 12px' }}>{capitalize(dayjs().format('dddd D MMMM'))}</p>}>
       {isLoading && <SkeletonList rows={4} avatar={false} />}
       {error && <Placeholder title="Données indisponibles">{error.message}</Placeholder>}
 

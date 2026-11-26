@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { requireUser } from '../auth.js';
 import { invalidateKeys } from '../cache.js';
 import { config } from '../config.js';
-import { appFitness, storeOf } from '../activityStore.js';
+import { appFitness, storeOf, withAppLoad } from '../activityStore.js';
 import { setupStatus } from '../lib/setup.js';
 import { isoDay, summarize } from '../lib/summary.js';
 import { matchPlan } from '../lib/plan.js';
@@ -66,15 +66,11 @@ export async function registerAthleteRoutes(app: FastifyInstance) {
     ]);
     // Charge de l'app quand elle existe (sinon celle d'Intervals.icu), sortie par sortie.
     const store = await storeOf(id, src, now);
-    const stored = new Map((store ? await store.backend.list(isoDay(monday), isoDay(new Date(sunday.getTime() + DAY))) : []).map((r) => [r.id, r]));
-    const withAppLoad = activities.map((a) => {
-      const load = stored.get(String(a.id))?.load;
-      return load == null ? a : { ...a, icu_training_load: load };
-    });
+    const shownActivities = await withAppLoad(store, activities, isoDay(monday), isoDay(new Date(sunday.getTime() + DAY)));
     const workouts = events.filter((e) => e.category === 'WORKOUT');
     const week = Array.from({ length: 7 }, (_, i) => {
       const date = isoDay(new Date(monday.getTime() + i * DAY));
-      const dayActivities = withAppLoad.filter((a) => a.start_date_local.startsWith(date));
+      const dayActivities = shownActivities.filter((a) => a.start_date_local.startsWith(date));
       return {
         date,
         planned: workouts.filter((e) => e.start_date_local.startsWith(date)).map((e) => e.name ?? 'Séance'),
@@ -87,7 +83,7 @@ export async function registerAthleteRoutes(app: FastifyInstance) {
 
     // Appariement des séances du jour avec les sorties (utilise matchPlan)
     const todayWorkouts = workouts.filter((e) => e.start_date_local.startsWith(today));
-    const todayActivities = withAppLoad.filter((a) => a.start_date_local.startsWith(today));
+    const todayActivities = shownActivities.filter((a) => a.start_date_local.startsWith(today));
     const { activityOf } = matchPlan(todayWorkouts, todayActivities);
     const doneEventIds = [...activityOf.keys()].filter((e) => e.id != null).map((e) => String(e.id));
 

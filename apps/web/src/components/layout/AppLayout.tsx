@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { CalendarDays, Layers, LineChart, Settings, Sun, Users, Zap, type LucideIcon } from 'lucide-react';
+import { CalendarDays, Layers, LineChart, Sun, Users, type LucideIcon } from 'lucide-react';
 import { useMe } from '@/hooks/useCoach';
 import { IosInstallHint } from '@/components/common/IosInstallHint';
 import { UpdateBanner } from '@/components/common/UpdateBanner';
@@ -7,18 +7,16 @@ import { UpdateBanner } from '@/components/common/UpdateBanner';
 type Tab = { to: string; label: string; icon: LucideIcon; end?: boolean };
 
 const COACH_TABS: Tab[] = [
-  { to: '/', label: 'Équipe', icon: Users, end: true },
-  { to: '/activite', label: 'Activité', icon: Zap },
+  { to: '/', label: "Aujourd'hui", icon: Sun, end: true },
+  { to: '/equipe', label: 'Équipe', icon: Users },
   { to: '/calendrier', label: 'Calendrier', icon: CalendarDays },
   { to: '/seances', label: 'Séances', icon: Layers },
-  { to: '/reglages', label: 'Réglages', icon: Settings },
 ];
 
 const ATHLETE_TABS: Tab[] = [
   { to: '/', label: "Aujourd'hui", icon: Sun, end: true },
   { to: '/plan', label: 'Plan', icon: CalendarDays },
   { to: '/progres', label: 'Progrès', icon: LineChart },
-  { to: '/reglages', label: 'Réglages', icon: Settings },
 ];
 
 /** Coque de l'app : contenu + barre d'onglets translucide (le contenu défile dessous). */

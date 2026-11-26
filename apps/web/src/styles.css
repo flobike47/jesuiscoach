@@ -329,9 +329,10 @@ a.cell:active {
   padding: 14px 16px;
 }
 
-.card + .card,
-.card + section,
-section + .card {
+/* Cartes empilées dans le flux de la page (pas dans une grille à gap). */
+.page > .card + .card,
+.page > .card + section,
+.page > section + .card {
   margin-top: 12px;
 }
 

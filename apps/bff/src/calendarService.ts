@@ -4,6 +4,7 @@ import { dbCalendarStore, type CalendarStore, type NewCalendarRow } from './db/c
 import { findUserByAthlete } from './db/repo.js';
 import { demoCalendarStore } from './demoCalendar.js';
 import { demoSource, sourceFor } from './sources.js';
+import { storeOf, withAppLoad } from './activityStore.js';
 import { CALENDAR_LIMITS, categoryOf, dayStatus, eventJson, importedFields, parisToday, reconcile, type CalendarRow, type CreatedBy, type EventInput, type EventPatch } from './lib/calendar.js';
 import { matchPlan } from './lib/plan.js';
 import { removeEventFromDevices, syncEventToDevices } from './devices/service.js';
@@ -303,7 +304,11 @@ export async function teamDay(athleteIds: string[], date: string): Promise<TeamD
         const planned = events.filter((e) => onDay(e.start_date_local));
         const workouts = planned.filter((e) => e.category === 'WORKOUT');
         const plannedDone = workouts.filter((e) => doneEventIds.includes(String(e.id))).length;
-        const done = activities.filter((a) => onDay(a.start_date_local)).map((a) => ({
+        // Cherche la charge calculée par l'app (comme dans le feed) pour cohérence.
+        const src = await sourceFor(id);
+        const store = await storeOf(id, src, new Date());
+        const today = await withAppLoad(store, activities.filter((a) => onDay(a.start_date_local)), date, date);
+        const done = today.map((a) => ({
           id: String(a.id),
           name: a.name ?? null,
           type: a.type ?? null,
