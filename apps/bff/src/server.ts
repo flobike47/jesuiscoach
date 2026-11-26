@@ -15,6 +15,7 @@ import { registerProfileRoutes } from './routes/profile.js';
 import { registerCareRoutes } from './routes/care.js';
 import { registerCalendarRoutes } from './routes/calendar.js';
 import { registerMetricsRoutes } from './routes/metrics.js';
+import { registerDeviceRoutes } from './routes/devices.js';
 import { registerPlanningRoutes } from './routes/planning.js';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -145,6 +146,7 @@ export async function buildServer() {
   await app.register(registerCareRoutes, { prefix: '/api' });
   await app.register(registerCalendarRoutes, { prefix: '/api' });
   await app.register(registerMetricsRoutes, { prefix: '/api' });
+  await app.register(registerDeviceRoutes, { prefix: '/api' });
   await app.register(registerPlanningRoutes, { prefix: '/api' });
 
   return app;

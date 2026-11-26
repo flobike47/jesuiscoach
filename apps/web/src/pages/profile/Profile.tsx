@@ -5,6 +5,7 @@ import { PhysiologyRow, ProfileSuggestions } from './Physiology';
 import { AvailabilityRow } from './Availability';
 import { EquipmentRow, HealthRow } from './Health';
 import { GoalsRow } from './Goals';
+import { DevicesRow } from './Devices';
 
 /**
  * Fiche profil de l'athlète (A1 : identité et physiologie ; A2 :
@@ -26,6 +27,7 @@ export default function Profile() {
         <AvailabilityRow athleteId={athleteId} base={base} />
         <EquipmentRow athleteId={athleteId} base={base} />
         <HealthRow athleteId={athleteId} base={base} />
+        <DevicesRow athleteId={athleteId} base={base} />
       </Section>
     </Page>
   );
