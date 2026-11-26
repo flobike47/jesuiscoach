@@ -50,9 +50,13 @@ export default function Privacy() {
             </>,
             <>
               <strong>Données d'entraînement lues sur Intervals.icu</strong> : sorties (date, durée, distance, puissance,
-              fréquence cardiaque, charge), indicateurs de forme et séances du calendrier. Elles restent dans Intervals.icu ;
-              l'application n'en garde qu'une copie temporaire en cache (de quelques minutes à 30 jours au plus) et
-              l'identifiant des sorties déjà notifiées (30 jours).
+              fréquence cardiaque, charge), indicateurs de forme et séances du calendrier. Intervals.icu reste la source de
+              ces données. L'application garde une copie de chaque sortie : son résumé et ses courbes seconde par seconde
+              (puissance, fréquence cardiaque, cadence, vitesse, altitude, distance ; aucune position GPS). Cette copie est
+              conservée tant que ton compte existe, puis effacée avec lui. Elle sert à calculer dans l'application la
+              puissance pondérée, l'intensité, la charge et la forme, à partir de ton profil. Les autres données lues sont
+              en cache temporaire (de quelques minutes à 30 jours au plus), et l'identifiant des sorties déjà notifiées
+              est gardé 30 jours.
             </>,
             <>
               <strong>Ressenti saisi dans l'app</strong> : humeur, effort perçu et note libre, conservés jusqu'à la
@@ -177,8 +181,12 @@ export default function Privacy() {
             </>,
             <>
               <strong>Training data read from Intervals.icu</strong>: activities (date, duration, distance, power, heart
-              rate, load), fitness metrics and calendar workouts. They stay in Intervals.icu; the app only keeps a temporary
-              cached copy (from a few minutes up to 30 days) and the IDs of activities already notified (30 days).
+              rate, load), fitness metrics and calendar workouts. Intervals.icu remains the source of this data. The app keeps
+              a copy of each activity: its summary and its second-by-second curves (power, heart rate, cadence, speed,
+              altitude, distance; no GPS position). This copy is kept as long as your account exists, then deleted with it.
+              It is used to compute, in the app and from your profile, the weighted power, intensity, load and form. Other
+              data read is kept in temporary cache (from a few minutes up to 30 days), and the IDs of activities already
+              notified are kept for 30 days.
             </>,
             <>
               <strong>Check-ins entered in the app</strong>: mood, perceived effort and free-text note, kept until account

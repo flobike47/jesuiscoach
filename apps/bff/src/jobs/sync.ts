@@ -4,6 +4,7 @@ import { redis } from '../cache.js';
 import { formatDuration, formatKm } from '../lib/format.js';
 import { isoDay, summarize } from '../lib/summary.js';
 import { activeAlertCodes, coachesOf, markActivitiesSeen, purgeSeenActivities, recordSync, syncTargets, updateActiveAlerts, type SyncTarget } from '../db/repo.js';
+import { dbContext, storeSyncedActivities } from '../activityStore.js';
 import { pushConfigured, sendToUser, type PushPayload } from '../push.js';
 import { sourceFor, type AthleteSource } from '../sources.js';
 import type { Alert, IntervalsActivity } from '../types.js';
@@ -57,8 +58,22 @@ function importedAt(a: IntervalsActivity): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
+/**
+ * Copie des sorties dans l'app (résumés, courbes et calculs des sorties nouvelles).
+ * Appelée après les notifications : un échec n'empêche ni elles ni `recordSync`.
+ */
+async function storeActivities(target: SyncTarget, source: AthleteSource, activities: IntervalsActivity[], fresh: Set<string>, log?: FastifyBaseLogger): Promise<void> {
+  try {
+    await storeSyncedActivities(dbContext(target.id), target.intervals_athlete_id, source, activities, fresh, (err) =>
+      log?.warn({ err, userId: target.id }, 'sync: courbes non récupérées'),
+    );
+  } catch (err) {
+    log?.warn({ err, userId: target.id }, 'sync: copie des sorties en échec');
+  }
+}
+
 /** Synchronise un athlète ; renvoie le nombre de nouvelles sorties notifiées. */
-export async function syncAthlete(target: SyncTarget, source: AthleteSource, notify: Notify, now = new Date()): Promise<number> {
+export async function syncAthlete(target: SyncTarget, source: AthleteSource, notify: Notify, now = new Date(), log?: FastifyBaseLogger): Promise<number> {
   const id = target.intervals_athlete_id;
   const today = isoDay(now);
   const activities = await source.activities(id, isoDay(new Date(now.getTime() - WINDOW_DAYS * DAY)), today);
@@ -74,6 +89,7 @@ export async function syncAthlete(target: SyncTarget, source: AthleteSource, not
     for (const a of afterSignup) if (coaches.length) await notify(coaches, rideNotification(target.name, id, a));
     const inactive = summarize({ id }, [], activities, [], now).alerts.filter((a) => a.code === 'inactive');
     await updateActiveAlerts(target.id, inactive.map((a) => a.code));
+    await storeActivities(target, source, activities, fresh, log);
     await recordSync(target.id, null);
     return afterSignup.length;
   }
@@ -106,6 +122,7 @@ export async function syncAthlete(target: SyncTarget, source: AthleteSource, not
     }
   }
 
+  await storeActivities(target, source, activities, fresh, log);
   await recordSync(target.id, null);
   return newRides.length;
 }
@@ -142,7 +159,7 @@ export async function runSync(log: FastifyBaseLogger, notify: Notify = pushNotif
   const targets = await syncTargets();
   for (const target of targets) {
     try {
-      rides += await syncAthlete(target, await sourceFor(target.intervals_athlete_id), notify);
+      rides += await syncAthlete(target, await sourceFor(target.intervals_athlete_id), notify, undefined, log);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.warn({ err, userId: target.id }, 'sync: athlète en échec');
