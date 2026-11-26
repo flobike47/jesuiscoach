@@ -6,6 +6,7 @@ import { demoCalendarStore } from './demoCalendar.js';
 import { demoSource, sourceFor } from './sources.js';
 import { CALENDAR_LIMITS, categoryOf, dayStatus, eventJson, importedFields, parisToday, reconcile, type CalendarRow, type CreatedBy, type EventInput, type EventPatch } from './lib/calendar.js';
 import { matchPlan } from './lib/plan.js';
+import { removeEventFromDevices, syncEventToDevices } from './devices/service.js';
 import { ProviderError } from './providers/http.js';
 import type { CalendarEventPatch, IntervalsActivity, IntervalsEvent } from './types.js';
 import { BadRequest, Conflict, HttpError, NotFound } from './validation.js';
@@ -151,7 +152,19 @@ async function pushCreate(athleteId: string, store: CalendarStore, row: Calendar
 }
 
 /** Crée une séance, une compétition ou une note. Renvoie la ligne (synchronisée ou en erreur). */
+/** Recopie une séance vers les appareils reliés (Wahoo) : en arrière-plan, erreurs ignorées (jamais bloquant). */
+function toDevices(athleteId: string, row: CalendarRow): void {
+  void syncEventToDevices(athleteId, row).catch(() => undefined);
+}
+
+/** Crée une séance, une compétition ou une note. Renvoie la ligne (synchronisée ou en erreur). */
 export async function createEvent(athleteId: string, input: EventInput, by: 'athlete' | 'coach'): Promise<CalendarRow> {
+  const row = await createEventRow(athleteId, input, by);
+  toDevices(athleteId, row);
+  return row;
+}
+
+async function createEventRow(athleteId: string, input: EventInput, by: 'athlete' | 'coach'): Promise<CalendarRow> {
   const store = await calendarStoreFor(athleteId);
   const row = await store.insert(newRowOf(input, by), CALENDAR_LIMITS.maxFuture);
   if (!row) throw new Conflict(`${CALENDAR_LIMITS.maxFuture} événements à venir au plus pour cet athlète`);
@@ -178,6 +191,12 @@ function mergeRow(row: CalendarRow, patch: EventPatch): NewCalendarRow {
 
 /** Modifie une séance / compétition / note (uuid ou id Intervals.icu). Seuls les champs modifiés partent chez Intervals.icu. */
 export async function updateEvent(athleteId: string, ref: string, patch: EventPatch): Promise<CalendarRow> {
+  const row = await updateEventRow(athleteId, ref, patch);
+  toDevices(athleteId, row);
+  return row;
+}
+
+async function updateEventRow(athleteId: string, ref: string, patch: EventPatch): Promise<CalendarRow> {
   const store = await calendarStoreFor(athleteId);
   const row = await store.find(ref);
   if (!row) throw new NotFound('Événement introuvable');
@@ -230,6 +249,8 @@ export async function removeEvent(athleteId: string, ref: string): Promise<{ rem
       }
     }
   }
+  // Avant la suppression : la ligne de suivi de l'appareil disparaît avec l'événement (cascade).
+  await removeEventFromDevices(athleteId, row.id).catch(() => undefined);
   await store.remove(row.id);
   await invalidateEvents(athleteId);
   return { removed: true };
@@ -237,6 +258,12 @@ export async function removeEvent(athleteId: string, ref: string): Promise<{ rem
 
 /** Renvoie vers Intervals.icu une ligne en erreur (ou jamais envoyée) : crée ou met à jour l'événement. */
 export async function resyncEvent(athleteId: string, ref: string): Promise<CalendarRow> {
+  const row = await resyncEventRow(athleteId, ref);
+  toDevices(athleteId, row);
+  return row;
+}
+
+async function resyncEventRow(athleteId: string, ref: string): Promise<CalendarRow> {
   const store = await calendarStoreFor(athleteId);
   const row = await store.find(ref);
   if (!row) throw new NotFound('Événement introuvable');

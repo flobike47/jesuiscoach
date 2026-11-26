@@ -7,6 +7,7 @@ import { ensureDemoUsers, purgeExpiredSessions } from './db/repo.js';
 import { DEMO_ATHLETE, DEMO_USER } from './auth.js';
 import { startSync } from './jobs/sync.js';
 import { startBackfill } from './jobs/backfill.js';
+import { startDevicePush } from './jobs/devicePush.js';
 
 // Schéma à jour avant d'accepter la moindre requête (échec = arrêt : Portainer
 // garde l'ancienne version visible dans les logs plutôt qu'un BFF à moitié prêt).
@@ -30,6 +31,7 @@ try {
 
 const stopSync = startSync(app.log);
 const stopBackfill = startBackfill(app.log);
+const stopDevicePush = startDevicePush(app.log);
 
 // Ménage quotidien des sessions expirées.
 const purgeTimer = setInterval(() => {
@@ -46,6 +48,7 @@ const shutdown = async (signal: string) => {
     clearInterval(purgeTimer);
     stopSync();
     stopBackfill();
+    stopDevicePush();
     await app.close();
     await closeDb();
     await redis.quit();
