@@ -28,6 +28,7 @@ function fakeSource(activities: IntervalsActivity[], form = { ctl: 60, atl: 65 }
     calls,
     athlete: async (id) => (calls.push('athlete'), { id, name: 'Athlète B' }),
     wellness: async () => (calls.push('wellness'), [{ id: '2026-11-24', ctl: form.ctl, atl: form.atl, rampRate: 2 }]),
+    wellnessHistory: async () => [],
     activities: async () => (calls.push('activities'), activities),
     events: async () => (calls.push('events'), []),
     createWorkout: unused,

@@ -13,6 +13,8 @@ function afterWrite(qc: QueryClient, athleteId: string, data: ProfileView) {
   qc.invalidateQueries({ queryKey: ['athlete', athleteId] });
   qc.invalidateQueries({ queryKey: ['power', athleteId] });
   qc.invalidateQueries({ queryKey: ['zones', athleteId] });
+  // Une pesée enregistrée rejoint la courbe du poids.
+  qc.invalidateQueries({ queryKey: ['weight', athleteId] });
 }
 
 export function useProfile(athleteId: string | undefined) {
