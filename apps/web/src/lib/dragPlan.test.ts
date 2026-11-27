@@ -232,6 +232,13 @@ describe('dragPlan', () => {
       expect(canDrop(athlete, '2026-12-01')).toBe(false);
     });
 
+    it('refuse un jour de repos prescrit par le coach', () => {
+      const athlete = createMockAthlete();
+      athlete.days[1] = createMockDay(athlete.days[1].date, { rest: { id: 'r1', name: 'Repos', description: null } });
+      expect(canDrop(athlete, athlete.days[1].date)).toBe(false);
+      expect(canDrop(athlete, athlete.days[2].date)).toBe(true);
+    });
+
     it('refuse une date non trouvée', () => {
       const athlete = createMockAthlete();
       expect(canDrop(athlete, '2099-01-01')).toBe(false);

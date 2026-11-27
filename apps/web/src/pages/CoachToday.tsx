@@ -7,6 +7,7 @@ import { useTeam } from '@/hooks/useCoach';
 import { useTeamToday } from '@/hooks/useCalendarData';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { PullIndicator } from '@/components/common/PullIndicator';
+import { WeekReviewCard } from '@/components/coach/WeekReviewCard';
 import { formatDuration, formatLoad } from '@/lib/format';
 import { todayCounts } from '@/lib/today';
 import type { AthleteSummary } from '@/types';
@@ -101,6 +102,9 @@ export default function CoachToday() {
           <div style={{ fontSize: 13, color: 'var(--label-2)', marginTop: 4 }}>encore prévues</div>
         </div>
       </div>
+
+      {/* Bilan de la semaine écoulée (lundi matin) */}
+      <WeekReviewCard today={dateStr} />
 
       {/* À traiter */}
       {toWatch.length > 0 && (

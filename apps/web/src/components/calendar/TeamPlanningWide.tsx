@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { Placeholder, SkeletonList } from '@/components/ios';
 import { WorkoutProfile } from '@/components/workout/StructureEditor';
 import { EditEventSheet } from '@/components/calendar/EventSheets';
+import { RestSheet } from '@/components/calendar/RestDay';
+import { isPrescribedRest, teamRestAsEvent } from '@/lib/restDay';
 import { teamWorkoutAsEvent } from '@/lib/teamEvent';
 import { useSavedWorkouts, useTeam } from '@/hooks/useCoach';
 import { useEventMutations } from '@/hooks/useCalendarData';
@@ -309,25 +311,35 @@ export function TeamPlanningWide() {
                         {a.days.slice(week * 7, week * 7 + 7).map((day) => {
                           const kind = cellKind(day);
                           const w = day.workouts[0];
-                          const bg = w ? dominantColor(w.description) : kind === 'off' ? 'repeating-linear-gradient(135deg, var(--fill-2) 0 2px, transparent 2px 7px)' : kind === 'extra' ? 'var(--fill-2)' : 'var(--cell)';
+                          const bg = w
+                            ? dominantColor(w.description)
+                            : kind === 'rest'
+                              ? 'color-mix(in srgb, var(--indigo) 22%, var(--cell))'
+                              : kind === 'off'
+                                ? 'repeating-linear-gradient(135deg, var(--fill-2) 0 2px, transparent 2px 7px)'
+                                : kind === 'extra'
+                                  ? 'var(--fill-2)'
+                                  : 'var(--cell)';
                           const key = `${a.id}|${day.date}`;
-                          const label = `${a.name}, ${dayjs(day.date).format('dddd D MMMM')} : ${w ? w.name : kind === 'off' ? 'indisponible' : kind === 'extra' ? 'sortie hors plan' : 'libre'}`;
+                          const label = `${a.name}, ${dayjs(day.date).format('dddd D MMMM')} : ${w ? w.name : kind === 'rest' ? 'repos prescrit' : kind === 'off' ? 'indisponible' : kind === 'extra' ? 'sortie hors plan' : 'libre'}`;
                           return (
                             <div
                               key={key}
                               data-cell={key}
                               className={hover === key ? (canDrop(a, day.date) ? 'wide-cell drop-ok' : 'wide-cell drop-no') : 'wide-cell'}
-                              style={{ background: bg, color: w ? textOn(bg) : 'var(--label)', cursor: w ? 'grab' : undefined }}
+                              style={{ background: bg, color: w ? textOn(bg) : kind === 'rest' ? 'var(--indigo)' : 'var(--label)', cursor: w ? 'grab' : undefined }}
                               title={label}
                               aria-label={label}
                               onPointerDown={w ? (e) => startDrag(e, { kind: 'event', athleteId: a.id, event: w, fromDate: day.date, x: e.clientX, y: e.clientY }) : undefined}
                               onDoubleClick={
                                 w
                                   ? () => setEditing({ athleteId: a.id, event: teamWorkoutAsEvent(w, day.date) })
-                                  : undefined
+                                  : kind === 'rest' && day.rest
+                                    ? () => setEditing({ athleteId: a.id, event: teamRestAsEvent(day.rest!, day.date) })
+                                    : undefined
                               }
                             >
-                              {w ? `${w.done ? '✓ ' : ''}${shortDuration(w.seconds)}` : kind === 'extra' ? '✓' : ''}
+                              {w ? `${w.done ? '✓ ' : ''}${shortDuration(w.seconds)}` : kind === 'rest' ? 'Repos' : kind === 'extra' ? '✓' : ''}
                             </div>
                           );
                         })}
@@ -356,7 +368,7 @@ export function TeamPlanningWide() {
         )}
 
         <p className="footnote secondary" style={{ marginTop: 12 }}>
-          Les cases rayées viennent des disponibilités du profil.
+          Les cases rayées viennent des disponibilités du profil ; les cases « Repos » sont des repos prescrits (double-clic pour les modifier).
         </p>
         {error && (
           <p role="alert" className="footnote" style={{ color: 'var(--red)' }}>
@@ -399,7 +411,8 @@ export function TeamPlanningWide() {
         </div>
       )}
 
-      {editing && <EditEventSheet athleteId={editing.athleteId} event={editing.event} weekStart={weekStart} onClose={() => setEditing(null)} />}
+      {editing && isPrescribedRest(editing.event) && <RestSheet athleteId={editing.athleteId} event={editing.event} weekStart={weekStart} onClose={() => setEditing(null)} />}
+      {editing && !isPrescribedRest(editing.event) && <EditEventSheet athleteId={editing.athleteId} event={editing.event} weekStart={weekStart} onClose={() => setEditing(null)} />}
     </div>
   );
 }

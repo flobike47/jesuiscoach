@@ -184,6 +184,30 @@ describe('calendrier : écriture recopiée vers Intervals.icu', () => {
   });
 });
 
+describe('calendrier : repos prescrit par le coach', () => {
+  it("crée un repos : ligne « rest » en base, NOTE « Repos » chez Intervals.icu", async () => {
+    const res = await call('POST', eventsUrl(), 'token-a', { kind: 'rest', date: addDays(2), description: 'Récupération complète' });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().event).toMatchObject({ kind: 'rest', category: 'NOTE', name: 'Repos', syncStatus: 'synced' });
+    expect(icu.calls).toEqual([['create', { category: 'NOTE', date: addDays(2), name: 'Repos', description: 'Récupération complète' }]]);
+    expect(await rows('calendar_events')).toEqual([expect.objectContaining({ kind: 'rest', sport: null, created_by: 'coach' })]);
+  });
+
+  it("reste un repos à la relecture (pas réimporté comme une note)", async () => {
+    await call('POST', eventsUrl(), 'token-a', { kind: 'rest', date: addDays(2) });
+    await pause();
+    const { events } = (await call('GET', `${cal()}?from=${addDays(0)}&to=${addDays(5)}`, 'token-b')).json();
+    expect(events).toEqual([expect.objectContaining({ kind: 'rest', category: 'NOTE', origin: 'app' })]);
+  });
+
+  it("refuse qu'un athlète se prescrive un repos (403, rien chez Intervals.icu)", async () => {
+    const res = await call('POST', eventsUrl(), 'token-b', { kind: 'rest', date: addDays(2) });
+    expect(res.statusCode).toBe(403);
+    expect(icu.calls).toEqual([]);
+    expect(await rows('calendar_events')).toEqual([]);
+  });
+});
+
 describe('calendrier : import et réconciliation à la lecture', () => {
   it('importe un événement créé directement dans Intervals.icu, une seule fois', async () => {
     icu.events.push({ id: '555', category: 'WORKOUT', type: 'Run', start_date_local: `${addDays(4)}T00:00:00`, name: 'Fractionné Intervals' });

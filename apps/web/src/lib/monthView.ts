@@ -7,6 +7,8 @@ export interface DayMarks {
   bars: Array<{ color: string; widthPct: number }>;
   done: boolean;
   race: boolean;
+  /** Repos prescrit par le coach ce jour-là. */
+  rest: boolean;
 }
 
 /**
@@ -27,6 +29,7 @@ export function dayMarks(
   const bars: Array<{ color: string; widthPct: number }> = [];
   let done = false;
   let race = false;
+  let rest = false;
 
   // Cherche les événements du jour
   const dayEvents = events.filter((e) => e.start_date_local?.slice(0, 10) === day);
@@ -34,6 +37,10 @@ export function dayMarks(
   // Marque de course
   if (dayEvents.some((e) => e.category?.startsWith('RACE_'))) {
     race = true;
+  }
+
+  if (dayEvents.some((e) => e.kind === 'rest')) {
+    rest = true;
   }
 
   // Séances WORKOUT de ce jour
@@ -78,7 +85,7 @@ export function dayMarks(
     done = true;
   }
 
-  return { bars, done, race };
+  return { bars, done, race, rest };
 }
 
 /**

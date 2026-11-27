@@ -11,7 +11,7 @@ import type { AppEvent, EventInput, EventPatch, RacePriority } from '@/services/
 const SPORTS: Sport[] = ['Ride', 'Run', 'Swim'];
 
 /** Les sept jours de la semaine, pour choisir une date. */
-function DayPicker({ weekStart, value, onChange }: { weekStart: dayjs.Dayjs; value: string; onChange: (key: string) => void }) {
+export function DayPicker({ weekStart, value, onChange }: { weekStart: dayjs.Dayjs; value: string; onChange: (key: string) => void }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, textAlign: 'center' }} role="radiogroup" aria-label="Jour de la semaine">
@@ -131,16 +131,22 @@ export function EditEventSheet({ athleteId, event, weekStart, onClose, initialDa
   );
 }
 
-const KIND_OPTIONS = [
+type NewKind = 'workout' | 'race' | 'note' | 'rest';
+
+const KIND_OPTIONS: ReadonlyArray<{ value: NewKind; label: string }> = [
   { value: 'workout', label: 'Séance' },
   { value: 'race', label: 'Compétition' },
   { value: 'note', label: 'Note' },
-] as const;
+  { value: 'rest', label: 'Repos' },
+];
 
-/** Feuille d'ajout : une séance, une compétition (A/B/C) ou une note. */
-export function NewEventSheet({ athleteId, weekStart, defaultDay, onClose }: { athleteId: string; weekStart: dayjs.Dayjs; defaultDay: dayjs.Dayjs; onClose: () => void }) {
+/**
+ * Feuille d'ajout : une séance, une compétition (A/B/C), une note ou, pour le
+ * coach (`allowRest`), un repos prescrit.
+ */
+export function NewEventSheet({ athleteId, weekStart, defaultDay, onClose, allowRest = false }: { athleteId: string; weekStart: dayjs.Dayjs; defaultDay: dayjs.Dayjs; onClose: () => void; allowRest?: boolean }) {
   const { create } = useEventMutations();
-  const [kind, setKind] = useState<'workout' | 'race' | 'note'>('workout');
+  const [kind, setKind] = useState<NewKind>('workout');
   const [name, setName] = useState('');
   const [date, setDate] = useState(defaultDay.format('YYYY-MM-DD'));
   const [sport, setSport] = useState<Sport>('Ride');
@@ -152,11 +158,12 @@ export function NewEventSheet({ athleteId, weekStart, defaultDay, onClose }: { a
 
   const save = async () => {
     setError(null);
-    if (!name.trim()) return setError('Le nom est requis.');
+    // Un repos sans nom s'appelle « Repos » (le BFF le nomme).
+    if (!name.trim() && kind !== 'rest') return setError('Le nom est requis.');
     const body: EventInput = { kind, date, name: name.trim() };
     if (kind === 'workout') Object.assign(body, { sport, description });
     if (kind === 'race') Object.assign(body, { racePriority: priority, raceDistanceM: km ? Math.round(km * 1000) : null, raceGoal: goalText.trim() || null });
-    if (kind === 'note') Object.assign(body, { description: description || null });
+    if (kind === 'note' || kind === 'rest') Object.assign(body, { description: description || null });
     try {
       await create.mutateAsync({ athleteId, body });
       onClose();
@@ -176,9 +183,9 @@ export function NewEventSheet({ athleteId, weekStart, defaultDay, onClose }: { a
         </button>
       }
     >
-      <Segmented<'workout' | 'race' | 'note'> label="Type" value={kind} onChange={setKind} options={KIND_OPTIONS.map((o) => ({ ...o }))} />
+      <Segmented<NewKind> label="Type" value={kind} onChange={setKind} options={KIND_OPTIONS.filter((o) => allowRest || o.value !== 'rest').map((o) => ({ ...o }))} />
       <div className="group" style={{ marginTop: 12 }}>
-        <input className="field" aria-label="Nom" placeholder="Nom" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
+        <input className="field" aria-label="Nom" placeholder={kind === 'rest' ? 'Repos' : 'Nom'} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
       </div>
 
       {kind === 'workout' && (
@@ -217,6 +224,15 @@ export function NewEventSheet({ athleteId, weekStart, defaultDay, onClose }: { a
           <div className="group" style={{ marginTop: 12 }}>
             <input className="field" aria-label="Objectif" placeholder="Objectif (ex. finir en 4 h 30)" value={goalText} onChange={(e) => setGoalText(e.target.value)} maxLength={200} />
           </div>
+        </>
+      )}
+
+      {kind === 'rest' && (
+        <>
+          <div className="group" style={{ marginTop: 12 }}>
+            <input className="field" aria-label="Consigne du repos" placeholder="Consigne (facultatif)" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={4000} />
+          </div>
+          <p className="section-footer">Un repos prescrit : aucune séance ne sera proposée ce jour-là. L'athlète le voit dans son calendrier.</p>
         </>
       )}
 

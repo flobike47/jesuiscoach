@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bed, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Sheet, SkeletonList, Placeholder } from '@/components/ios';
 import { useTeamCalendar, useGroups, useGroupMutations } from '@/hooks/useTeamPlanning';
 import { useTeam } from '@/hooks/useCoach';
@@ -11,6 +11,8 @@ import { formZone } from '@/lib/form';
 import { TEMPLATES, SPORT_LABELS } from '@/lib/workout';
 import { EditEventSheet } from '@/components/calendar/EventSheets';
 import { teamWorkoutAsEvent } from '@/lib/teamEvent';
+import { RestSheet } from '@/components/calendar/RestDay';
+import { isPrescribedRest, teamRestAsEvent } from '@/lib/restDay';
 import type { AppEvent } from '@/services/calendarApi';
 import {
   cellKind,
@@ -54,6 +56,8 @@ export function TeamPlanning() {
   const [showGroupSheet, setShowGroupSheet] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const groupMutations = useGroupMutations();
+  const [restBusy, setRestBusy] = useState(false);
+  const [restError, setRestError] = useState<string | null>(null);
 
   // Filtrer les athlètes et préparer les données
   const athletes = useMemo(() => {
@@ -80,7 +84,7 @@ export function TeamPlanning() {
 
   // Marquer une cellule comme sélectionnée
   const toggleCellSelection = (athleteId: string, date: string, dayKind: string) => {
-    if (dayKind === 'workout' || dayKind === 'extra' || dayKind === 'off') return;
+    if (dayKind === 'workout' || dayKind === 'extra' || dayKind === 'off' || dayKind === 'rest') return;
 
     const isSelected = selectedCells.some((c) => c.athleteId === athleteId && c.date === date);
 
@@ -122,6 +126,25 @@ export function TeamPlanning() {
       setShowWorkoutPicker(false);
       setPickerProgress({ current: 0, total: 0 });
     }
+  };
+
+  // Prescrire un repos sur les cases choisies (une écriture par case, recopiée vers Intervals.icu).
+  const prescribeRest = async () => {
+    if (selectedCells.length === 0) return;
+    setRestBusy(true);
+    setRestError(null);
+    const failed: Array<{ athleteId: string; date: string }> = [];
+    for (const cell of selectedCells) {
+      try {
+        await create.mutateAsync({ athleteId: cell.athleteId, body: { kind: 'rest', date: cell.date, name: 'Repos' } });
+      } catch (err) {
+        failed.push(cell);
+        setRestError((err as Error).message);
+      }
+    }
+    // Les cases en échec restent sélectionnées pour réessayer.
+    setSelectedCells(failed);
+    setRestBusy(false);
   };
 
   if (cal.isLoading) return <SkeletonList rows={4} avatar={false} />;
@@ -281,6 +304,8 @@ export function TeamPlanning() {
                 ? 'var(--cell)'
                 : kind === 'off'
                 ? 'repeating-linear-gradient(135deg, var(--fill-2) 0 2px, transparent 2px 6px)'
+                : kind === 'rest'
+                ? 'color-mix(in srgb, var(--indigo) 22%, var(--cell))'
                 : kind === 'extra'
                 ? 'var(--fill-2)'
                 : dominantColor(day.workouts[0]?.description);
@@ -292,12 +317,14 @@ export function TeamPlanning() {
                   key={`${athlete.id}-${day.date}`}
                   type="button"
                   aria-label={`${athlete.name}, ${dayjs(day.date).format('dddd D MMMM')} : ${
-                    isWorkout ? day.workouts[0].name : kind === 'off' ? 'indisponible' : kind === 'extra' ? 'sortie hors plan' : 'libre'
+                    isWorkout ? day.workouts[0].name : kind === 'rest' ? 'repos prescrit' : kind === 'off' ? 'indisponible' : kind === 'extra' ? 'sortie hors plan' : 'libre'
                   }`}
                   aria-pressed={kind === 'free' ? isSelected : undefined}
                   onClick={() => {
                     if (isWorkout) {
                       setEditingEvent({ event: teamWorkoutAsEvent(day.workouts[0], day.date), athleteId: athlete.id });
+                    } else if (kind === 'rest' && day.rest) {
+                      setEditingEvent({ event: teamRestAsEvent(day.rest, day.date), athleteId: athlete.id });
                     } else {
                       toggleCellSelection(athlete.id, day.date, kind);
                     }
@@ -324,6 +351,7 @@ export function TeamPlanning() {
                     </span>
                   )}
                   {!isSelected && kind === 'extra' && '✓'}
+                  {!isSelected && kind === 'rest' && <Bed size={13} strokeWidth={2.4} color="var(--indigo)" aria-hidden />}
                 </button>
               );
             })}
@@ -371,7 +399,32 @@ export function TeamPlanning() {
             <div style={{ fontSize: 13, color: 'var(--label-2)' }}>
               {selectionSummary(selectedCells, cal.data?.athletes ?? [])}
             </div>
+            {restError && (
+              <div role="alert" style={{ fontSize: 13, color: 'var(--red)' }}>
+                {restError}
+              </div>
+            )}
           </div>
+          <button
+            type="button"
+            className="pressable"
+            onClick={prescribeRest}
+            disabled={restBusy}
+            style={{
+              minHeight: 40,
+              padding: '0 12px',
+              borderRadius: 12,
+              background: 'color-mix(in srgb, var(--indigo) 18%, transparent)',
+              color: 'var(--indigo)',
+              fontWeight: 600,
+              fontSize: 15,
+              border: 'none',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {restBusy ? 'Envoi…' : 'Repos'}
+          </button>
           <button
             type="button"
             onClick={() => setShowWorkoutPicker(true)}
@@ -406,7 +459,10 @@ export function TeamPlanning() {
       )}
 
       {/* EditEventSheet pour modifier une séance */}
-      {editingEvent && (
+      {editingEvent && isPrescribedRest(editingEvent.event) && (
+        <RestSheet athleteId={editingEvent.athleteId} event={editingEvent.event} weekStart={weekStart} onClose={() => setEditingEvent(null)} />
+      )}
+      {editingEvent && !isPrescribedRest(editingEvent.event) && (
         <EditEventSheet
           athleteId={editingEvent.athleteId}
           event={editingEvent.event}

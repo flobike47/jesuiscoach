@@ -88,6 +88,7 @@ async function athleteInput(id: string, from: string, to: string, sport: Workout
       date: day,
       inWindow: day >= from && day <= to && day >= today,
       availability: availabilityOf(day, care.state),
+      rest: cal.events.some((e) => e.kind === 'rest' && e.start_date_local.slice(0, 10) === day),
       maxMinutes: care.state.days.find((d) => d.weekday === weekday)?.maxMinutes ?? null,
       existing,
       doneLoad: activities.filter((a) => a.start_date_local.slice(0, 10) === day).reduce((s, a) => s + (a.icu_training_load ?? 0), 0),

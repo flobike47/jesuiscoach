@@ -10,7 +10,8 @@ import { BadRequest, DATE_RE, validateString, validateUuid } from '../validation
 
 export const CALENDAR_LIMITS = { maxFuture: 500, maxGoals: 30, maxRange: 62 } as const;
 
-export type EventKind = 'workout' | 'race' | 'note';
+/** `rest` : jour de repos prescrit par le coach (recopié comme NOTE chez Intervals.icu). */
+export type EventKind = 'workout' | 'race' | 'note' | 'rest';
 export type RacePriority = 'A' | 'B' | 'C';
 export type SyncStatus = 'pending' | 'synced' | 'error';
 export type EventOrigin = 'app' | 'intervals';
@@ -50,7 +51,9 @@ export interface EventInput {
 
 export type EventPatch = Partial<Omit<EventInput, 'kind'>>;
 
-const KINDS: readonly EventKind[] = ['workout', 'race', 'note'];
+const KINDS: readonly EventKind[] = ['workout', 'race', 'note', 'rest'];
+/** Nom d'un repos prescrit quand le coach n'en donne pas. */
+export const REST_NAME = 'Repos';
 const PRIORITIES: readonly RacePriority[] = ['A', 'B', 'C'];
 
 function fail(message: string): never {
@@ -91,19 +94,21 @@ function day(v: unknown, name = 'date'): string {
 /** Validation complète d'une création. */
 export function validateEventInput(body: unknown): EventInput {
   const b = isObj(body) ? body : {};
-  if (!KINDS.includes(b.kind as EventKind)) fail('kind invalide (workout, race ou note)');
+  if (!KINDS.includes(b.kind as EventKind)) fail('kind invalide (workout, race, note ou rest)');
   const kind = b.kind as EventKind;
   const sport = optionalSport(b.sport);
   const racePriority = optionalPriority(b.racePriority);
   if (kind === 'workout' && !sport) fail('sport requis pour une séance');
   if (kind === 'race' && !racePriority) fail('priorité A, B ou C requise pour une compétition');
-  if (typeof b.name !== 'string') fail('name requis');
+  // Un repos se suffit à lui-même : sans nom, il s'appelle « Repos ».
+  const name = kind === 'rest' && (b.name == null || (typeof b.name === 'string' && b.name.trim() === '')) ? REST_NAME : b.name;
+  if (typeof name !== 'string') fail('name requis');
   return {
     kind,
     date: day(b.date),
-    name: validateString(b.name, 'name', 120),
+    name: validateString(name, 'name', 120),
     description: optionalString(b.description, 'description', 4000),
-    sport: kind === 'note' ? null : sport,
+    sport: kind === 'note' || kind === 'rest' ? null : sport,
     racePriority: kind === 'race' ? racePriority : null,
     raceDistanceM: kind === 'race' ? optionalDistance(b.raceDistanceM) : null,
     raceGoal: kind === 'race' ? optionalString(b.raceGoal, 'raceGoal', 200) : null,
@@ -130,10 +135,14 @@ export function validateEventPatch(body: unknown): EventPatch {
   return patch;
 }
 
-/** Catégorie Intervals.icu d'une ligne (compétition = RACE_ + priorité). */
+/**
+ * Catégorie Intervals.icu d'une ligne (compétition = RACE_ + priorité). Un repos
+ * prescrit part en NOTE : Intervals.icu n'a pas de catégorie « repos », et une
+ * séance (WORKOUT) fausserait sa charge prévue et la montre.
+ */
 export function categoryOf(kind: EventKind, racePriority: RacePriority | null): CalendarCategory {
   if (kind === 'race') return `RACE_${racePriority ?? 'C'}` as CalendarCategory;
-  return kind === 'note' ? 'NOTE' : 'WORKOUT';
+  return kind === 'note' || kind === 'rest' ? 'NOTE' : 'WORKOUT';
 }
 
 const IMPORTABLE: ReadonlySet<string> = new Set(['WORKOUT', 'RACE_A', 'RACE_B', 'RACE_C', 'NOTE']);
