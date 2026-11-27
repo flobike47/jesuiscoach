@@ -13,19 +13,19 @@ beforeEach(() => {
 });
 
 describe('AthleteSportsCard', () => {
-  it('écrit chaque sport avec son temps et sa part', async () => {
-    api.athleteSports.mockResolvedValue({ from: '2026-10-31', to: '2026-11-27', time: { Ride: 6 * 3600, Run: 3600 + 1800, Swim: 1800, Other: 0 } });
+  it('écrit chaque sport avec son nombre de sorties et sa part', async () => {
+    api.athleteSports.mockResolvedValue({ from: '2026-10-31', to: '2026-11-27', count: { Ride: 12, Run: 3, Swim: 1, Other: 0 } });
     renderPage(<AthleteSportsCard athleteId="i1" />);
-    expect(await screen.findByText('8 h au total')).toBeInTheDocument();
+    expect(await screen.findByText('16 sorties au total')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Vélo 75 %, Natation 6 %, Course 19 %' })).toBeInTheDocument();
     expect(screen.getByText('Vélo')).toBeInTheDocument();
-    expect(screen.getByText('1 h 30 · 19 %')).toBeInTheDocument();
+    expect(screen.getByText('3 sorties · 19 %')).toBeInTheDocument();
     expect(screen.queryByText('Autre')).not.toBeInTheDocument();
     expect(api.athleteSports).toHaveBeenCalledWith('i1');
   });
 
   it('dit quand il n’y a aucune sortie', async () => {
-    api.athleteSports.mockResolvedValue({ from: '2026-10-31', to: '2026-11-27', time: { Ride: 0, Run: 0, Swim: 0, Other: 0 } });
+    api.athleteSports.mockResolvedValue({ from: '2026-10-31', to: '2026-11-27', count: { Ride: 0, Run: 0, Swim: 0, Other: 0 } });
     renderPage(<AthleteSportsCard athleteId="i1" />);
     expect(await screen.findByText('Aucune sortie sur les 4 dernières semaines.')).toBeInTheDocument();
   });

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { requireUser } from '../auth.js';
 import { appFitness, storeOf } from '../activityStore.js';
 import { fitnessPoints } from '../lib/fitness.js';
-import { addSportTimes, timeBySport } from '../lib/sportTime.js';
+import { addSportCounts, countBySport } from '../lib/sportCount.js';
 import { isoDay } from '../lib/summary.js';
 import { assertCanView, sourceFor, teamOf } from '../sources.js';
 import { ATHLETE_ID_RE, BadRequest, Forbidden, HttpError } from '../validation.js';
@@ -62,7 +62,7 @@ export async function registerTrendRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Temps par sport sur 4 semaines, pour l'équipe et par athlète. Lit les
+   * Nombre de sorties par sport sur 4 semaines, pour l'équipe et par athlète. Lit les
    * sorties de /team (fenêtre J−28 → J, même clé de cache) puis garde J−27 → J.
    */
   app.get('/team/sports', async (req) => {
@@ -75,12 +75,12 @@ export async function registerTrendRoutes(app: FastifyInstance) {
       async (id) => {
         const src = await sourceFor(id);
         const [info, activities] = await Promise.all([src.athlete(id), src.activities(id, daysAgo(now, 28), isoDay(now))]);
-        return { id, name: info.name ?? id, time: timeBySport(activities, from) };
+        return { id, name: info.name ?? id, count: countBySport(activities, from) };
       },
       (err, id) => req.log.warn({ err, athleteId: id }, 'team/sports : athlète en erreur'),
     );
     ok.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-    return { from, to: isoDay(now), team: addSportTimes(ok.map((a) => a.time)), athletes: ok, errors };
+    return { from, to: isoDay(now), team: addSportCounts(ok.map((a) => a.count)), athletes: ok, errors };
   });
 
   /** Même répartition pour un athlète (lui-même ou son coach). Fenêtre de la fiche athlète (J−30, même clé de cache). */
@@ -93,6 +93,6 @@ export async function registerTrendRoutes(app: FastifyInstance) {
     const from = daysAgo(now, SPORT_DAYS - 1);
     const src = await sourceFor(id);
     const activities = await src.activities(id, daysAgo(now, 30), isoDay(now));
-    return { from, to: isoDay(now), time: timeBySport(activities, from) };
+    return { from, to: isoDay(now), count: countBySport(activities, from) };
   });
 }

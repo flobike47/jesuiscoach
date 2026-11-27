@@ -1,11 +1,11 @@
 /**
- * Répartition des sports pratiqués (logique pure) : temps par sport sur
- * 4 semaines, en parts qui totalisent 100 %.
+ * Répartition des sports pratiqués (logique pure) : nombre de sorties par
+ * sport sur 4 semaines, en parts qui totalisent 100 %.
  */
 
 export type SportGroup = 'Ride' | 'Run' | 'Swim' | 'Other';
-/** Secondes par sport (réponse du BFF). */
-export type SportTime = Record<SportGroup, number>;
+/** Nombre de sorties par sport (réponse du BFF). */
+export type SportCount = Record<SportGroup, number>;
 
 /**
  * Ordre fixe et couleurs (variables CSS). Ordre choisi pour que deux couleurs
@@ -23,20 +23,21 @@ export interface SportShare {
   key: SportGroup;
   label: string;
   color: string;
-  secs: number;
+  /** Nombre de sorties. */
+  count: number;
   /** Part entière en %, la somme des parts non nulles vaut 100. */
   percent: number;
 }
 
-export const totalSecs = (t: SportTime): number => SPORT_ORDER.reduce((s, x) => s + Math.max(0, t[x.key] || 0), 0);
+export const totalCount = (t: SportCount): number => SPORT_ORDER.reduce((s, x) => s + Math.max(0, t[x.key] || 0), 0);
 
 /** Parts de chaque sport pratiqué (les sports à 0 sont omis), arrondies au plus fort reste. */
-export function sportShares(t: SportTime): SportShare[] {
-  const total = totalSecs(t);
+export function sportShares(t: SportCount): SportShare[] {
+  const total = totalCount(t);
   if (total <= 0) return [];
   const rows = SPORT_ORDER.filter((s) => (t[s.key] || 0) > 0).map((s) => {
     const exact = ((t[s.key] || 0) / total) * 100;
-    return { ...s, secs: t[s.key], percent: Math.floor(exact), rest: exact - Math.floor(exact) };
+    return { ...s, count: t[s.key], percent: Math.floor(exact), rest: exact - Math.floor(exact) };
   });
   let missing = 100 - rows.reduce((s, r) => s + r.percent, 0);
   for (const r of [...rows].sort((a, b) => b.rest - a.rest)) {
@@ -47,13 +48,10 @@ export function sportShares(t: SportTime): SportShare[] {
   return rows.map(({ rest: _rest, ...r }) => r);
 }
 
-/** « 12 h 30 », « 45 min », « 0 min ». */
-export function formatHours(secs: number): string {
-  const minutes = Math.round(Math.max(0, secs) / 60);
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m} min`;
-  return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, '0')}`;
+/** « 1 sortie », « 12 sorties », « 0 sortie ». */
+export function formatCount(n: number): string {
+  const v = Math.max(0, Math.round(n));
+  return `${v.toLocaleString('fr-FR')} sortie${v > 1 ? 's' : ''}`;
 }
 
 /** Phrase pour les lecteurs d'écran : « Vélo 80 %, Course 20 % ». */

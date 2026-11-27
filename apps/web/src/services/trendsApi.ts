@@ -1,6 +1,6 @@
 import { get } from '@/services/api';
 import type { AthleteFitness } from '@/lib/teamFitness';
-import type { SportTime } from '@/lib/sportShare';
+import type { SportCount } from '@/lib/sportShare';
 
 /** Tendances de l'équipe (BFF : routes/trends.ts). Lues dans le cache du BFF. */
 
@@ -11,19 +11,19 @@ export interface TeamFitnessView {
   errors: Array<{ id: string; error: string }>;
 }
 
-/** Temps par sport sur 4 semaines (du `from` au `to` inclus). */
+/** Nombre de sorties par sport sur 4 semaines (du `from` au `to` inclus). */
 export interface TeamSportsView {
   from: string;
   to: string;
-  team: SportTime;
-  athletes: Array<{ id: string; name: string; time: SportTime }>;
+  team: SportCount;
+  athletes: Array<{ id: string; name: string; count: SportCount }>;
   errors: Array<{ id: string; error: string }>;
 }
 
 export interface AthleteSportsView {
   from: string;
   to: string;
-  time: SportTime;
+  count: SportCount;
 }
 
 export const trendsApi = {

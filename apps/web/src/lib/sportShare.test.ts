@@ -1,25 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { formatHours, sharesLabel, sportShares, totalSecs } from './sportShare';
+import { formatCount, sharesLabel, sportShares, totalCount } from './sportShare';
 
 describe('sportShare', () => {
   it('donne des parts entières qui totalisent 100 %, dans un ordre fixe', () => {
-    const shares = sportShares({ Ride: 1000, Run: 1000, Swim: 1000, Other: 0 });
+    const shares = sportShares({ Ride: 1, Run: 1, Swim: 1, Other: 0 });
     expect(shares.map((s) => s.key)).toEqual(['Ride', 'Swim', 'Run']);
     expect(shares.reduce((s, x) => s + x.percent, 0)).toBe(100);
     expect(shares.map((s) => s.percent).sort()).toEqual([33, 33, 34]);
   });
 
   it('omet les sports non pratiqués et gère l’absence de sortie', () => {
-    expect(sportShares({ Ride: 3600, Run: 0, Swim: 0, Other: 0 })).toEqual([{ key: 'Ride', label: 'Vélo', color: 'var(--blue)', secs: 3600, percent: 100 }]);
+    expect(sportShares({ Ride: 12, Run: 0, Swim: 0, Other: 0 })).toEqual([{ key: 'Ride', label: 'Vélo', color: 'var(--blue)', count: 12, percent: 100 }]);
     expect(sportShares({ Ride: 0, Run: 0, Swim: 0, Other: 0 })).toEqual([]);
-    expect(totalSecs({ Ride: 10, Run: 20, Swim: 0, Other: 5 })).toBe(35);
+    expect(totalCount({ Ride: 10, Run: 2, Swim: 0, Other: 1 })).toBe(13);
   });
 
-  it('formate les durées en heures et minutes', () => {
-    expect(formatHours(45 * 60)).toBe('45 min');
-    expect(formatHours(3 * 3600)).toBe('3 h');
-    expect(formatHours(3 * 3600 + 5 * 60)).toBe('3 h 05');
-    expect(formatHours(0)).toBe('0 min');
+  it('écrit le nombre de sorties, au singulier ou au pluriel', () => {
+    expect(formatCount(0)).toBe('0 sortie');
+    expect(formatCount(1)).toBe('1 sortie');
+    expect(formatCount(12)).toBe('12 sorties');
   });
 
   it('décrit la répartition en texte', () => {

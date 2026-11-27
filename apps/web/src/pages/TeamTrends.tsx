@@ -64,7 +64,7 @@ export default function TeamTrends() {
             Sports pratiqués
           </h2>
           <p className="footnote secondary" style={{ margin: '0 4px 10px' }}>
-            Temps passé par sport sur les 4 dernières semaines, pour l’équipe puis pour chacun.
+            Nombre de sorties par sport sur les 4 dernières semaines, pour l’équipe puis pour chacun.
           </p>
           {sports.isLoading && <SkeletonList rows={3} avatar={false} />}
           {sports.error && <Placeholder title="Répartition indisponible">{sports.error.message}</Placeholder>}

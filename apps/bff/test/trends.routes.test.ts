@@ -100,12 +100,12 @@ describe('sports pratiqués', () => {
     expect(reads).toEqual([]);
   });
 
-  it("donne le temps par sport sur 4 semaines, pour l'équipe du coach seulement", async () => {
+  it("donne le nombre de sorties par sport sur 4 semaines, pour l'équipe du coach seulement", async () => {
     const res = await get('/api/team/sports', auth('token-a'));
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(body.athletes).toEqual([{ id: 'iB', name: 'Bérénice', time: { Ride: 3600, Run: 1800, Swim: 0, Other: 0 } }]);
-    expect(body.team).toEqual({ Ride: 3600, Run: 1800, Swim: 0, Other: 0 });
+    expect(body.athletes).toEqual([{ id: 'iB', name: 'Bérénice', count: { Ride: 1, Run: 1, Swim: 0, Other: 0 } }]);
+    expect(body.team).toEqual({ Ride: 1, Run: 1, Swim: 0, Other: 0 });
     expect(reads.every((r) => r.includes(':iB'))).toBe(true);
   });
 
@@ -120,7 +120,7 @@ describe('sports pratiqués', () => {
   });
 
   it("par athlète : lui-même ou son coach ; 404 sinon, 400 si l'id est invalide", async () => {
-    expect((await get('/api/athletes/iB/sports', auth('token-b'))).json().time).toEqual({ Ride: 3600, Run: 1800, Swim: 0, Other: 0 });
+    expect((await get('/api/athletes/iB/sports', auth('token-b'))).json().count).toEqual({ Ride: 1, Run: 1, Swim: 0, Other: 0 });
     expect((await get('/api/athletes/iB/sports', auth('token-a'))).statusCode).toBe(200);
     expect((await get('/api/athletes/iB/sports', { authorization: 'Bearer token-c' })).statusCode).toBe(404);
     expect((await get('/api/athletes/iD/sports', auth('token-b'))).statusCode).toBe(404);
