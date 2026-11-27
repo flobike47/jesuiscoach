@@ -165,3 +165,6 @@ vite.config.ts.timestamp-*
 
 # JetBrains (WebStorm / IntelliJ)
 .idea/
+
+# Copies de travail des agents Claude Code
+.claude/worktrees/
