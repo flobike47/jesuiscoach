@@ -5,7 +5,8 @@ import { Placeholder, SkeletonList } from '@/components/ios';
 import { MonthView } from '@/components/calendar/MonthView';
 import { WorkoutProfile } from '@/components/workout/StructureEditor';
 import { useCalendar } from '@/hooks/useCoach';
-import { useEventMutations } from '@/hooks/useCalendarData';
+import { useEventMutations, useGoals } from '@/hooks/useCalendarData';
+import { nextRace, raceSubtitle, raceWeekLabel } from '@/lib/raceWeeks';
 import { monthGrid } from '@/lib/calendar';
 import { formatDuration, formatLoad } from '@/lib/format';
 import { parseWorkout, workoutStats, type Sport } from '@/lib/workout';
@@ -32,6 +33,7 @@ export function MonthPanel({
   const [picking, setPicking] = useState<Picking>(null);
   const [message, setMessage] = useState<string | null>(null);
   const { create, update, remove } = useEventMutations();
+  const race = nextRace(useGoals(athleteId).data?.races, today);
 
   const grid = useMemo(() => monthGrid(month.format('YYYY-MM-DD')), [month]);
   const from = grid[0][0].date;
@@ -77,6 +79,8 @@ export function MonthPanel({
   return (
     <div style={{ marginTop: 12 }}>
       <MonthView
+        subtitle={race ? raceSubtitle(race, today) : null}
+        weekLabel={(monday) => (dayjs(monday).add(6, 'day').format('YYYY-MM-DD') >= today ? raceWeekLabel(monday, race) : null)}
         month={month.format('YYYY-MM-DD')}
         events={events}
         activities={activities}

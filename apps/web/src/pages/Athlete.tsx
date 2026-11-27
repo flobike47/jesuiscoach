@@ -13,6 +13,7 @@ import { PullIndicator } from '@/components/common/PullIndicator';
 import { formatDuration, formatKm, relativeDay, formatLoad } from '@/lib/format';
 import { METRIC_COLORS } from '@/theme';
 import { RaceBlockSheet } from '@/components/calendar/RaceBlockSheet';
+import { nextRace } from '@/lib/raceWeeks';
 import type { SeriesPoint } from '@/types';
 
 type Range = '30' | '90';
@@ -43,15 +44,7 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
     },
   });
 
-  // Trouver la prochaine course : priorité A, sinon la plus proche
-  const upcomingRace = (() => {
-    if (!goalsData?.races) return null;
-    const today = dayjs();
-    const future = goalsData.races.filter((r) => dayjs(r.date).isAfter(today));
-    if (future.length === 0) return null;
-    const priorityA = future.find((r) => r.racePriority === 'A');
-    return priorityA || future.sort((a, b) => dayjs(a.date).diff(dayjs(b.date)))[0] || null;
-  })();
+  const upcomingRace = nextRace(goalsData?.races, dayjs().format('YYYY-MM-DD'));
 
   return (
     <>

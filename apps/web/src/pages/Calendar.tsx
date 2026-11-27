@@ -10,7 +10,8 @@ import { TeamPlanning } from '@/components/calendar/TeamPlanning';
 import { TeamPlanningWide } from '@/components/calendar/TeamPlanningWide';
 import { useCalendar, useTeam } from '@/hooks/useCoach';
 import { useCare } from '@/hooks/useCare';
-import { useEventMutations } from '@/hooks/useCalendarData';
+import { useEventMutations, useGoals } from '@/hooks/useCalendarData';
+import { nextRace, raceWeekLabel } from '@/lib/raceWeeks';
 import { dayStatus, isDayOpen } from '@/lib/availability';
 import { formatRaceDistance, weekLoad, nextFreeDay, shiftWorkouts } from '@/lib/calendar';
 import { formatDuration, formatLoad, formatHours, dayShort } from '@/lib/format';
@@ -41,6 +42,7 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
   const cal = useCalendar(athleteId, from, to);
   // Jours de repos et exceptions de l'athlète : grisés, sans changer le calendrier.
   const care = useCare(athleteId);
+  const race = nextRace(useGoals(athleteId).data?.races, dayjs().format('YYYY-MM-DD'));
   const { create } = useEventMutations();
   const today = dayjs().format('YYYY-MM-DD');
   const [editing, setEditing] = useState<AppEvent | null>(null);
@@ -178,6 +180,7 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
               <div className="headline">
                 {weekStart.format('D MMM')} – {weekStart.add(6, 'day').format('D MMM')}
               </div>
+              {raceWeekLabel(from, race) && <div className="footnote secondary">{raceWeekLabel(from, race)}</div>}
               {weekStart.startOf('week').format('YYYY-MM-DD') !== startOfWeek(dayjs()).format('YYYY-MM-DD') && (
                 <button onClick={() => setWeekStart(startOfWeek(dayjs()))} style={{ color: 'var(--tint)', fontSize: 13, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}>
                   Cette semaine

@@ -40,6 +40,7 @@ vi.mock('@/hooks/useCare', () => ({
 }));
 
 vi.mock('@/hooks/useCalendarData', () => ({
+  useGoals: () => ({ data: { races: [], goals: [] } }),
   useEventMutations: () => ({
     create: { mutateAsync: vi.fn(), isPending: false },
     update: { mutateAsync: vi.fn(), isPending: false },

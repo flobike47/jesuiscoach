@@ -18,6 +18,10 @@ export interface MonthViewProps {
   onNextMonth: () => void;
   /** Mode déplacement/duplication en cours : la grille affiche le bandeau et le toucher choisit la date d'arrivée. */
   picking?: { label: string; onPick: (day: string) => void; onCancel: () => void } | null;
+  /** Sous le nom du mois : la prochaine course (« Grand Fond le 8 janvier · dans 6 semaines »). */
+  subtitle?: string | null;
+  /** Étiquette d'une semaine (lundi AAAA-MM-JJ) par rapport à la course. */
+  weekLabel?: (monday: string) => string | null;
 }
 
 /**
@@ -44,7 +48,10 @@ export function MonthView(props: MonthViewProps) {
     <div>
       {/* En-tête : mois + flèches */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <h2 style={{ margin: 0, fontSize: '28px', fontWeight: 700, letterSpacing: '-0.024em' }}>{monthUpper}</h2>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '28px', fontWeight: 700, letterSpacing: '-0.024em' }}>{monthUpper}</h2>
+          {props.subtitle && <div className="footnote secondary">{props.subtitle}</div>}
+        </div>
         <div style={{ display: 'flex', gap: 0 }}>
           <button
             type="button"
@@ -151,6 +158,11 @@ export function MonthView(props: MonthViewProps) {
 
           return (
             <div key={weekIdx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {props.weekLabel?.(week[0].date) && (
+                <div className="caption" style={{ fontWeight: 600, color: week[0].date <= today && today <= week[6].date ? 'var(--tint)' : 'var(--label-2)', padding: '6px 2px 0' }}>
+                  {props.weekLabel(week[0].date)}
+                </div>
+              )}
               <div
                 style={{
                   display: 'grid',
