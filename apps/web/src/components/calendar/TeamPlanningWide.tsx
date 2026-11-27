@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { Placeholder, SkeletonList } from '@/components/ios';
 import { WorkoutProfile } from '@/components/workout/StructureEditor';
 import { EditEventSheet } from '@/components/calendar/EventSheets';
+import { TeamLoadChart } from '@/components/calendar/TeamLoadChart';
 import { teamWorkoutAsEvent } from '@/lib/teamEvent';
 import { useSavedWorkouts, useTeam } from '@/hooks/useCoach';
 import { useEventMutations } from '@/hooks/useCalendarData';
@@ -358,6 +359,7 @@ export function TeamPlanningWide() {
         <p className="footnote secondary" style={{ marginTop: 12 }}>
           Les cases rayées viennent des disponibilités du profil.
         </p>
+        {cal.data && <TeamLoadChart athletes={athletes} from={from} to={to} today={today} />}
         {error && (
           <p role="alert" className="footnote" style={{ color: 'var(--red)' }}>
             {error}
