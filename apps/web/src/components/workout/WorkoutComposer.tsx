@@ -22,6 +22,10 @@ interface Draft {
   savedId?: string;
   /** Ouvrir sur la saisie en une ligne. */
   quick?: boolean;
+  /** Ouvrir directement l'étape « Attribuer ». */
+  assign?: boolean;
+  /** Athlètes cochés d'avance (ex. le groupe visé par une suggestion). */
+  athleteIds?: string[];
 }
 
 type Step = 'workout' | 'assign';
@@ -38,13 +42,13 @@ export function WorkoutComposer({ draft, onClose }: { draft: Draft; onClose: () 
   const remove = useDeleteSavedWorkout();
   const markUsed = useMarkUsed();
 
-  const [step, setStep] = useState<Step>('workout');
+  const [step, setStep] = useState<Step>(draft.assign ? 'assign' : 'workout');
   const [savedId, setSavedId] = useState(draft.savedId);
   const [name, setName] = useState(draft.name);
   const [sport, setSport] = useState<Sport>(draft.sport);
   const [description, setDescription] = useState(draft.description);
   const [date, setDate] = useState(dayjs().add(1, 'day').format('YYYY-MM-DD'));
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(draft.athleteIds));
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [forced, setForced] = useState<Set<string>>(new Set());

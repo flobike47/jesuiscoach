@@ -6,7 +6,15 @@ import { WorkoutComposer } from './WorkoutComposer';
 vi.mock('@/hooks/useCoach', () => {
   const mutation = { mutateAsync: vi.fn(), mutate: vi.fn(), isPending: false };
   return {
-    useTeam: () => ({ data: { athletes: [], errors: [] } }),
+    useTeam: () => ({
+      data: {
+        athletes: [
+          { id: 'a', name: 'Alex', ftp: 250 },
+          { id: 'b', name: 'Bea', ftp: 230 },
+        ],
+        errors: [],
+      },
+    }),
     useSaveWorkout: () => mutation,
     useDeleteSavedWorkout: () => mutation,
     useMarkUsed: () => mutation,
@@ -56,5 +64,16 @@ describe('WorkoutComposer', () => {
     expect(screen.getByLabelText('Date')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Séance/ }));
     expect(screen.getByLabelText('Décris-la en une ligne')).toBeInTheDocument();
+  });
+});
+
+describe('WorkoutComposer ouvert sur l’attribution', () => {
+  afterEach(cleanup);
+
+  it('coche d’avance les athlètes reçus (le groupe visé par une suggestion)', () => {
+    render(<WorkoutComposer draft={{ key: 's', name: 'Seuil 3×10', description: '- 10m 97%', sport: 'Ride', assign: true, athleteIds: ['b'] }} onClose={() => {}} />);
+    fireEvent.pointerDown(screen.getByRole('tab', { name: 'Même jour pour tous' }));
+    expect(screen.getByRole('checkbox', { name: 'Bea' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('checkbox', { name: 'Alex' })).toHaveAttribute('aria-checked', 'false');
   });
 });

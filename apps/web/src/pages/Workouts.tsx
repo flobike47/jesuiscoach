@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Bike, CalendarRange, Footprints, Search, Star, Type, BarChart3, Waves } from 'lucide-react';
+import dayjs from 'dayjs';
+import { Activity, Bike, CalendarRange, Footprints, Search, Sparkles, Star, Type, BarChart3, Waves } from 'lucide-react';
+import { SwipeRow } from '@/components/common/SwipeRow';
+import { FromActivitySheet } from '@/components/workout/FromActivitySheet';
+import { useGroups, useTeamCalendar } from '@/hooks/useTeamPlanning';
+import { suggestForWeek } from '@/lib/suggestWeek';
 import { Cell, Page, Section } from '@/components/ios';
 import { PlanSheet } from '@/components/workout/PlanSheet';
 import { WorkoutComposer } from '@/components/workout/WorkoutComposer';
@@ -20,6 +25,10 @@ interface Draft {
   savedId?: string;
   /** Ouvrir la feuille sur la saisie en une ligne. */
   quick?: boolean;
+  /** Ouvrir directement sur l'attribution. */
+  assign?: boolean;
+  /** Athlètes cochés d'avance. */
+  athleteIds?: string[];
 }
 
 /** Une ligne de la bibliothèque : séance enregistrée, séance type ou séance Intervals.icu. */
@@ -55,6 +64,14 @@ export default function Workouts() {
   const plans = usePlans();
   const saved = useSavedWorkouts();
   const toggleFav = useToggleFavorite();
+  const [fromActivity, setFromActivity] = useState(false);
+  // « Suggéré cette semaine » : 2 semaines passées + la semaine à venir (requête dédiée, distincte de celle du planning d'équipe).
+  const today = dayjs().format('YYYY-MM-DD');
+  const teamCal = useTeamCalendar(dayjs().subtract(13, 'day').format('YYYY-MM-DD'), dayjs().add(6, 'day').format('YYYY-MM-DD'));
+  const groups = useGroups();
+  const suggestion = teamCal.data ? suggestForWeek(teamCal.data.athletes, groups.data?.groups ?? [], today) : null;
+  const suggestedTemplate = suggestion ? TEMPLATES.find((t) => t.name === suggestion.template && t.sport === sport) : undefined;
+  const suggested: Entry | null = suggestedTemplate ? { key: `suggest-${suggestedTemplate.name}`, ...suggestedTemplate } : null;
 
   const entries = useMemo<Entry[]>(() => {
     const mine = (saved.data?.workouts ?? []).map((w) => ({ key: `saved-${w.id}`, name: w.name, description: w.description, sport: w.sport, saved: w }));
@@ -70,7 +87,8 @@ export default function Workouts() {
   const favorites = visible.filter((e) => e.saved?.favorite);
   const kinds = KINDS.filter((k) => entries.some((e) => workoutKind(e.description) === k));
 
-  const open = (e: Entry) => setEditing({ key: e.key, name: e.name, description: e.description, sport: e.sport, savedId: e.saved?.id });
+  const open = (e: Entry, assign = false, athleteIds?: string[]) =>
+    setEditing({ key: `${e.key}-${assign}`, name: e.name, description: e.description, sport: e.sport, savedId: e.saved?.id, assign, athleteIds });
   const create = (quick: boolean) =>
     setEditing({ key: `new-${Date.now()}`, name: 'Nouvelle séance', description: quick ? '' : STARTERS[sport], sport, quick });
 
@@ -106,7 +124,7 @@ export default function Workouts() {
       )}
 
       <h2 className="section-header">Créer</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
         <button type="button" className="card pressable create-card" onClick={() => create(true)}>
           <Type size={22} color="var(--blue)" aria-hidden />
           <b>En une ligne</b>
@@ -117,7 +135,36 @@ export default function Workouts() {
           <b>En blocs</b>
           <span className="footnote secondary">palier par palier</span>
         </button>
+        <button type="button" className="card pressable create-card" onClick={() => setFromActivity(true)}>
+          <Activity size={22} color="var(--green)" aria-hidden />
+          <b>D’une sortie</b>
+          <span className="footnote secondary">ses intervalles</span>
+        </button>
       </div>
+
+      {suggestion && suggested && (
+        <>
+          <h2 className="section-header">Suggéré cette semaine</h2>
+          <div className="card" style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <Sparkles size={20} color="var(--purple)" aria-hidden style={{ flex: 'none', marginTop: 2 }} />
+              <p style={{ margin: 0, fontSize: 15, lineHeight: 1.4 }}>{suggestion.message}</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--fill)', borderRadius: 12, padding: '10px 12px' }}>
+              <span style={{ width: 90, flex: 'none' }}>
+                <WorkoutProfile steps={parseWorkout(suggested.description)} sport={suggested.sport} height={26} />
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <b style={{ display: 'block', fontSize: 15 }}>{suggested.name}</b>
+                <span className="footnote secondary tabular-nums">{statsLine(suggested.description)}</span>
+              </span>
+              <button type="button" onClick={() => open(suggested, true, suggestion.athleteIds)} style={{ color: 'var(--tint)', fontWeight: 600, minHeight: 44 }}>
+                Planifier
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {favorites.length > 0 && (
         <>
@@ -138,8 +185,9 @@ export default function Workouts() {
       )}
 
       <Section header={kind ? kindLabel(kind) : 'Toutes'} footer={visible.length === 0 ? 'Aucune séance pour ce filtre.' : 'Les % sont relatifs à la FTP, à la FC seuil ou à l’allure seuil de chaque athlète.'}>
-        {visible.map((e) => (
-          <div key={e.key} className="cell" style={{ ['--separator-inset' as string]: '84px', padding: 0 }}>
+        {visible.map((e, i) => (
+          <SwipeRow key={e.key} actionLabel="Planifier" onAction={() => open(e, true)}>
+          <div className="cell" style={{ padding: 0, borderTop: i ? '0.5px solid var(--separator)' : undefined }}>
             <button type="button" onClick={() => open(e)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0 10px 16px', textAlign: 'left' }}>
               <span style={{ width: 56, flex: 'none' }}>
                 <WorkoutProfile steps={parseWorkout(e.description)} sport={e.sport} height={22} />
@@ -166,6 +214,7 @@ export default function Workouts() {
               <span style={{ width: 16 }} />
             )}
           </div>
+          </SwipeRow>
         ))}
       </Section>
       {library.isError && <p className="section-footer">Bibliothèque Intervals.icu indisponible pour le moment.</p>}
@@ -189,6 +238,15 @@ export default function Workouts() {
       </Section>
 
       {editing && <WorkoutComposer key={editing.key} draft={editing} onClose={() => setEditing(null)} />}
+      {fromActivity && (
+        <FromActivitySheet
+          onClose={() => setFromActivity(false)}
+          onPick={(d) => {
+            setFromActivity(false);
+            setEditing({ key: `activity-${Date.now()}`, name: d.name, description: d.description, sport: 'Ride' });
+          }}
+        />
+      )}
       {planOpen && <PlanSheet key={planOpen.plan?.id ?? 'new'} plan={planOpen.plan} onClose={() => setPlanOpen(null)} />}
     </Page>
   );
