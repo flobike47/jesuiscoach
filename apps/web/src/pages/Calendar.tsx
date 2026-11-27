@@ -6,6 +6,7 @@ import { Page, Placeholder, Segmented, Sheet, SkeletonList } from '@/components/
 import { AthletePicker } from '@/components/calendar/AthletePicker';
 import { EditEventSheet, NewEventSheet } from '@/components/calendar/EventSheets';
 import { MonthPanel } from '@/components/calendar/MonthPanel';
+import { BlockCopySheet } from '@/components/calendar/BlockCopySheet';
 import { TeamPlanning } from '@/components/calendar/TeamPlanning';
 import { TeamPlanningWide } from '@/components/calendar/TeamPlanningWide';
 import { useCalendar, useTeam } from '@/hooks/useCoach';
@@ -51,6 +52,7 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
   const [addingDay, setAddingDay] = useState<dayjs.Dayjs | null>(null);
   const [showCopyWeek, setShowCopyWeek] = useState(false);
   const [copyingWeek, setCopyingWeek] = useState(false);
+  const [copyingBlock, setCopyingBlock] = useState(false);
   const [resyncError, setResyncError] = useState<string | null>(null);
   const [view, setView] = useState<'semaine' | 'mois' | 'equipe'>(() => {
     const v = searchParams.get('vue');
@@ -434,6 +436,15 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
             </button>
             <button
               type="button"
+              className="button tinted block pressable"
+              style={{ marginTop: 8, minHeight: 44 }}
+              disabled={copyingWeek}
+              onClick={() => (setShowCopyWeek(false), setCopyingBlock(true))}
+            >
+              Dupliquer un bloc de semaines…
+            </button>
+            <button
+              type="button"
               onClick={() => setShowCopyWeek(false)}
               disabled={copyingWeek}
               style={{
@@ -453,6 +464,7 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
           </div>
         </Sheet>
       )}
+      {copyingBlock && athleteId && <BlockCopySheet athleteId={athleteId} monday={from} athletes={athletes} onClose={() => setCopyingBlock(false)} />}
     </Page>
   );
 }
