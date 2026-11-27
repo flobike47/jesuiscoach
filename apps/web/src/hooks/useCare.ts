@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { careApi, type CareDay, type CareEquipment, type CareException, type CareInjuryInput, type WorkoutCheckInput, type WorkoutSendInput } from '@/services/careApi';
+import { careApi, type AssignSuggestInput, type CareDay, type CareEquipment, type CareException, type CareInjuryInput, type WorkoutCheckInput, type WorkoutSendInput } from '@/services/careApi';
 
 /** Fiche « soin » d'un athlète (disponibilités, matériel, exceptions, blessures). */
 export function useCare(athleteId: string | undefined) {
@@ -72,6 +72,16 @@ export function useSendWorkout() {
       qc.invalidateQueries({ queryKey: ['calendar'] });
       qc.invalidateQueries({ queryKey: ['team'] });
     },
+  });
+}
+
+/** Suggestions de placement intelligent pour une séance selon les disponibilités et la forme de chaque athlète. */
+export function useAssignSuggest(input: AssignSuggestInput | null) {
+  return useQuery({
+    queryKey: ['assign-suggest', input],
+    queryFn: () => careApi.assignSuggest(input!),
+    enabled: Boolean(input && input.athleteIds.length > 0),
+    placeholderData: (previous) => previous,
   });
 }
 

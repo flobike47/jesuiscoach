@@ -16,7 +16,9 @@ vi.mock('@/hooks/useCare', () => ({
   useSendWorkout: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useWorkoutCheck: () => ({ data: undefined }),
   useDebounced: <T,>(v: T) => v,
+  useAssignSuggest: () => ({ data: { suggestions: [] }, isLoading: false }),
 }));
+vi.mock('@/hooks/useTeamPlanning', () => ({ useGroups: () => ({ data: { groups: [] } }) }));
 
 const draft = { key: 'k', name: 'Nouvelle séance', description: '', sport: 'Ride' as const, quick: true };
 
@@ -48,6 +50,9 @@ describe('WorkoutComposer', () => {
   it("passe à l'étape d'attribution puis revient", () => {
     fireEvent.change(screen.getByLabelText('Décris-la en une ligne'), { target: { value: '3x12 SS r4' } });
     fireEvent.click(screen.getByRole('button', { name: /Attribuer/ }));
+    // Par défaut : le meilleur jour pour chacun ; « Même jour pour tous » rend le choix de date.
+    expect(screen.getByRole('tab', { name: 'Meilleur jour pour chacun' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.pointerDown(screen.getByRole('tab', { name: 'Même jour pour tous' }));
     expect(screen.getByLabelText('Date')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Séance/ }));
     expect(screen.getByLabelText('Décris-la en une ligne')).toBeInTheDocument();

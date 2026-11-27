@@ -86,6 +86,30 @@ export interface WorkoutSendResult {
   results: Array<{ id: string; ok: boolean; blocked?: boolean; error?: string }>;
 }
 
+export interface AssignSuggestInput {
+  description: string;
+  sport: Sport;
+  athleteIds: string[];
+  from: string;
+  to: string;
+}
+
+export interface AssignSuggestion {
+  athleteId: string;
+  name: string;
+  date: string | null;
+  variant: 'courte' | 'standard' | 'longue';
+  intensityScale: number;
+  reasons: string[];
+  alternatives: string[];
+  replaces: { eventId: string; name: string } | null;
+  blocked: string | null;
+}
+
+export interface AssignSuggestResult {
+  suggestions: AssignSuggestion[];
+}
+
 const enc = encodeURIComponent;
 
 export const careApi = {
@@ -99,5 +123,6 @@ export const careApi = {
   updateInjury: (athleteId: string, id: string, body: CareInjuryInput) => put<CareInjury>(`/athletes/${enc(athleteId)}/care/injuries/${enc(id)}`, body),
   deleteInjury: (athleteId: string, id: string) => del<{ ok: true }>(`/athletes/${enc(athleteId)}/care/injuries/${enc(id)}`),
   checkWorkout: (body: WorkoutCheckInput) => post<{ results: Array<{ id: string; warnings: CareWarning[] }> }>('/workouts/check', body),
+  assignSuggest: (body: AssignSuggestInput) => post<AssignSuggestResult>('/assign/suggest', body),
   sendWorkout: (body: WorkoutSendInput) => post<WorkoutSendResult>('/workouts', body),
 };

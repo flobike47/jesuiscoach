@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { ChevronLeft, Trash2 } from 'lucide-react';
 import { Segmented, Sheet } from '@/components/ios';
 import { AthletePicker } from '@/components/workout/AthletePicker';
+import { SmartAssign } from '@/components/workout/SmartAssign';
 import { StructureEditor, WorkoutSummary } from '@/components/workout/StructureEditor';
 import { useDeleteSavedWorkout, useMarkUsed, useSaveWorkout, useTeam } from '@/hooks/useCoach';
 import { useDebounced, useSendWorkout, useWorkoutCheck } from '@/hooks/useCare';
@@ -162,6 +163,44 @@ export function WorkoutComposer({ draft, onClose }: { draft: Draft; onClose: () 
     }
   };
 
+  const [placement, setPlacement] = useState<'smart' | 'same'>('smart');
+  const [progress, setProgress] = useState<string | null>(null);
+
+  /** Envoi par lots (un jour et une variante par lot), avec les vérifications serveur habituelles. */
+  const sendSmart = async (groups: Array<{ date: string; description: string; athleteIds: string[] }>) => {
+    setMessage(null);
+    const invalid = check();
+    if (invalid) return setMessage({ ok: false, text: invalid });
+    const errors: string[] = [];
+    let done = 0;
+    for (const [i, g] of groups.entries()) {
+      setProgress(`Envoi ${i + 1} / ${groups.length}…`);
+      const steps = parseWorkout(g.description);
+      const stats = workoutStats(steps);
+      try {
+        const { results: sent } = await assign.mutateAsync({
+          athleteIds: g.athleteIds,
+          date: g.date,
+          sport,
+          durationSec: stats.complete ? stats.seconds : null,
+          usesPower: steps.some((st) => st.target === 'power'),
+          highIntensity: steps.some((st) => Math.max(st.from, st.to) >= 100),
+          name: name.trim(),
+          description: g.description,
+          force: [],
+        });
+        done += sent.filter((r) => r.ok).length;
+        for (const r of sent.filter((x) => !x.ok)) errors.push(`${nameOf(r.id)} : ${r.blocked ? 'blessure en cours' : (r.error ?? 'échec')}`);
+      } catch (e) {
+        errors.push((e as Error).message);
+      }
+    }
+    setProgress(null);
+    if (savedId && done > 0) await markUsed.mutateAsync({ id: savedId, count: done }).catch(() => undefined);
+    if (errors.length) setMessage({ ok: false, text: `${done} séance(s) planifiée(s). ${errors.join(' · ')}` });
+    else onClose();
+  };
+
   const onDelete = async () => {
     if (!savedId) return;
     if (!confirmDelete) return setConfirmDelete(true);
@@ -192,49 +231,59 @@ export function WorkoutComposer({ draft, onClose }: { draft: Draft; onClose: () 
         }
       >
         <div style={{ marginBottom: 12 }}>
-          <Segmented<Sport>
-            label="Sport"
-            value={sport}
-            onChange={changeSport}
-            options={(['Ride', 'Run', 'Swim'] as const).map((s) => ({ value: s, label: SPORT_LABELS[s] }))}
+          <Segmented<'smart' | 'same'>
+            label="Placement"
+            value={placement}
+            onChange={setPlacement}
+            options={[
+              { value: 'smart', label: 'Meilleur jour pour chacun' },
+              { value: 'same', label: 'Même jour pour tous' },
+            ]}
           />
         </div>
 
-        <h3 className="section-header">Envoyer</h3>
-        <div className="group">
-          <input type="date" className="field" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
-        </div>
-        <AthletePicker athletes={athletes} selected={selected} onChange={setSelected} />
-        {results.some((r) => r.warnings.length) && (
-          <div className="group" style={{ marginTop: 12, padding: 12, display: 'grid', gap: 12 }}>
-            {results
-              .filter((r) => r.warnings.length)
-              .map((r) => (
-                <AthleteWarnings
-                  key={r.id}
-                  name={nameOf(r.id)}
-                  warnings={r.warnings}
-                  confirmed={forced.has(r.id)}
-                  onConfirm={() => setForced((all) => toggle(all, r.id))}
-                />
-              ))}
+        {placement === 'smart' ? (
+          <SmartAssign baseDescription={description} sport={sport} athletes={athletes} selected={selected} onSelected={setSelected} onSend={sendSmart} isPending={assign.isPending} />
+        ) : (
+          <>
+          <h3 className="section-header">Envoyer</h3>
+          <div className="group">
+            <input type="date" className="field" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
+          <AthletePicker athletes={athletes} selected={selected} onChange={setSelected} />
+          {results.some((r) => r.warnings.length) && (
+            <div className="group" style={{ marginTop: 12, padding: 12, display: 'grid', gap: 12 }}>
+              {results
+                .filter((r) => r.warnings.length)
+                .map((r) => (
+                  <AthleteWarnings
+                    key={r.id}
+                    name={nameOf(r.id)}
+                    warnings={r.warnings}
+                    confirmed={forced.has(r.id)}
+                    onConfirm={() => setForced((all) => toggle(all, r.id))}
+                  />
+                ))}
+            </div>
+          )}
+          <button
+            type="button"
+            className="button filled block pressable"
+            style={{ marginTop: 14 }}
+            disabled={assign.isPending || (selected.size > 0 && sendable.length === 0)}
+            onClick={send}
+          >
+            {assign.isPending
+              ? 'Envoi…'
+              : selected.size === 0
+                ? 'Envoyer'
+                : sendable.length === 0
+                  ? 'Aucun envoi possible'
+                  : `Envoyer à ${sendable.length} athlète${sendable.length > 1 ? 's' : ''}`}
+          </button>
+          </>
         )}
-        <button
-          type="button"
-          className="button filled block pressable"
-          style={{ marginTop: 14 }}
-          disabled={assign.isPending || (selected.size > 0 && sendable.length === 0)}
-          onClick={send}
-        >
-          {assign.isPending
-            ? 'Envoi…'
-            : selected.size === 0
-              ? 'Envoyer'
-              : sendable.length === 0
-                ? 'Aucun envoi possible'
-                : `Envoyer à ${sendable.length} athlète${sendable.length > 1 ? 's' : ''}`}
-        </button>
+        {progress && <p role="status" className="footnote secondary" style={{ margin: '12px 4px 0' }}>{progress}</p>}
         <p className="section-footer">« Enregistrer » garde la séance dans « Mes séances » sans l'envoyer.</p>
 
         {message && (
