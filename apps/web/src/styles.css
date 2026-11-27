@@ -682,16 +682,22 @@ textarea.field {
 
 /* ---------- Planning d'équipe, grand écran ---------- */
 
-/* Sort de la colonne de 720 px de .page : jusqu'à 1440 px, marges de 24 px. */
+/*
+ * Sort de la colonne de 720 px de .page : jusqu'à 1440 px, marges de 24 px.
+ * Centré par une marge négative, surtout pas par un transform : un transform
+ * fait du planning le repère de ses enfants en position: fixed (étiquette qui
+ * suit la souris, aperçu de charge, bandeau « Annuler »), qui se retrouvaient
+ * décalés par rapport au pointeur.
+ */
 .wide-planner {
+  --wide-planner-width: min(1440px, calc(100vw - 48px));
   position: relative;
-  left: 50%;
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   gap: 20px;
-  width: min(1440px, calc(100vw - 48px));
+  width: var(--wide-planner-width);
   margin-top: 16px;
-  transform: translateX(-50%);
+  margin-left: calc((100% - var(--wide-planner-width)) / 2);
   user-select: none;
   -webkit-user-select: none;
 }
