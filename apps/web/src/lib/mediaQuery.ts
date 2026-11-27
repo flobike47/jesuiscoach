@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+
 /**
  * Source externe compatible `useSyncExternalStore` pour une media query :
  * la valeur suit les changements en direct (réglage d'accessibilité modifié
@@ -29,3 +31,12 @@ export function createMediaQueryStore(query: string): MediaQueryStore {
 }
 
 export const reducedMotionQuery = createMediaQueryStore('(prefers-reduced-motion: reduce)');
+
+const stores = new Map<string, MediaQueryStore>();
+
+/** Media query suivie en direct (redimensionnement, rotation de l'iPad). */
+export function useMediaQuery(query: string): boolean {
+  let store = stores.get(query);
+  if (!store) stores.set(query, (store = createMediaQueryStore(query)));
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, () => false);
+}

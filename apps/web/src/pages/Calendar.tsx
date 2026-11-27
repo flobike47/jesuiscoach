@@ -7,6 +7,7 @@ import { AthletePicker } from '@/components/calendar/AthletePicker';
 import { EditEventSheet, NewEventSheet } from '@/components/calendar/EventSheets';
 import { MonthPanel } from '@/components/calendar/MonthPanel';
 import { TeamPlanning } from '@/components/calendar/TeamPlanning';
+import { TeamPlanningWide } from '@/components/calendar/TeamPlanningWide';
 import { useCalendar, useTeam } from '@/hooks/useCoach';
 import { useCare } from '@/hooks/useCare';
 import { useEventMutations } from '@/hooks/useCalendarData';
@@ -15,6 +16,7 @@ import { formatRaceDistance, weekLoad, nextFreeDay, shiftWorkouts } from '@/lib/
 import { formatDuration, formatLoad, formatHours, dayShort } from '@/lib/format';
 import { parseWorkout, workoutStats, type Sport } from '@/lib/workout';
 import { WorkoutProfile } from '@/components/workout/StructureEditor';
+import { useMediaQuery } from '@/lib/mediaQuery';
 import type { AppEvent } from '@/services/calendarApi';
 
 /** Écran 6 (coach) : semaine d'un athlète de l'équipe, au choix. */
@@ -28,6 +30,7 @@ export default function Calendar() {
  */
 export function CalendarView({ fixed, account }: { fixed?: { id: string; title: string }; account?: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const isWideScreen = useMediaQuery('(min-width: 1024px)');
   const team = useTeam(!fixed);
   const athletes = useMemo(() => [...(team.data?.athletes ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'fr')), [team.data]);
   const [picked, setPicked] = useState<string | null>(() => searchParams.get('athlete'));
@@ -395,7 +398,7 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
         ) : null
       )}
 
-      {view === 'equipe' && <TeamPlanning />}
+      {view === 'equipe' && (isWideScreen ? <TeamPlanningWide /> : <TeamPlanning />)}
 
       {editing && athleteId && (
         <EditEventSheet key={String(editing.id)} athleteId={athleteId} event={editing} weekStart={weekStart} initialDate={editingInitialDate ?? undefined} onClose={() => { setEditing(null); setEditingInitialDate(null); }} />

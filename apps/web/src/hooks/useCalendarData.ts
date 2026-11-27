@@ -8,13 +8,14 @@ export const useTeamToday = (date: string) => useQuery({ queryKey: ['team-today'
 export const useGoals = (athleteId: string | undefined) =>
   useQuery({ queryKey: ['goals', athleteId], queryFn: () => calendarApi.goals(athleteId!), enabled: Boolean(athleteId) });
 
-/** Toute écriture du calendrier rafraîchit la semaine, l'équipe et la vue du jour. */
+/** Toute écriture du calendrier rafraîchit la semaine, l'équipe, le planning d'équipe et la vue du jour. */
 export function useEventMutations() {
   const qc = useQueryClient();
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['calendar'] });
     qc.invalidateQueries({ queryKey: ['team'] });
     qc.invalidateQueries({ queryKey: ['team-today'] });
+    qc.invalidateQueries({ queryKey: ['team-calendar'] });
     qc.invalidateQueries({ queryKey: ['goals'] });
   };
   const create = useMutation({ mutationFn: (v: { athleteId: string; body: EventInput }) => calendarApi.createEvent(v.athleteId, v.body), onSuccess: refresh });
