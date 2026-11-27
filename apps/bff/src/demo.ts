@@ -66,6 +66,8 @@ function rng(seed: number) {
 interface DemoAthlete {
   info: IntervalsAthlete;
   wellness: IntervalsWellness[];
+  /** Pesées antérieures à la fenêtre simulée (courbe du poids sur un an). */
+  olderWeighIns: IntervalsWellness[];
   activities: IntervalsActivity[];
   events: IntervalsEvent[];
 }
@@ -162,9 +164,60 @@ function simulate(k: number, now: Date): DemoAthlete {
       ],
     },
     wellness,
-    activities,
+    olderWeighIns: addDemoWeighIns(k, now, wellness, 62 + k * 2),
+    activities: retagDemoSports(k, activities),
     events,
   };
+}
+
+/**
+ * Quelques sorties de semaine deviennent course, natation ou renforcement,
+ * pour que la répartition des sports ait du relief (deux triathlètes, les
+ * autres courent un peu). Tirage séparé : le nombre, les dates et les durées
+ * des sorties ne changent pas.
+ */
+function retagDemoSports(k: number, activities: IntervalsActivity[]): IntervalsActivity[] {
+  const r = rng(seedOf(`sports-${k}`));
+  const triathlete = k % 5 === 3;
+  for (const a of activities) {
+    const weekday = new Date(`${a.start_date_local.slice(0, 10)}T12:00:00Z`).getUTCDay();
+    if (weekday === 0 || weekday === 6) continue;
+    const x = r();
+    const hours = (a.moving_time ?? 3600) / 3600;
+    if (x < (triathlete ? 0.25 : 0.1)) {
+      Object.assign(a, { type: 'Run', name: 'Footing', distance: Math.round(hours * 10_500) });
+    } else if (triathlete && x < 0.4) {
+      Object.assign(a, { type: 'Swim', name: 'Natation', distance: Math.round(hours * 2_600) });
+    } else if (x > 0.97) {
+      Object.assign(a, { type: 'WeightTraining', name: 'Renforcement', distance: 0 });
+    }
+  }
+  return activities;
+}
+
+/**
+ * Pesées démo sur un an (environ deux par semaine), qui finissent près du
+ * poids du profil : certains perdent, d'autres restent stables ou prennent un
+ * peu. Tirage séparé du reste de la simulation (sorties et forme inchangées).
+ * Ajoute le poids aux jours de `wellness` et renvoie les pesées plus anciennes.
+ */
+function addDemoWeighIns(k: number, now: Date, wellness: IntervalsWellness[], finalKg: number): IntervalsWellness[] {
+  const r = rng(seedOf(`poids-${k}`));
+  const drift = [-3.5, 0, 1.5, -2, 0.5][k % 5];
+  const byDay = new Map(wellness.map((w) => [w.id, w]));
+  const older: IntervalsWellness[] = [];
+  for (let d = 365; d >= 0; d--) {
+    if (d > 0 && r() > 0.3) continue;
+    const date = isoDay(new Date(now.getTime() - d * DAY));
+    // `drift` = évolution sur l'année : on part de finalKg − drift il y a un an.
+    const seasonal = 0.5 * Math.sin((d / 365) * 2 * Math.PI);
+    const noise = d === 0 ? 0 : (r() - 0.5) * 0.8;
+    const kg = Math.round((finalKg - drift * (d / 365) + seasonal + noise) * 10) / 10;
+    const w = byDay.get(date);
+    if (w) w.weight = kg;
+    else older.push({ id: date, weight: kg });
+  }
+  return older;
 }
 
 const between = <T,>(xs: T[], key: (x: T) => string, oldest: string, newest: string) =>
@@ -226,6 +279,10 @@ export class DemoSource {
   }
   async wellness(id: string, oldest: string, newest: string) {
     return between(this.get(id).wellness, (w) => w.id, oldest, newest);
+  }
+  async wellnessHistory(id: string, oldest: string, newest: string) {
+    const a = this.get(id);
+    return between([...a.olderWeighIns, ...a.wellness], (w) => w.id, oldest, newest);
   }
   async activities(id: string, oldest: string, newest: string) {
     return between(this.get(id).activities, (a) => a.start_date_local, oldest, newest).reverse();

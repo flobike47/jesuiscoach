@@ -19,6 +19,7 @@ export const TTL = {
   // on lit donc en priorité la copie locale et on ne rafraîchit qu'à ce rythme.
   athlete: 6 * 60 * 60,            // 6 h — profil, FTP, zones
   wellness: 30 * 60,               // 30 min — fitness / fatigue / forme
+  wellnessHistory: 6 * 60 * 60,    // 6 h — historique d'un an (courbe du poids), vidé à chaque pesée
   activities: 10 * 60,             // 10 min — complété par les webhooks
   events: 10 * 60,                 // 10 min — calendrier
   activity: 6 * 60 * 60,           // 6 h — détail d'une sortie (peut être réanalysée juste après l'import)

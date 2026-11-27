@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { randomToken } from '../lib/crypto.js';
 import { insertInvitation } from '../db/repo.js';
 import { appFitness, storeOf, withAppLoad } from '../activityStore.js';
+import { fitnessPoints } from '../lib/fitness.js';
 import { matchPlan } from '../lib/plan.js';
 import { isoDay, summarize } from '../lib/summary.js';
 import { assertCanView, listCheckins, sourceFor, teamOf } from '../sources.js';
@@ -12,7 +13,6 @@ import { ATHLETE_ID_RE, BadRequest, Forbidden, HttpError } from '../validation.j
 
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (now: Date, n: number) => isoDay(new Date(now.getTime() - n * DAY));
-const round1 = (n: number) => Math.round(n * 10) / 10;
 
 
 export async function registerTeamRoutes(app: FastifyInstance) {
@@ -79,11 +79,7 @@ export async function registerTeamRoutes(app: FastifyInstance) {
     // Fitness, fatigue et forme calculées par l'app quand ses sorties sont en base ; sinon Intervals.icu.
     const store = await storeOf(id, src, now);
     const app = store ? await appFitness(store, daysAgo(now, 90), isoDay(now), wellness) : null;
-    const series = app
-      ? app.days.map((d) => ({ date: d.date, fitness: round1(d.fitness), fatigue: round1(d.fatigue), form: round1(d.form) }))
-      : wellness
-          .filter((w) => w.ctl != null)
-          .map((w) => ({ date: w.id, fitness: w.ctl ?? 0, fatigue: w.atl ?? 0, form: Math.round(((w.ctl ?? 0) - (w.atl ?? 0)) * 10) / 10 }));
+    const series = fitnessPoints(app?.days ?? null, wellness);
     const shown = await withAppLoad(store, activities, daysAgo(now, 30), isoDay(now));
     const summary = summarize(info, (app?.wellness ?? wellness).slice(-14), shown, events, now);
     return { summary, series, activities: shown, checkins, source: app ? 'app' : 'intervals' };

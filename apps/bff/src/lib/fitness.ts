@@ -58,3 +58,28 @@ export function fitnessSeries(loads: ReadonlyMap<string, number>, from: string, 
   }
   return out;
 }
+
+/** Point de la courbe affichée (arrondi au dixième). */
+export interface FitnessPoint {
+  date: string;
+  fitness: number;
+  fatigue: number;
+  form: number;
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Courbe d'un athlète : calculée par l'app quand ses sorties sont en base
+ * (`appDays`), sinon celle d'Intervals.icu (`wellness`). Partagée par la fiche
+ * athlète et la vue d'équipe : mêmes chiffres sur les deux écrans.
+ */
+export function fitnessPoints(
+  appDays: FitnessDay[] | null,
+  wellness: Array<{ id: string; ctl?: number | null; atl?: number | null }>,
+): FitnessPoint[] {
+  if (appDays) return appDays.map((d) => ({ date: d.date, fitness: round1(d.fitness), fatigue: round1(d.fatigue), form: round1(d.form) }));
+  return wellness
+    .filter((w) => w.ctl != null)
+    .map((w) => ({ date: w.id, fitness: w.ctl ?? 0, fatigue: w.atl ?? 0, form: round1((w.ctl ?? 0) - (w.atl ?? 0)) }));
+}
