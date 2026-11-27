@@ -36,6 +36,12 @@ const PENALTY = {
 } as const;
 /** En surcharge : bonus par jour de plus, pour laisser 48 h faciles avant. */
 const LATER_BONUS = 6;
+/**
+ * Étalement de l'équipe : pénalité par athlète déjà placé le même jour.
+ * Faible (inférieure aux vraies contraintes) : elle départage les jours
+ * équivalents pour ne pas mettre toute l'équipe le lundi.
+ */
+const CROWD = 4;
 
 const VARIANT_SCALE = { courte: 0.75, standard: 1, longue: 4 / 3 } as const;
 export type Variant = keyof typeof VARIANT_SCALE;
@@ -125,10 +131,21 @@ interface Candidate {
 
 /** Une suggestion par athlète. */
 export function suggest(workout: AssignWorkout, athletes: AssignAthlete[]): Suggestion[] {
-  return athletes.map((a) => suggestFor(workout, a));
+  // Les plus contraints d'abord (moins de jours possibles), puis étalement des autres.
+  const crowd = new Map<string, number>();
+  const order = [...athletes].sort((x, y) => openDays(x) - openDays(y));
+  const byId = new Map<string, Suggestion>();
+  for (const a of order) {
+    const s = suggestFor(workout, a, crowd);
+    if (s.date) crowd.set(s.date, (crowd.get(s.date) ?? 0) + 1);
+    byId.set(a.id, s);
+  }
+  return athletes.map((a) => byId.get(a.id)!);
 }
 
-export function suggestFor(workout: AssignWorkout, a: AssignAthlete): Suggestion {
+const openDays = (a: AssignAthlete) => a.days.filter((d) => d.inWindow && !d.availability && !d.blocked).length;
+
+export function suggestFor(workout: AssignWorkout, a: AssignAthlete, crowd: ReadonlyMap<string, number> = new Map()): Suggestion {
   const base: Suggestion = { athleteId: a.id, name: a.name, date: null, variant: 'standard', intensityScale: 1, reasons: [], alternatives: [], replaces: null, blocked: null };
   const window = a.days.filter((d) => d.inWindow);
   const intense = workout.intensity >= INTENSE;
@@ -191,6 +208,7 @@ export function suggestFor(workout: AssignWorkout, a: AssignAthlete): Suggestion
     }
 
     if (overloaded) score += i * LATER_BONUS;
+    score -= CROWD * (crowd.get(day.date) ?? 0);
     candidates.push({ day, score, reasons, replaces, variant });
   });
 

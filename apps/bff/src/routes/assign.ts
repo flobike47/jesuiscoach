@@ -112,8 +112,11 @@ export async function registerAssignRoutes(app: FastifyInstance) {
     const workout = { seconds, load: estimatedLoad(blocks), intensity };
 
     const settled = await Promise.allSettled(ids.map((id) => athleteInput(id, input.from, input.to, input.sport, intensity >= 1, seconds)));
+    // Un seul appel au moteur pour toute l'équipe : il étale les athlètes sur la semaine.
+    const ok = settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+    const placed = new Map(suggest(workout, ok).map((sg) => [sg.athleteId, sg]));
     const suggestions: Suggestion[] = settled.map((r, i) => {
-      if (r.status === 'fulfilled') return suggest(workout, [r.value])[0];
+      if (r.status === 'fulfilled') return placed.get(r.value.id)!;
       req.log.warn({ err: r.reason, athleteId: ids[i] }, 'assign: athlète en erreur');
       return { athleteId: ids[i], name: ids[i], date: null, variant: 'standard', intensityScale: 1, reasons: ['Données indisponibles'], alternatives: [], replaces: null, blocked: 'Données indisponibles' };
     });

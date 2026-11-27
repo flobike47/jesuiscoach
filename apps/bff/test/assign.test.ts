@@ -501,3 +501,12 @@ describe("moteur assign - exclusions et scoring", () => {
     });
   });
 });
+
+describe('étalement de l’équipe', () => {
+  it('répartit des athlètes identiques sur plusieurs jours', () => {
+    const days = ['2026-11-30', '2026-12-01', '2026-12-02', '2026-12-03'].map((d) => day(d));
+    const team = ['a', 'b', 'c', 'd'].map((id) => athlete({ id, name: id, days: days.map((d) => ({ ...d })) }));
+    const dates = suggest(workout(), team).map((s) => s.date);
+    expect(new Set(dates).size).toBeGreaterThan(1);
+  });
+});

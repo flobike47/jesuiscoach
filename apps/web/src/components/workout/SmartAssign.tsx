@@ -17,7 +17,7 @@ interface SmartAssignProps {
   selected: Set<string>;
   onSelected: (next: Set<string>) => void;
   /** Lots à envoyer : une description (variante, cibles ajustées) par jour. */
-  onSend: (groups: Array<{ date: string; description: string; athleteIds: string[] }>) => Promise<void>;
+  onSend: (groups: Array<{ date: string; description: string; athleteIds: string[] }>, notify: boolean) => Promise<void>;
   isPending: boolean;
 }
 
@@ -75,6 +75,9 @@ export function SmartAssign({
 
   // Nombre de séances (une par athlète planifié), pas de lots.
   const planningCount = groupedSuggestions.reduce((n, g) => n + g.athleteIds.length, 0);
+  // Athlètes dont la semaine dépasserait l'habitude (raison donnée par le moteur).
+  const heavy = effective.filter((sg) => sg.date && sg.reasons.some((r) => r.startsWith('Semaine déjà chargée'))).map((sg) => sg.name);
+  const [notify, setNotify] = useState(true);
 
   // Résolvette pour l'UI du jour
   const getDayDisplay = (date: string | null) => {
@@ -253,9 +256,15 @@ export function SmartAssign({
 
       {/* Compteur et boutons */}
       <div style={{ padding: '12px 16px 34px', borderTop: '.5px solid var(--separator)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--label-2)' }}>
-          <span>Chaque athlète reçoit sa variante ; les cibles sont baissées de 5 % en cas de surcharge.</span>
+        <div className="footnote" style={{ color: heavy.length ? 'var(--orange)' : 'var(--label-2)' }}>
+          {heavy.length === 0
+            ? 'Charge de la semaine : aucun athlète au-delà de +15 % de son habitude.'
+            : `Charge de la semaine : ${heavy.join(', ')} au-delà de +15 % de son habitude.`}
         </div>
+        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 44, fontSize: 15 }}>
+          Prévenir les athlètes
+          <input type="checkbox" role="switch" checked={notify} onChange={(e) => setNotify(e.target.checked)} style={{ width: 22, height: 22, accentColor: 'var(--green)' }} />
+        </label>
 
         <button
           type="button"
@@ -271,7 +280,7 @@ export function SmartAssign({
             opacity: isPending || planningCount === 0 ? 0.5 : 1,
           }}
           disabled={isPending || planningCount === 0}
-          onClick={() => onSend(groupedSuggestions.map((g) => ({ date: g.date, description: g.description, athleteIds: g.athleteIds })))}
+          onClick={() => onSend(groupedSuggestions.map((g) => ({ date: g.date, description: g.description, athleteIds: g.athleteIds })), notify)}
         >
           {isPending
             ? 'Planification…'

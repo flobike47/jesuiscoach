@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { requireUser, type AuthUser } from '../auth.js';
 import { calendarStoreFor, createEvent, readCalendar, removeEvent, resyncEvent, teamDay, teamCalendar, updateEvent } from '../calendarService.js';
-import { validateWorkoutCheck } from '../lib/care.js';
+import { formatDay, validateWorkoutCheck } from '../lib/care.js';
+import { findUserByAthlete } from '../db/repo.js';
+import { pushConfigured, sendToUser } from '../push.js';
 import { warningsOfAthlete } from './care.js';
 import { CALENDAR_LIMITS, eventJson, goalJson, parisToday, validateEventInput, validateEventPatch, validateGoalInput, type GoalInput, type CalendarRow } from '../lib/calendar.js';
 import { validateSport } from '../lib/sport.js';
@@ -33,6 +35,8 @@ interface AssignBody {
   highIntensity?: unknown;
   /** Athlètes pour lesquels l'envoi malgré un blocage (blessure) a été confirmé. */
   force?: unknown;
+  /** Prévenir chaque athlète servi par une notification (appareils abonnés). */
+  notify?: unknown;
 }
 
 /** Accès en lecture ou en écriture au calendrier d'un athlète : connecté, id valide, droit de voir (404 sinon). */
@@ -158,7 +162,26 @@ export async function registerCalendarRoutes(app: FastifyInstance) {
         }
       }),
     );
-    return { results };
+
+    // Notification aux athlètes servis : n'échoue jamais l'envoi (appareil absent, push non configuré).
+    let notified = 0;
+    if (body.notify === true && pushConfigured && !config.demoMode) {
+      for (const r of results.filter((x) => x.ok)) {
+        try {
+          const user = await findUserByAthlete(r.id);
+          if (!user) continue;
+          const report = await sendToUser(
+            user.id,
+            { title: 'Nouvelle séance de ton coach', body: `${workout.name} · ${formatDay(workout.date)}`, url: 'plan', tag: `seance-${workout.date}` },
+            req.log,
+          );
+          if (report.sent > 0) notified++;
+        } catch (err) {
+          req.log.warn({ err, athleteId: r.id }, 'workouts: notification non envoyée');
+        }
+      }
+    }
+    return { results, notified };
   });
 
   /** Vue « Aujourd'hui » du coach : séances prévues, sorties faites et statut de chaque athlète de son équipe. */

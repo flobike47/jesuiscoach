@@ -167,7 +167,7 @@ export function WorkoutComposer({ draft, onClose }: { draft: Draft; onClose: () 
   const [progress, setProgress] = useState<string | null>(null);
 
   /** Envoi par lots (un jour et une variante par lot), avec les vérifications serveur habituelles. */
-  const sendSmart = async (groups: Array<{ date: string; description: string; athleteIds: string[] }>) => {
+  const sendSmart = async (groups: Array<{ date: string; description: string; athleteIds: string[] }>, notify: boolean) => {
     setMessage(null);
     const invalid = check();
     if (invalid) return setMessage({ ok: false, text: invalid });
@@ -188,6 +188,7 @@ export function WorkoutComposer({ draft, onClose }: { draft: Draft; onClose: () 
           name: name.trim(),
           description: g.description,
           force: [],
+          notify,
         });
         done += sent.filter((r) => r.ok).length;
         for (const r of sent.filter((x) => !x.ok)) errors.push(`${nameOf(r.id)} : ${r.blocked ? 'blessure en cours' : (r.error ?? 'échec')}`);

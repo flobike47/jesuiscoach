@@ -80,10 +80,14 @@ export interface WorkoutSendInput extends WorkoutCheckInput {
   description: string;
   /** Athlètes pour lesquels l'envoi malgré un blocage est confirmé. */
   force: string[];
+  /** Prévenir les athlètes servis par une notification. */
+  notify?: boolean;
 }
 
 export interface WorkoutSendResult {
   results: Array<{ id: string; ok: boolean; blocked?: boolean; error?: string }>;
+  /** Athlètes effectivement notifiés. */
+  notified?: number;
 }
 
 export interface AssignSuggestInput {
