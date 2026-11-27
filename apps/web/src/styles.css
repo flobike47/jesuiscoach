@@ -702,6 +702,18 @@ textarea.field {
   max-height: calc(100dvh - var(--tabbar-h) - 80px);
   overflow-y: auto;
 }
+.wide-shortcuts {
+  display: grid;
+  gap: 3px;
+  margin: 12px 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--fill);
+  line-height: 1.4;
+}
+.wide-shortcuts b {
+  color: var(--label);
+}
 .wide-lib-item {
   display: grid;
   gap: 6px;

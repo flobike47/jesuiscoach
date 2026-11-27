@@ -54,7 +54,9 @@ const asLibraryItem = (key: string, name: string, description: string, sport: Sp
 export function TeamPlanningWide() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(dayjs()));
   const from = weekStart.format('YYYY-MM-DD');
-  const to = weekStart.add(13, 'day').format('YYYY-MM-DD');
+  const [span, setSpan] = useState<7 | 14 | 28>(14);
+  const weeks = Array.from({ length: span / 7 }, (_, i) => i);
+  const to = weekStart.add(span - 1, 'day').format('YYYY-MM-DD');
   const cal = useTeamCalendar(from, to);
   const groups = useGroups();
   const team = useTeam();
@@ -76,7 +78,7 @@ export function TeamPlanningWide() {
     () => [...filterByGroup(cal.data?.athletes ?? [], group)].sort((a, b) => a.name.localeCompare(b.name, 'fr')),
     [cal.data, group],
   );
-  const days = useMemo(() => Array.from({ length: 14 }, (_, i) => weekStart.add(i, 'day').format('YYYY-MM-DD')), [weekStart]);
+  const days = useMemo(() => Array.from({ length: span }, (_, i) => weekStart.add(i, 'day').format('YYYY-MM-DD')), [weekStart, span]);
   const today = dayjs().format('YYYY-MM-DD');
 
   const library = useMemo(() => {
@@ -87,7 +89,7 @@ export function TeamPlanningWide() {
   }, [saved.data, search]);
 
   const formOf = (id: string) => team.data?.athletes.find((a) => a.id === id)?.form ?? null;
-  const weekLoad = (a: TeamCalendarAthlete, week: 0 | 1) =>
+  const weekLoad = (a: TeamCalendarAthlete, week: number) =>
     a.days.slice(week * 7, week * 7 + 7).reduce((s, d) => s + d.workouts.reduce((t, w) => t + (w.load ?? 0), 0), 0);
   // Charge habituelle ramenée à une semaine (le serveur la donne pour la période).
   const usualWeek = (a: TeamCalendarAthlete) => (a.load.usual != null && a.days.length ? (a.load.usual * 7) / a.days.length : null);
@@ -180,7 +182,7 @@ export function TeamPlanningWide() {
 
   /* ---------- Rendu ---------- */
 
-  const columns = '150px repeat(7, minmax(0, 1fr)) 52px repeat(7, minmax(0, 1fr)) 52px';
+  const columns = `150px ${weeks.map(() => 'repeat(7, minmax(0, 1fr)) 52px').join(' ')}`;
 
   return (
     <div className="wide-planner" onPointerMove={onMove} onPointerUp={onDrop} onPointerCancel={endDrag}>
@@ -190,9 +192,13 @@ export function TeamPlanningWide() {
           <Search size={15} color="var(--label-2)" aria-hidden />
           <input type="search" aria-label="Rechercher dans la bibliothèque" placeholder="Rechercher" value={search} onChange={(e) => setSearch(e.target.value)} />
         </label>
-        <p className="footnote secondary" style={{ margin: '10px 2px' }}>
-          Glisse une séance sur une case libre.
-        </p>
+        <div className="wide-shortcuts footnote secondary">
+          <b>Raccourcis</b>
+          <span>Glisser une séance sur une case libre : la planifier</span>
+          <span>Glisser une séance planifiée : la déplacer</span>
+          <span>⌥ Alt + glisser : la dupliquer</span>
+          <span>Double-clic : la modifier · Échap : annuler</span>
+        </div>
         {[
           { title: 'Mes séances', items: library.mine },
           { title: 'Séances types', items: library.types },
@@ -230,15 +236,27 @@ export function TeamPlanningWide() {
 
       <main style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <button type="button" aria-label="Deux semaines plus tôt" onClick={() => setWeekStart((w) => w.subtract(14, 'day'))} style={{ color: 'var(--tint)', minWidth: 36, minHeight: 36 }}>
+          <button type="button" aria-label="Période précédente" onClick={() => setWeekStart((w) => w.subtract(span, 'day'))} style={{ color: 'var(--tint)', minWidth: 36, minHeight: 36 }}>
             <ChevronLeft size={20} />
           </button>
           <span className="headline">
             {dayjs(from).format('D MMM')} – {dayjs(to).format('D MMM')}
           </span>
-          <button type="button" aria-label="Deux semaines plus tard" onClick={() => setWeekStart((w) => w.add(14, 'day'))} style={{ color: 'var(--tint)', minWidth: 36, minHeight: 36 }}>
+          <button type="button" aria-label="Période suivante" onClick={() => setWeekStart((w) => w.add(span, 'day'))} style={{ color: 'var(--tint)', minWidth: 36, minHeight: 36 }}>
             <ChevronRight size={20} />
           </button>
+          <div className="segmented" role="tablist" aria-label="Période affichée" style={{ width: 280 }}>
+            <span className="segmented-thumb" aria-hidden style={{ width: 'calc((100% - 4px) / 3)', transform: `translateX(${[7, 14, 28].indexOf(span) * 100}%)` }} />
+            {([
+              [7, 'Semaine'],
+              [14, '2 semaines'],
+              [28, 'Mois'],
+            ] as const).map(([n, label]) => (
+              <button key={n} type="button" role="tab" aria-selected={span === n} onPointerDown={() => setSpan(n)} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setSpan(n)}>
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="chips" style={{ margin: 0, padding: 0, flex: 1, justifyContent: 'flex-end' }}>
             <button type="button" className={group == null ? 'chip active' : 'chip'} aria-pressed={group == null} onClick={() => setGroup(null)}>
               Tous · {cal.data?.athletes.length ?? 0}
@@ -257,7 +275,7 @@ export function TeamPlanningWide() {
         {cal.data && (
           <div className="wide-grid" style={{ gridTemplateColumns: columns }}>
             <span />
-            {[0, 1].map((week) => (
+            {weeks.map((week) => (
               <div key={week} style={{ display: 'contents' }}>
                 {days.slice(week * 7, week * 7 + 7).map((d) => (
                   <span key={d} className="wide-head" style={d === today ? { color: 'var(--tint)', fontWeight: 700 } : undefined}>
@@ -278,12 +296,12 @@ export function TeamPlanningWide() {
                   {a.ftp && <span className="caption secondary tabular-nums" style={{ marginLeft: 'auto' }}>{a.ftp} W</span>}
                 </div>
                 {a.error ? (
-                  <span className="footnote secondary" style={{ gridColumn: 'span 16' }}>
+                  <span className="footnote secondary" style={{ gridColumn: `span ${weeks.length * 8}` }}>
                     Lecture impossible : {a.error}
                   </span>
                 ) : (
-                  [0, 1].map((week) => {
-                    const load = weekLoad(a, week as 0 | 1);
+                  weeks.map((week) => {
+                    const load = weekLoad(a, week);
                     const usual = usualWeek(a);
                     return (
                       <div key={week} style={{ display: 'contents' }}>
@@ -323,7 +341,7 @@ export function TeamPlanningWide() {
             ))}
 
             <span className="wide-name footnote secondary">Charge équipe</span>
-            {[0, 1].map((week) => (
+            {weeks.map((week) => (
               <div key={week} style={{ display: 'contents' }}>
                 {days.slice(week * 7, week * 7 + 7).map((d) => (
                   <span key={d} className="wide-head tabular-nums">
@@ -337,8 +355,7 @@ export function TeamPlanningWide() {
         )}
 
         <p className="footnote secondary" style={{ marginTop: 12 }}>
-          Glisser une séance planifiée la déplace sur la même ligne ; avec Alt (⌥), elle est dupliquée. Double-clic pour la modifier. Les cases rayées viennent des
-          disponibilités du profil.
+          Les cases rayées viennent des disponibilités du profil.
         </p>
         {error && (
           <p role="alert" className="footnote" style={{ color: 'var(--red)' }}>
