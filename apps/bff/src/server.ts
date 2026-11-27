@@ -19,6 +19,8 @@ import { registerDeviceRoutes } from './routes/devices.js';
 import { registerPlanningRoutes } from './routes/planning.js';
 import { registerGroupRoutes } from './routes/groups.js';
 import { registerAssignRoutes } from './routes/assign.js';
+import { registerWeightRoutes } from './routes/weight.js';
+import { registerTrendRoutes } from './routes/trends.js';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -152,6 +154,8 @@ export async function buildServer() {
   await app.register(registerPlanningRoutes, { prefix: '/api' });
   await app.register(registerGroupRoutes, { prefix: '/api' });
   await app.register(registerAssignRoutes, { prefix: '/api' });
+  await app.register(registerWeightRoutes, { prefix: '/api' });
+  await app.register(registerTrendRoutes, { prefix: '/api' });
 
   return app;
 }

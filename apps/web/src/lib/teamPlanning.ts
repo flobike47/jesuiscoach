@@ -1,11 +1,17 @@
 import type { Group, TeamCalendarAthlete, TeamCalendarDay } from '@/types';
 import { parseWorkout, zoneColor } from '@/lib/workout';
 
-export type CellKind = 'free' | 'off' | 'workout' | 'extra';
+/** `rest` : repos prescrit par le coach ; `off` : repos habituel ou indisponibilité (profil). */
+export type CellKind = 'free' | 'off' | 'rest' | 'workout' | 'extra';
 
-/** Détermine le type de cellule pour une journée d'athlète. */
+/**
+ * Détermine le type de cellule pour une journée d'athlète. Une séance prime
+ * sur tout ; puis le repos prescrit (même si l'athlète a roulé : la consigne
+ * reste visible) ; puis la sortie hors plan ; puis les disponibilités.
+ */
 export function cellKind(day: TeamCalendarDay): CellKind {
   if (day.workouts.length > 0) return 'workout';
+  if (day.rest) return 'rest';
   if (day.activities.length > 0) return 'extra';
   if (day.availability === 'repos' || day.availability === 'indisponible') return 'off';
   return 'free';
@@ -85,10 +91,13 @@ export function selectionSummary(
   return `${athleteNames.join(', ')} · ${dateStr}`;
 }
 
+/** Charge tolérée au-dessus de l'habitude (même seuil que le BFF : WEEK_OVERLOAD). */
+export const OVERLOAD_RATIO = 1.15;
+
 /** Vérifie si la charge planifiée dépasse la charge habituelle de plus de 15%. */
 export function isOverload(load: { planned: number; usual: number | null }): boolean {
   if (load.usual === null) return false;
-  return load.planned > load.usual * 1.15;
+  return load.planned > load.usual * OVERLOAD_RATIO;
 }
 
 /** Compte des séances planifiées et cases libres pour la semaine. */
@@ -100,7 +109,7 @@ export function weekCounts(athletes: TeamCalendarAthlete[]): { planned: number; 
     for (const day of athlete.days) {
       if (day.workouts.length > 0) {
         planned += 1;
-      } else if (day.availability === null) {
+      } else if (day.availability === null && !day.rest) {
         free += 1;
       }
     }

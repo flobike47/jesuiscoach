@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -73,7 +73,13 @@ describe('TeamPlanning', () => {
 
   it('affiche une ligne par athlète', () => {
     renderPlanning();
-    for (const name of ['Hugo', 'Léa', 'Sarah']) expect(screen.getByText(name)).toBeInTheDocument();
+    for (const name of ['Hugo', 'Léa', 'Sarah']) expect(cell(name, TUESDAY)).toBeInTheDocument();
+  });
+
+  it('montre sous la grille la charge prévue / faite de chaque athlète', () => {
+    renderPlanning();
+    const chart = screen.getByRole('region', { name: 'Charge prévue / faite' });
+    expect(within(chart).getAllByRole('listitem')).toHaveLength(3);
   });
 
   it('sélectionne puis désélectionne des cases libres', () => {
@@ -102,8 +108,10 @@ describe('TeamPlanning', () => {
   it('filtre par groupe', () => {
     renderPlanning();
     fireEvent.click(screen.getByRole('button', { name: /^Route/ }));
-    expect(screen.getByText('Hugo')).toBeInTheDocument();
-    expect(screen.getByText('Léa')).toBeInTheDocument();
+    expect(cell('Hugo', TUESDAY)).toBeInTheDocument();
+    expect(cell('Léa', TUESDAY)).toBeInTheDocument();
     expect(screen.queryByText('Sarah')).not.toBeInTheDocument();
+    // Le graphique de charge suit le filtre.
+    expect(within(screen.getByRole('region', { name: 'Charge prévue / faite' })).getAllByRole('listitem')).toHaveLength(2);
   });
 });

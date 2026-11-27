@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
-import { Activity, Bike, CalendarRange, Footprints, Search, Sparkles, Star, Type, BarChart3, Waves } from 'lucide-react';
+import { Activity, Bike, CalendarRange, Footprints, Repeat, Search, Sparkles, Star, Type, BarChart3, Waves } from 'lucide-react';
 import { SwipeRow } from '@/components/common/SwipeRow';
 import { FromActivitySheet } from '@/components/workout/FromActivitySheet';
 import { useGroups, useTeamCalendar } from '@/hooks/useTeamPlanning';
 import { suggestForWeek } from '@/lib/suggestWeek';
 import { Cell, Page, Section } from '@/components/ios';
 import { PlanSheet } from '@/components/workout/PlanSheet';
+import { RecurringSheet } from '@/components/workout/RecurringSheet';
 import { WorkoutComposer } from '@/components/workout/WorkoutComposer';
 import { WorkoutProfile } from '@/components/workout/StructureEditor';
 import { useLibrary, usePlans, useSavedWorkouts, useToggleFavorite } from '@/hooks/useCoach';
@@ -65,6 +66,7 @@ export default function Workouts() {
   const saved = useSavedWorkouts();
   const toggleFav = useToggleFavorite();
   const [fromActivity, setFromActivity] = useState(false);
+  const [recurring, setRecurring] = useState(false);
   // « Suggéré cette semaine » : 2 semaines passées + la semaine à venir (requête dédiée, distincte de celle du planning d'équipe).
   const today = dayjs().format('YYYY-MM-DD');
   const teamCal = useTeamCalendar(dayjs().subtract(13, 'day').format('YYYY-MM-DD'), dayjs().add(6, 'day').format('YYYY-MM-DD'));
@@ -235,6 +237,13 @@ export default function Workouts() {
           );
         })}
         <Cell onClick={() => setPlanOpen({ plan: null })} title={<span style={{ color: 'var(--tint)' }}>Créer un plan</span>} />
+        <Cell
+          onClick={() => setRecurring(true)}
+          inset={52}
+          leading={<Repeat size={20} color="var(--tint)" aria-hidden />}
+          title={<span style={{ color: 'var(--tint)' }}>Programmer une séance récurrente</span>}
+          subtitle="La sortie club tous les mardis, pendant 12 semaines au plus"
+        />
       </Section>
 
       {editing && <WorkoutComposer key={editing.key} draft={editing} onClose={() => setEditing(null)} />}
@@ -247,6 +256,7 @@ export default function Workouts() {
           }}
         />
       )}
+      {recurring && <RecurringSheet onClose={() => setRecurring(false)} />}
       {planOpen && <PlanSheet key={planOpen.plan?.id ?? 'new'} plan={planOpen.plan} onClose={() => setPlanOpen(null)} />}
     </Page>
   );

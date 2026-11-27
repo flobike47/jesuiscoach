@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { LineChart } from 'lucide-react';
 import { Avatar, Cell, Page, Placeholder, Rings, Section, SkeletonList } from '@/components/ios';
 import { useTeam } from '@/hooks/useCoach';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -75,6 +76,17 @@ export default function Team() {
               </div>
             </div>
           </div>
+
+          <Section>
+            <Cell
+              to="/equipe/tendances"
+              inset={52}
+              leading={<LineChart size={20} color="var(--blue)" aria-hidden />}
+              title="Tendances"
+              subtitle="Fitness du groupe, sports pratiqués"
+              chevron
+            />
+          </Section>
 
           {watch.length > 0 && (
             <Section header={`À surveiller · ${watch.length}`}>
