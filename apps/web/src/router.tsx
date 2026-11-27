@@ -86,6 +86,8 @@ export const router = createBrowserRouter(
             { path: 'athletes/:id/profil/appareils', lazy: page(() => import('@/pages/profile/Devices')) },
             // Phase C : accueil du coach et équipe
             { path: 'aujourdhui', lazy: page(() => import('@/pages/TeamToday')) },
+            // Coach : résumé de la semaine (depuis la carte « Semaine écoulée » de l'accueil)
+            { path: 'semaine', lazy: page(() => import('@/pages/WeekReview')) },
             { path: '*', element: <Navigate to="/" replace /> },
           ],
         },

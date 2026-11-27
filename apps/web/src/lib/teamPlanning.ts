@@ -91,10 +91,13 @@ export function selectionSummary(
   return `${athleteNames.join(', ')} · ${dateStr}`;
 }
 
+/** Charge tolérée au-dessus de l'habitude (même seuil que le BFF : WEEK_OVERLOAD). */
+export const OVERLOAD_RATIO = 1.15;
+
 /** Vérifie si la charge planifiée dépasse la charge habituelle de plus de 15%. */
 export function isOverload(load: { planned: number; usual: number | null }): boolean {
   if (load.usual === null) return false;
-  return load.planned > load.usual * 1.15;
+  return load.planned > load.usual * OVERLOAD_RATIO;
 }
 
 /** Compte des séances planifiées et cases libres pour la semaine. */
