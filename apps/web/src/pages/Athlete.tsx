@@ -3,13 +3,15 @@ import { useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import dayjs from 'dayjs';
-import { AlertTriangle, BarChart3, Clock, TrendingUp, UserRound, Zap } from 'lucide-react';
+import { AlertTriangle, BarChart3, Clock, Flag, TrendingUp, UserRound, Zap } from 'lucide-react';
 import { Avatar, Cell, Page, Placeholder, Section, Segmented, FormGauge, SkeletonList } from '@/components/ios';
 import { useAthleteOverview } from '@/hooks/useCoach';
+import { useGoals } from '@/hooks/useCalendarData';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { PullIndicator } from '@/components/common/PullIndicator';
 import { formatDuration, formatKm, relativeDay, formatLoad } from '@/lib/format';
 import { METRIC_COLORS } from '@/theme';
+import { RaceBlockSheet } from '@/components/calendar/RaceBlockSheet';
 import type { SeriesPoint } from '@/types';
 
 type Range = '30' | '90';
@@ -25,7 +27,9 @@ export default function Athlete() {
 /** Fiche athlète (forme sur 90 jours, alertes, ressentis, sorties récentes). */
 export function AthleteView({ id, back, title, account }: { id: string | undefined; back?: { to: string; label: string }; title?: string; account?: boolean }) {
   const { data, isLoading, error } = useAthleteOverview(id);
+  const { data: goalsData } = useGoals(id);
   const [range, setRange] = useState<Range>('90');
+  const [raceBlockSheetOpen, setRaceBlockSheetOpen] = useState(false);
   const name = data?.summary.name ?? 'Athlète';
   const queryClient = useQueryClient();
 
@@ -34,6 +38,16 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
       await queryClient.invalidateQueries({ queryKey: ['athlete', id] });
     },
   });
+
+  // Trouver la prochaine course : priorité A, sinon la plus proche
+  const upcomingRace = (() => {
+    if (!goalsData?.races) return null;
+    const today = dayjs();
+    const future = goalsData.races.filter((r) => dayjs(r.date).isAfter(today));
+    if (future.length === 0) return null;
+    const priorityA = future.find((r) => r.racePriority === 'A');
+    return priorityA || future.sort((a, b) => dayjs(a.date).diff(dayjs(b.date)))[0] || null;
+  })();
 
   return (
     <>
@@ -61,6 +75,23 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
           <div className="card">
             <FormGauge form={data.summary.form} fitness={data.summary.fitness} fatigue={data.summary.fatigue} audience="coach" />
           </div>
+
+          {upcomingRace && (
+            <div className="card" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'color-mix(in srgb, var(--orange) 18%, transparent)', display: 'grid', placeItems: 'center', flex: 'none' }}>
+                <Flag size={22} color="var(--orange)" aria-hidden />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>{upcomingRace.name}{upcomingRace.racePriority ? ` · priorité ${upcomingRace.racePriority}` : ''}</div>
+                <div className="caption secondary" style={{ marginTop: 2 }}>
+                  {dayjs(upcomingRace.date).format('D MMMM')} · dans {Math.ceil(dayjs(upcomingRace.date).diff(dayjs(), 'week', true))} sem.
+                </div>
+              </div>
+              <button type="button" className="button tinted pressable" style={{ minHeight: 36, padding: '0 14px', fontSize: 15 }} onClick={() => setRaceBlockSheetOpen(true)}>
+                Préparer le bloc
+              </button>
+            </div>
+          )}
 
           <div className="card">
             <div style={{ margin: '0 0 8px' }}>
@@ -139,6 +170,15 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
         </>
       )}
     </Page>
+    {raceBlockSheetOpen && upcomingRace && id && (
+      <RaceBlockSheet
+        athleteId={id}
+        race={upcomingRace}
+        sport="Ride"
+        today={dayjs().format('YYYY-MM-DD')}
+        onClose={() => setRaceBlockSheetOpen(false)}
+      />
+    )}
     </>
   );
 }
