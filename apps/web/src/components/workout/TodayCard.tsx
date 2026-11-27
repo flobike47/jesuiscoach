@@ -5,6 +5,8 @@ import { formatDuration, formatLoad } from '@/lib/format';
 import { textToBlocks } from '@/lib/workoutBlocks';
 import { WorkoutProfile } from './StructureEditor';
 import { summarizeBlocks } from '@/lib/workoutSummary';
+import { compareBlocks } from '@/lib/blockCompare';
+import { useActivityDetail } from '@/hooks/useCoach';
 
 export interface TodayCardProps {
   /** Séance prévue. */
@@ -26,10 +28,15 @@ export interface TodayCardProps {
   ftp: number | null;
   /** Sport de la séance (Ride par défaut). */
   sport?: Sport;
+  /** Athlète (lien vers le détail de la sortie et intervalles). */
+  athleteId?: string;
 }
 
 /** Carte « Séance du jour » : avant la sortie (bleu) ou après (vert). */
-export function TodayWorkoutCard({ workout, activity, ftp, sport = 'Ride' }: TodayCardProps) {
+export function TodayWorkoutCard({ workout, activity, ftp, sport = 'Ride', athleteId }: TodayCardProps) {
+  // Intervalles de la sortie (cache longue durée) pour comparer bloc par bloc.
+  const detail = useActivityDetail(athleteId, activity?.id);
+  const comparison = detail.data ? compareBlocks(parseWorkout(workout.description ?? ''), ftp, detail.data.intervals) : null;
   const steps = parseWorkout(workout.description ?? '');
   const stats = workoutStats(steps);
 
@@ -37,16 +44,12 @@ export function TodayWorkoutCard({ workout, activity, ftp, sport = 'Ride' }: Tod
   const blocks = textToBlocks(workout.description ?? '');
   const blockSummaries = summarizeBlocks(blocks, ftp);
 
-  // Extrait le « mot du coach » : première ligne non vide qui n'est pas une directive
   const lines = (workout.description ?? '').split('\n');
+  // Mot du coach : les phrases de la description qui ne sont ni des paliers ni des titres de bloc.
   const coachWords = lines
-    .filter((line) => {
-      const trimmed = line.trim();
-      return trimmed && !trimmed.match(/^-\s/) && !trimmed.match(/^\d+x$/i) && !trimmed.match(/^ramp$/i) && !trimmed.match(/^[A-Z][a-z]/);
-    })
-    .slice(0, 1)
-    .join('\n')
-    .trim();
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('-') && !/^\d+\s*x$/i.test(l) && l.split(/\s+/).length >= 4)
+    .join('\n');
 
   const done = Boolean(activity);
   const bgColor = done ? 'color-mix(in srgb, var(--green) 18%, var(--cell))' : 'color-mix(in srgb, var(--blue) 18%, var(--cell))';
@@ -76,8 +79,8 @@ export function TodayWorkoutCard({ workout, activity, ftp, sport = 'Ride' }: Tod
             </>
           )}
         </div>
-        {done && activity && (
-          <Link to={`/sorties/${activity.id}`} style={{ fontSize: 15, color: 'var(--tint)' }}>
+        {done && activity && athleteId && (
+          <Link to={`/athletes/${encodeURIComponent(athleteId ?? '')}/sorties/${encodeURIComponent(activity.id)}`} style={{ fontSize: 15, color: 'var(--tint)' }}>
             Détail
           </Link>
         )}
@@ -150,6 +153,31 @@ export function TodayWorkoutCard({ workout, activity, ftp, sport = 'Ride' }: Tod
             </div>
           )}
         </>
+      )}
+
+      {done && comparison && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: 10 }} role="img" aria-label={comparison.summary}>
+            {comparison.blocks.map((b, i) => {
+              // Échelle : cible au milieu, ±25 % autour.
+              const lo = b.target[0] * 0.75;
+              const hi = b.target[1] * 1.25;
+              const y = (w: number) => `${100 - ((Math.min(hi, Math.max(lo, w)) - lo) / (hi - lo)) * 100}%`;
+              return (
+                <div key={i} style={{ flex: 1, display: 'grid', gap: 4, justifyItems: 'center' }}>
+                  <div style={{ position: 'relative', width: '100%', height: 54, borderRadius: 6, background: 'var(--fill)' }}>
+                    <span style={{ position: 'absolute', left: 0, right: 0, top: y(b.target[1]), bottom: `calc(100% - ${y(b.target[0])})`, background: 'color-mix(in srgb, var(--yellow) 28%, transparent)', borderTop: '1px dashed var(--yellow)', borderBottom: '1px dashed var(--yellow)' }} />
+                    <span style={{ position: 'absolute', left: 8, right: 8, top: `calc(${y(b.actual)} - 2px)`, height: 4, borderRadius: 2, background: b.ok ? 'var(--label)' : 'var(--orange)' }} />
+                  </div>
+                  <span className="tabular-nums" style={{ fontSize: 15, fontWeight: 600, color: b.ok ? undefined : 'var(--orange)' }}>
+                    {b.actual} W
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="footnote" style={{ margin: '8px 0 0', color: 'var(--label-2)' }}>{comparison.summary}</p>
+        </div>
       )}
 
       {done && (

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import dayjs from 'dayjs';
 import { Frown, Meh, Smile, Laugh, Angry, type LucideIcon, Check, Circle, X } from 'lucide-react';
 import { Page, Placeholder, Section, Cell, FormGauge, SkeletonList } from '@/components/ios';
-import { useSaveCheckin, useToday } from '@/hooks/useCoach';
+import { useMe, useSaveCheckin, useToday } from '@/hooks/useCoach';
 import { formatDuration, formatLoad, dayShort } from '@/lib/format';
 import { TodayWorkoutCard } from '@/components/workout/TodayCard';
 import type { Checkin } from '@/types';
@@ -36,6 +36,7 @@ const RPE_LABELS: Record<number, string> = {
 /** Écran 8 : « Aujourd'hui » de l'athlète. */
 export default function Today() {
   const { data, isLoading, error } = useToday();
+  const me = useMe();
 
   return (
     <Page title="Aujourd'hui" account header={<p className="footnote secondary" style={{ margin: '-8px 0 12px' }}>{capitalize(dayjs().format('dddd D MMMM'))}</p>}>
@@ -58,6 +59,7 @@ export default function Today() {
               activity={data.activitiesToday.length > 0 ? data.activitiesToday[0] : undefined}
               ftp={data.ftp}
               sport="Ride"
+              athleteId={me.data?.athleteId}
             />
           )}
 
