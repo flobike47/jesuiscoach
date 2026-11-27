@@ -88,10 +88,11 @@ export default function CoachToday() {
         </div>
         <div className="card" style={{ padding: 12, borderRadius: 12 }}>
           <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--green)', fontVariantNumeric: 'tabular-nums' }}>
-            {counts.doneWorkouts}
-            <span style={{ fontSize: 17, color: 'var(--label-2)', fontWeight: 600 }}>/{counts.totalWorkouts}</span>
+            {counts.totalWorkouts ? counts.doneWorkouts : counts.ridesToday}
+            {counts.totalWorkouts > 0 && <span style={{ fontSize: 17, color: 'var(--label-2)', fontWeight: 600 }}>/{counts.totalWorkouts}</span>}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--label-2)', marginTop: 4 }}>séances faites</div>
+          {/* Sans séance prévue aujourd'hui, on compte les sorties : « 0/0 » ne dit rien. */}
+          <div style={{ fontSize: 13, color: 'var(--label-2)', marginTop: 4 }}>{counts.totalWorkouts ? 'séances faites' : 'sorties du jour'}</div>
         </div>
         <div className="card" style={{ padding: 12, borderRadius: 12 }}>
           <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--blue)', fontVariantNumeric: 'tabular-nums' }}>
@@ -171,29 +172,15 @@ export default function CoachToday() {
                   const isActivityDone = activity != null;
                   const href = isActivityDone ? `/athletes/${encodeURIComponent(athlete.id)}/sorties/${encodeURIComponent(activity.id)}` : `/athletes/${encodeURIComponent(athlete.id)}`;
 
-                  let subtitle = '';
-                  let status: 'done' | 'planned' | 'missed' | 'extra' | null = null;
-
-                  if (activity) {
-                    const parts = [];
-                    if (activity.name) parts.push(activity.name);
-                    if (activity.moving_time) parts.push(formatDuration(activity.moving_time));
-                    if (activity.icu_training_load) parts.push(`charge ${formatLoad(activity.icu_training_load)}`);
-                    subtitle = parts.join(' · ');
-                    status = 'done';
-                  } else if (planned) {
-                    const parts = [];
-                    if (planned.name) parts.push(planned.name);
-                    if (planned.start_date_local) {
-                      const time = planned.start_date_local.split('T')[1]?.slice(0, 5);
-                      if (time && time !== '00:00') parts.push(`${time}`);
-                    }
-                    subtitle = parts.join(' · ');
-                    status = 'planned';
-                  } else if (athlete.done.length > 0 && athlete.planned.length === 0) {
-                    status = 'extra';
-                    subtitle = `Sortie libre · ${athlete.done.map((a) => a.name).join(', ')}`;
-                  }
+                  // Statut calculé par le serveur (séances prévues appariées aux sorties) : une seule vérité.
+                  const status = athlete.status === 'rest' || !athlete.status ? null : athlete.status;
+                  const describe = (a: { name: string | null; moving_time: number | null; icu_training_load: number | null }) =>
+                    [a.name, a.moving_time ? formatDuration(a.moving_time) : null, a.icu_training_load ? `charge ${formatLoad(a.icu_training_load)}` : null].filter(Boolean).join(' · ');
+                  const subtitle = activity
+                    ? describe(activity)
+                    : planned
+                      ? [planned.name ?? 'Séance', planned.start_date_local?.slice(11, 16) !== '00:00' ? planned.start_date_local?.slice(11, 16) : null].filter(Boolean).join(' · ')
+                      : 'Repos';
 
                   return (
                     <Link

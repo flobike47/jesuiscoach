@@ -9,6 +9,8 @@ export interface TodayCounts {
   doneWorkouts: number;
   totalWorkouts: number;
   stillPlanned: number;
+  /** Athlètes qui ont roulé aujourd'hui, prévu ou non. */
+  ridesToday: number;
 }
 
 /**
@@ -18,12 +20,14 @@ export interface TodayCounts {
  * - `stillPlanned` = séances restantes (planned)
  */
 export function todayCounts(athletes: TeamDayAthlete[]): TodayCounts {
-  const toWatch = athletes.filter((a) => a.status === 'missed' || a.status === 'extra' || a.status === 'rest').length;
+  const toWatch = athletes.filter((a) => a.status === 'missed').length;
+  const workouts = athletes.flatMap((a) => a.planned.filter((e) => e.category === 'WORKOUT'));
   const doneWorkouts = athletes.filter((a) => a.status === 'done').length;
-  const totalWorkouts = athletes.reduce((s, a) => s + a.planned.length, 0);
+  const totalWorkouts = workouts.length;
   const stillPlanned = athletes.filter((a) => a.status === 'planned').length;
 
   return {
+    ridesToday: athletes.filter((a) => a.done.length > 0).length,
     toWatch,
     doneWorkouts,
     totalWorkouts,
