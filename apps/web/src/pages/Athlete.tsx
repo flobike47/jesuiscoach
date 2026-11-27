@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import dayjs from 'dayjs';
-import { AlertTriangle, BarChart3, Clock, Flag, TrendingUp, UserRound, Zap } from 'lucide-react';
+import { AlertTriangle, BarChart3, CalendarDays, Clock, Flag, TrendingUp, UserRound, Zap } from 'lucide-react';
 import { Avatar, Cell, Page, Placeholder, Section, Segmented, FormGauge, SkeletonList } from '@/components/ios';
-import { useAthleteOverview } from '@/hooks/useCoach';
+import { useAthleteOverview, useMe } from '@/hooks/useCoach';
+import { WeekStrip } from '@/components/calendar/WeekStrip';
 import { useGoals } from '@/hooks/useCalendarData';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { PullIndicator } from '@/components/common/PullIndicator';
@@ -30,6 +31,9 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
   const { data: goalsData } = useGoals(id);
   const [range, setRange] = useState<Range>('90');
   const [raceBlockSheetOpen, setRaceBlockSheetOpen] = useState(false);
+  const [allRides, setAllRides] = useState(false);
+  const coach = useMe().data?.role === 'coach';
+  const enc = encodeURIComponent(id ?? '');
   const name = data?.summary.name ?? 'Athlète';
   const queryClient = useQueryClient();
 
@@ -56,6 +60,13 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
       title={title ?? name}
       back={back}
       account={account}
+      actions={
+        coach && id ? (
+          <Link to={`/calendrier?athlete=${enc}`} style={{ fontWeight: 600, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
+            Planifier
+          </Link>
+        ) : undefined
+      }
       header={
         data && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -75,6 +86,29 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
           <div className="card">
             <FormGauge form={data.summary.form} fitness={data.summary.fitness} fatigue={data.summary.fatigue} audience="coach" />
           </div>
+
+          <div className="chips" role="navigation" aria-label="Analyse">
+            <Link className="chip" to={`/athletes/${enc}/profil`}>
+              <UserRound size={16} color="var(--indigo)" aria-hidden />
+              Profil
+            </Link>
+            <Link className="chip" to={`/athletes/${enc}/puissance`}>
+              <Zap size={16} color="var(--blue)" aria-hidden />
+              Puissance
+            </Link>
+            <Link className="chip" to={`/athletes/${enc}/zones`}>
+              <BarChart3 size={16} color="var(--green)" aria-hidden />
+              Zones
+            </Link>
+            {coach && (
+              <Link className="chip" to={`/calendrier?athlete=${enc}`}>
+                <CalendarDays size={16} color="var(--orange)" aria-hidden />
+                Plan
+              </Link>
+            )}
+          </div>
+
+          {id && <WeekStrip athleteId={id} />}
 
           {upcomingRace && (
             <div className="card" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -113,12 +147,6 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
             </div>
           </div>
 
-          <Section header="Analyse">
-            <Cell inset={52} leading={<UserRound size={20} color="var(--indigo)" aria-hidden />} title="Profil" subtitle="Physiologie, disponibilités, santé" to={`/athletes/${encodeURIComponent(id!)}/profil`} chevron />
-            <Cell inset={52} leading={<Zap size={20} color="var(--blue)" aria-hidden />} title="Puissance" subtitle="Courbe, records, FTP estimée" to={`/athletes/${encodeURIComponent(id!)}/puissance`} chevron />
-            <Cell inset={52} leading={<BarChart3 size={20} color="var(--green)" aria-hidden />} title="Zones" subtitle="Temps par zone, semaine par semaine" to={`/athletes/${encodeURIComponent(id!)}/zones`} chevron />
-          </Section>
-
           {data.summary.alerts.length > 0 && (
             <Section header="Points d'attention">
               {data.summary.alerts.map((a) => {
@@ -148,9 +176,20 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
             </Section>
           )}
 
-          <Section header="Sorties des 30 derniers jours">
-            {data.activities.length === 0 && <Cell title={<span className="secondary">Aucune sortie</span>} />}
-            {data.activities.map((a) => (
+          <Section
+            header={
+              <span style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Dernières sorties</span>
+                {data.activities.length > 3 && (
+                  <button type="button" onClick={() => setAllRides((v) => !v)} style={{ color: 'var(--tint)', textTransform: 'none', fontSize: 15 }}>
+                    {allRides ? 'Réduire' : `Tout voir (${data.activities.length})`}
+                  </button>
+                )}
+              </span>
+            }
+          >
+            {data.activities.length === 0 && <Cell title={<span className="secondary">Aucune sortie sur 30 jours</span>} />}
+            {(allRides ? data.activities : data.activities.slice(0, 3)).map((a) => (
               <Cell
                 key={a.id}
                 title={a.name ?? 'Sortie'}
