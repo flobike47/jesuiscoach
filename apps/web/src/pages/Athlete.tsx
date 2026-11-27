@@ -23,7 +23,7 @@ const FEELING_LABELS = ['Très mal', 'Fatigué', 'Correct', 'Bien', 'En pleine f
 /** Écran 4 (coach) : fiche d'un athlète de l'équipe. */
 export default function Athlete() {
   const { id } = useParams();
-  return <AthleteView id={id} back={{ to: '/', label: 'Équipe' }} />;
+  return <AthleteView id={id} back={{ to: '/equipe', label: 'Équipe' }} />;
 }
 
 /** Fiche athlète (forme sur 90 jours, alertes, ressentis, sorties récentes). */

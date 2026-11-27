@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { setNavDirection } from '@/lib/navTransition';
 import { CalendarDays, Layers, LineChart, Sun, Users, type LucideIcon } from 'lucide-react';
 import { useMe } from '@/hooks/useCoach';
 import { IosInstallHint } from '@/components/common/IosInstallHint';
@@ -34,7 +35,7 @@ export default function AppLayout() {
       </main>
       <nav className="tab-bar" aria-label="Navigation principale">
         {tabs.map(({ to, label, icon: Icon, end }) => (
-          <NavLink key={to} to={to} end={end} className={({ isActive }) => (isActive ? 'active' : undefined)}>
+          <NavLink key={to} to={to} end={end} viewTransition onClick={() => setNavDirection('tab')} className={({ isActive }) => (isActive ? 'active' : undefined)}>
             <Icon size={24} strokeWidth={1.8} aria-hidden />
             {label}
           </NavLink>

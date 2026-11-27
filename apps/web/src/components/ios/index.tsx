@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Check, Circle, X, Diamond, AlertTriangle } from 'lucide-react';
 import { useSheetDrag } from '@/hooks/useSheetDrag';
+import { setNavDirection } from '@/lib/navTransition';
 import { usePrefersReducedMotion } from '@/components/common/usePrefersReducedMotion';
 import { useMe } from '@/hooks/useCoach';
 import { formZone, gaugePosition } from '@/lib/form';
@@ -49,7 +50,7 @@ export function Page({ title, back, actions, account, header, children }: PagePr
     <>
       {actions}
       {account && me.data && (
-        <Link to="/reglages" aria-label="Réglages" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', background: 'var(--fill-2)', color: 'var(--label)', textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
+        <Link to="/reglages" viewTransition onClick={() => setNavDirection('forward')} aria-label="Réglages" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', background: 'var(--fill-2)', color: 'var(--label)', textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
           {me.data.name.split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase()}
         </Link>
       )}
@@ -61,7 +62,7 @@ export function Page({ title, back, actions, account, header, children }: PagePr
       <div className={compact ? 'nav-bar compact' : 'nav-bar'} style={{ '--nav-title-opacity': compact ? 1 : 0 } as CSSProperties}>
         <div>
           {back && (
-            <Link to={back.to} className="nav-back">
+            <Link to={back.to} viewTransition onClick={() => setNavDirection('back')} className="nav-back">
               <ChevronLeft size={26} strokeWidth={2.2} aria-hidden />
               {back.label}
             </Link>
@@ -120,7 +121,7 @@ export function Cell({ title, subtitle, detail, leading, to, onClick, chevron, i
   const style = inset ? ({ '--separator-inset': `${inset}px` } as CSSProperties) : undefined;
   if (to) {
     return (
-      <Link to={to} className="cell" style={{ ...style, color: 'inherit' }}>
+      <Link to={to} viewTransition onClick={() => setNavDirection('forward')} className="cell" style={{ ...style, color: 'inherit' }}>
         {content}
       </Link>
     );
