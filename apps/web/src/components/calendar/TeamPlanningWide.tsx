@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { Placeholder, SkeletonList } from '@/components/ios';
 import { WorkoutProfile } from '@/components/workout/StructureEditor';
 import { EditEventSheet } from '@/components/calendar/EventSheets';
+import { teamWorkoutAsEvent } from '@/lib/teamEvent';
 import { useSavedWorkouts, useTeam } from '@/hooks/useCoach';
 import { useEventMutations } from '@/hooks/useCalendarData';
 import { useGroups, useTeamCalendar } from '@/hooks/useTeamPlanning';
@@ -322,7 +323,7 @@ export function TeamPlanningWide() {
                               onPointerDown={w ? (e) => startDrag(e, { kind: 'event', athleteId: a.id, event: w, fromDate: day.date, x: e.clientX, y: e.clientY }) : undefined}
                               onDoubleClick={
                                 w
-                                  ? () => setEditing({ athleteId: a.id, event: { id: w.id, name: w.name, description: w.description, type: w.sport ?? 'Ride', category: 'WORKOUT', start_date_local: `${day.date}T00:00:00` } as AppEvent })
+                                  ? () => setEditing({ athleteId: a.id, event: teamWorkoutAsEvent(w, day.date) })
                                   : undefined
                               }
                             >

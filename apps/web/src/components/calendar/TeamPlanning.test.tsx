@@ -11,7 +11,14 @@ import type { Group, TeamCalendarAthlete, TeamCalendarDay } from '@/types';
 vi.mock('@/hooks/useTeamPlanning');
 vi.mock('@/hooks/useCoach');
 vi.mock('@/hooks/useCalendarData');
-vi.mock('@/components/calendar/EventSheets', () => ({ EditEventSheet: () => null }));
+// La vraie feuille lit event.start_date_local dès le rendu : le double fait de même.
+vi.mock('@/components/calendar/EventSheets', () => ({
+  EditEventSheet: ({ event }: { event: { name?: string; start_date_local: string } }) => (
+    <div role="dialog" aria-label={event.name}>
+      {event.start_date_local.slice(0, 10)}
+    </div>
+  ),
+}));
 
 import * as planning from '@/hooks/useTeamPlanning';
 import * as coach from '@/hooks/useCoach';
@@ -84,6 +91,12 @@ describe('TeamPlanning', () => {
     renderPlanning();
     fireEvent.click(cell('Hugo', TUESDAY));
     expect(screen.queryByText(/sélectionnées?/)).not.toBeInTheDocument();
+  });
+
+  it('toucher une séance ouvre sa feuille à la date de la case', () => {
+    renderPlanning();
+    fireEvent.click(cell('Hugo', TUESDAY));
+    expect(screen.getByRole('dialog', { name: 'Tempo' })).toHaveTextContent(TUESDAY.format('YYYY-MM-DD'));
   });
 
   it('filtre par groupe', () => {

@@ -10,6 +10,8 @@ import { formatLoad, dayShort } from '@/lib/format';
 import { formZone } from '@/lib/form';
 import { TEMPLATES, SPORT_LABELS } from '@/lib/workout';
 import { EditEventSheet } from '@/components/calendar/EventSheets';
+import { teamWorkoutAsEvent } from '@/lib/teamEvent';
+import type { AppEvent } from '@/services/calendarApi';
 import {
   cellKind,
   shortDuration,
@@ -48,8 +50,7 @@ export function TeamPlanning() {
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false);
   const [pickerProgress, setPickerProgress] = useState({ current: 0, total: 0 });
   const [pickerError, setPickerError] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [editingEvent, setEditingEvent] = useState<{ event: any; athleteId: string } | null>(null);
+  const [editingEvent, setEditingEvent] = useState<{ event: AppEvent; athleteId: string } | null>(null);
   const [showGroupSheet, setShowGroupSheet] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const groupMutations = useGroupMutations();
@@ -296,7 +297,7 @@ export function TeamPlanning() {
                   aria-pressed={kind === 'free' ? isSelected : undefined}
                   onClick={() => {
                     if (isWorkout) {
-                      setEditingEvent({ event: day.workouts[0], athleteId: athlete.id });
+                      setEditingEvent({ event: teamWorkoutAsEvent(day.workouts[0], day.date), athleteId: athlete.id });
                     } else {
                       toggleCellSelection(athlete.id, day.date, kind);
                     }
