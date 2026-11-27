@@ -98,8 +98,11 @@ export interface AthleteOverview {
 export interface TodayView {
   today: string;
   name: string;
+  ftp: number | null;
   workouts: PlannedEvent[];
   activitiesToday: Activity[];
+  doneEventIds: string[];
+  tomorrow: PlannedEvent[];
   week: Array<{ date: string; planned: string[]; load: number; done: boolean }>;
   form: { fitness: number; fatigue: number; form: number };
   checkin: Checkin | null;
@@ -237,6 +240,9 @@ export interface SavedWorkout {
   sport: Sport;
   description: string;
   updatedAt: string;
+  favorite: boolean;
+  sentCount: number;
+  lastSentAt: string | null;
 }
 
 export interface LibraryFolder {
@@ -264,4 +270,37 @@ export interface TrainingPlan {
 export interface ApplyPlanResult {
   total: number;
   results: Array<{ id: string; ok: boolean; created: number; error?: string }>;
+}
+
+/* ---------- Planning d'équipe (BFF : routes/team.ts) ---------- */
+
+export interface Group {
+  id: string;
+  name: string;
+  athleteIds: string[];
+}
+
+export interface TeamCalendarDay {
+  date: string;
+  availability: 'repos' | 'indisponible' | null;
+  workouts: Array<{ id: string; name: string; description: string | null; sport: string | null; load: number | null; seconds: number | null; done: boolean }>;
+  races: Array<{ id: string; name: string; priority: 'A' | 'B' | 'C' | null }>;
+  activities: Array<{ id: string; name: string | null; moving_time: number | null; load: number | null }>;
+}
+
+export interface TeamCalendarAthlete {
+  id: string;
+  name: string;
+  ftp: number | null;
+  form: number | null;
+  groupIds: string[];
+  error: string | null;
+  days: TeamCalendarDay[];
+  load: { planned: number; done: number; usual: number | null };
+}
+
+export interface TeamCalendar {
+  from: string;
+  to: string;
+  athletes: TeamCalendarAthlete[];
 }

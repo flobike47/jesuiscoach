@@ -3,7 +3,7 @@ import { requireUser } from '../auth.js';
 import { config } from '../config.js';
 import { randomToken } from '../lib/crypto.js';
 import { insertInvitation } from '../db/repo.js';
-import { appFitness, storeOf } from '../activityStore.js';
+import { appFitness, storeOf, withAppLoad } from '../activityStore.js';
 import { matchPlan } from '../lib/plan.js';
 import { isoDay, summarize } from '../lib/summary.js';
 import { assertCanView, listCheckins, sourceFor, teamOf } from '../sources.js';
@@ -84,8 +84,9 @@ export async function registerTeamRoutes(app: FastifyInstance) {
       : wellness
           .filter((w) => w.ctl != null)
           .map((w) => ({ date: w.id, fitness: w.ctl ?? 0, fatigue: w.atl ?? 0, form: Math.round(((w.ctl ?? 0) - (w.atl ?? 0)) * 10) / 10 }));
-    const summary = summarize(info, (app?.wellness ?? wellness).slice(-14), activities, events, now);
-    return { summary, series, activities, checkins, source: app ? 'app' : 'intervals' };
+    const shown = await withAppLoad(store, activities, daysAgo(now, 30), isoDay(now));
+    const summary = summarize(info, (app?.wellness ?? wellness).slice(-14), shown, events, now);
+    return { summary, series, activities: shown, checkins, source: app ? 'app' : 'intervals' };
   });
 
   /** Fil d'activité : sorties de toute l'équipe sur 7 jours, la plus récente d'abord. */
@@ -105,11 +106,9 @@ export async function registerTeamRoutes(app: FastifyInstance) {
         const { eventOfActivity } = matchPlan(events, activities);
         // Charge calculée par l'app quand elle existe (remplace icu_training_load, comme ailleurs).
         const store = await storeOf(id, src, now);
-        const stored = new Map((store ? await store.backend.list(daysAgo(now, 7), isoDay(now)) : []).map((r) => [r.id, r]));
-        return activities.map((a) => {
-          const planned = eventOfActivity.get(String(a.id));
-          const load = stored.get(String(a.id))?.load;
-          const activity = load == null ? a : { ...a, icu_training_load: load };
+        const shown = await withAppLoad(store, activities, daysAgo(now, 7), isoDay(now));
+        return shown.map((activity) => {
+          const planned = eventOfActivity.get(String(activity.id));
           return { athleteId: id, athleteName: info.name ?? id, activity, plannedName: planned ? (planned.name ?? 'Séance prévue') : null };
         });
       }),

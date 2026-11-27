@@ -14,7 +14,7 @@ cp apps/web/.env.example apps/web/.env
 npm run dev
 ```
 
-Ouvre http://localhost:5173 puis « Essayer avec une équipe de démo ». Le BFF crée les tables lui-même au démarrage.
+Ouvre http://localhost:5173 puis « Démo coach » (ou « Démo athlète »). Le BFF crée les tables lui-même au démarrage.
 
 ## Structure
 

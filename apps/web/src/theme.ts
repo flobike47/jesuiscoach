@@ -28,6 +28,6 @@ export const ZONE_COLORS = ['var(--gray)', 'var(--blue)', 'var(--green)', 'var(-
 
 export const METRIC_COLORS = {
   fitness: 'var(--blue)',
-  fatigue: 'var(--pink)',
+  fatigue: 'var(--purple)',
   form: 'var(--yellow)',
 } as const;

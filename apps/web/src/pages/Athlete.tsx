@@ -1,13 +1,19 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import dayjs from 'dayjs';
-import { AlertTriangle, BarChart3, Clock, TrendingUp, UserRound, Zap } from 'lucide-react';
-import { Avatar, Cell, Page, Placeholder, Section, Segmented } from '@/components/ios';
-import { Spinner } from '@/components/common/PageLoader';
-import { useAthleteOverview } from '@/hooks/useCoach';
-import { formatDuration, formatKm, formColor, relativeDay, signed } from '@/lib/format';
+import { AlertTriangle, BarChart3, CalendarDays, Clock, Flag, TrendingUp, UserRound, Zap } from 'lucide-react';
+import { Avatar, Cell, Page, Placeholder, Section, Segmented, FormGauge, SkeletonList } from '@/components/ios';
+import { useAthleteOverview, useMe } from '@/hooks/useCoach';
+import { WeekStrip } from '@/components/calendar/WeekStrip';
+import { useGoals } from '@/hooks/useCalendarData';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { PullIndicator } from '@/components/common/PullIndicator';
+import { formatDuration, formatKm, relativeDay, formatLoad } from '@/lib/format';
 import { METRIC_COLORS } from '@/theme';
+import { RaceBlockSheet } from '@/components/calendar/RaceBlockSheet';
+import { nextRace } from '@/lib/raceWeeks';
 import type { SeriesPoint } from '@/types';
 
 type Range = '30' | '90';
@@ -17,19 +23,43 @@ const FEELING_LABELS = ['Très mal', 'Fatigué', 'Correct', 'Bien', 'En pleine f
 /** Écran 4 (coach) : fiche d'un athlète de l'équipe. */
 export default function Athlete() {
   const { id } = useParams();
-  return <AthleteView id={id} back={{ to: '/', label: 'Équipe' }} />;
+  return <AthleteView id={id} back={{ to: '/equipe', label: 'Équipe' }} />;
 }
 
 /** Fiche athlète (forme sur 90 jours, alertes, ressentis, sorties récentes). */
-export function AthleteView({ id, back, title }: { id: string | undefined; back?: { to: string; label: string }; title?: string }) {
+export function AthleteView({ id, back, title, account }: { id: string | undefined; back?: { to: string; label: string }; title?: string; account?: boolean }) {
   const { data, isLoading, error } = useAthleteOverview(id);
+  const { data: goalsData } = useGoals(id);
   const [range, setRange] = useState<Range>('90');
+  const [raceBlockSheetOpen, setRaceBlockSheetOpen] = useState(false);
+  const [allRides, setAllRides] = useState(false);
+  const coach = useMe().data?.role === 'coach';
+  const enc = encodeURIComponent(id ?? '');
   const name = data?.summary.name ?? 'Athlète';
+  const queryClient = useQueryClient();
+
+  const { pullPosition, isRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['athlete', id] });
+    },
+  });
+
+  const upcomingRace = nextRace(goalsData?.races, dayjs().format('YYYY-MM-DD'));
 
   return (
-    <Page
+    <>
+      <PullIndicator pullPosition={pullPosition} isRefreshing={isRefreshing} />
+      <Page
       title={title ?? name}
       back={back}
+      account={account}
+      actions={
+        coach && id ? (
+          <Link to={`/calendrier?athlete=${enc}`} style={{ fontWeight: 600, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
+            Planifier
+          </Link>
+        ) : undefined
+      }
       header={
         data && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -41,22 +71,57 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
         )
       }
     >
-      {isLoading && (
-        <div style={{ display: 'grid', placeItems: 'center', padding: 48 }}>
-          <Spinner />
-        </div>
-      )}
+      {isLoading && <SkeletonList rows={4} />}
       {error && <Placeholder title="Fiche indisponible">{error.message}</Placeholder>}
 
       {data && (
         <>
           <div className="card">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
-              <Metric label="Fitness" value={Math.round(data.summary.fitness)} color={METRIC_COLORS.fitness} />
-              <Metric label="Fatigue" value={Math.round(data.summary.fatigue)} color={METRIC_COLORS.fatigue} />
-              <Metric label="Forme" value={signed(data.summary.form)} color={formColor(data.summary.form)} />
+            <FormGauge form={data.summary.form} fitness={data.summary.fitness} fatigue={data.summary.fatigue} audience="coach" />
+          </div>
+
+          <div className="chips" role="navigation" aria-label="Analyse">
+            <Link className="chip" to={`/athletes/${enc}/profil`}>
+              <UserRound size={16} color="var(--indigo)" aria-hidden />
+              Profil
+            </Link>
+            <Link className="chip" to={`/athletes/${enc}/puissance`}>
+              <Zap size={16} color="var(--blue)" aria-hidden />
+              Puissance
+            </Link>
+            <Link className="chip" to={`/athletes/${enc}/zones`}>
+              <BarChart3 size={16} color="var(--green)" aria-hidden />
+              Zones
+            </Link>
+            {coach && (
+              <Link className="chip" to={`/calendrier?athlete=${enc}`}>
+                <CalendarDays size={16} color="var(--orange)" aria-hidden />
+                Plan
+              </Link>
+            )}
+          </div>
+
+          {id && <WeekStrip athleteId={id} />}
+
+          {upcomingRace && (
+            <div className="card" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'color-mix(in srgb, var(--orange) 18%, transparent)', display: 'grid', placeItems: 'center', flex: 'none' }}>
+                <Flag size={22} color="var(--orange)" aria-hidden />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>{upcomingRace.name}{upcomingRace.racePriority ? ` · priorité ${upcomingRace.racePriority}` : ''}</div>
+                <div className="caption secondary" style={{ marginTop: 2 }}>
+                  {dayjs(upcomingRace.date).format('D MMMM')} · dans {Math.ceil(dayjs(upcomingRace.date).diff(dayjs(), 'week', true))} sem.
+                </div>
+              </div>
+              <button type="button" className="button tinted pressable" style={{ minHeight: 36, padding: '0 14px', fontSize: 15 }} onClick={() => setRaceBlockSheetOpen(true)}>
+                Préparer le bloc
+              </button>
             </div>
-            <div style={{ margin: '14px 0 8px' }}>
+          )}
+
+          <div className="card">
+            <div style={{ margin: '0 0 8px' }}>
               <Segmented<Range>
                 label="Période"
                 value={range}
@@ -74,12 +139,6 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
               <Legend color={METRIC_COLORS.form} label="Forme" />
             </div>
           </div>
-
-          <Section header="Analyse">
-            <Cell inset={52} leading={<UserRound size={20} color="var(--indigo)" aria-hidden />} title="Profil" subtitle="Physiologie, disponibilités, santé" to={`/athletes/${encodeURIComponent(id!)}/profil`} chevron />
-            <Cell inset={52} leading={<Zap size={20} color="var(--blue)" aria-hidden />} title="Puissance" subtitle="Courbe, records, FTP estimée" to={`/athletes/${encodeURIComponent(id!)}/puissance`} chevron />
-            <Cell inset={52} leading={<BarChart3 size={20} color="var(--green)" aria-hidden />} title="Zones" subtitle="Temps par zone, semaine par semaine" to={`/athletes/${encodeURIComponent(id!)}/zones`} chevron />
-          </Section>
 
           {data.summary.alerts.length > 0 && (
             <Section header="Points d'attention">
@@ -110,9 +169,20 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
             </Section>
           )}
 
-          <Section header="Sorties des 30 derniers jours">
-            {data.activities.length === 0 && <Cell title={<span className="secondary">Aucune sortie</span>} />}
-            {data.activities.map((a) => (
+          <Section
+            header={
+              <span style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Dernières sorties</span>
+                {data.activities.length > 3 && (
+                  <button type="button" onClick={() => setAllRides((v) => !v)} style={{ color: 'var(--tint)', textTransform: 'none', fontSize: 15 }}>
+                    {allRides ? 'Réduire' : `Tout voir (${data.activities.length})`}
+                  </button>
+                )}
+              </span>
+            }
+          >
+            {data.activities.length === 0 && <Cell title={<span className="secondary">Aucune sortie sur 30 jours</span>} />}
+            {(allRides ? data.activities : data.activities.slice(0, 3)).map((a) => (
               <Cell
                 key={a.id}
                 title={a.name ?? 'Sortie'}
@@ -122,7 +192,7 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
                     {a.icu_weighted_avg_watts ? ` · ${a.icu_weighted_avg_watts} W` : ''}
                   </span>
                 }
-                detail={a.icu_training_load != null ? <span aria-label={`Charge ${a.icu_training_load}`}>{a.icu_training_load}</span> : undefined}
+                detail={formatLoad(a.icu_training_load) !== '–' ? <span aria-label={`Charge ${a.icu_training_load}`}>{formatLoad(a.icu_training_load)}</span> : undefined}
                 to={`/athletes/${encodeURIComponent(id!)}/sorties/${encodeURIComponent(a.id)}`}
                 chevron
               />
@@ -132,17 +202,16 @@ export function AthleteView({ id, back, title }: { id: string | undefined; back?
         </>
       )}
     </Page>
-  );
-}
-
-function Metric({ label, value, color }: { label: string; value: string | number; color: string }) {
-  return (
-    <div>
-      <div className="caption secondary">{label}</div>
-      <div className="metric" style={{ color }}>
-        {value}
-      </div>
-    </div>
+    {raceBlockSheetOpen && upcomingRace && id && (
+      <RaceBlockSheet
+        athleteId={id}
+        race={upcomingRace}
+        sport="Ride"
+        today={dayjs().format('YYYY-MM-DD')}
+        onClose={() => setRaceBlockSheetOpen(false)}
+      />
+    )}
+    </>
   );
 }
 

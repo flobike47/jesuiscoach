@@ -198,6 +198,24 @@ function memoryContext(athleteId: string): StoreContext {
  * compte n'est pas connecté. En démo, les sorties récentes sont copiées en mémoire
  * à la demande depuis la source démo.
  */
+/**
+ * Remplace `icu_training_load` par la charge calculée par l'app quand la
+ * sortie est en magasin : une sortie a la même charge sur tous les écrans.
+ */
+export async function withAppLoad<T extends { id: string | number; icu_training_load?: number | null }>(
+  store: StoreContext | null,
+  activities: T[],
+  from: string,
+  to: string,
+): Promise<T[]> {
+  if (!store || activities.length === 0) return activities;
+  const stored = new Map((await store.backend.list(from, to)).map((r) => [r.id, r.load]));
+  return activities.map((a) => {
+    const load = stored.get(String(a.id));
+    return load == null ? a : { ...a, icu_training_load: load };
+  });
+}
+
 export async function storeOf(athleteId: string, src: AthleteSource, now = new Date()): Promise<StoreContext | null> {
   if (config.demoMode) {
     const ctx = memoryContext(athleteId);

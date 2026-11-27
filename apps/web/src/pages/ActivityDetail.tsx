@@ -2,12 +2,11 @@ import { useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import dayjs from 'dayjs';
-import { Cell, Page, Placeholder, Section } from '@/components/ios';
-import { Spinner } from '@/components/common/PageLoader';
+import { Cell, MetricGrid, Page, Placeholder, Section, SkeletonList } from '@/components/ios';
 import { ZoneBar } from '@/components/common/ZoneBar';
 import { useActivityDetail } from '@/hooks/useCoach';
 import { useAthleteBack } from '@/hooks/useAthleteBack';
-import { formatClock, formatDuration, formatHours, formatKm } from '@/lib/format';
+import { formatClock, formatDuration, formatHours, formatKm, formatLoad, formatIntensity } from '@/lib/format';
 import { ZONE_COLORS } from '@/theme';
 import type { ActivityView } from '@/types';
 
@@ -29,11 +28,7 @@ export default function ActivityDetail() {
         )
       }
     >
-      {isLoading && (
-        <div style={{ display: 'grid', placeItems: 'center', padding: 48 }}>
-          <Spinner />
-        </div>
-      )}
+      {isLoading && <SkeletonList rows={4} avatar={false} />}
       {error && <Placeholder title="Sortie indisponible">{error.message}</Placeholder>}
       {data && <Detail view={data} />}
     </Page>
@@ -51,13 +46,17 @@ function Detail({ view }: { view: ActivityView }) {
 
   return (
     <>
-      <div className="card" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', rowGap: 12 }}>
-        <Metric label="Durée" value={formatDuration(a.movingTime)} />
-        <Metric label="Distance" value={formatKm(a.distance)} />
-        <Metric label="D+" value={a.elevation != null ? `${a.elevation} m` : '–'} />
-        <Metric label="Charge" value={a.load != null ? String(a.load) : '–'} />
-        <Metric label="P. pondérée" value={a.weightedWatts != null ? `${a.weightedWatts} W` : '–'} />
-        <Metric label="Intensité" value={a.intensity != null ? a.intensity.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–'} />
+      <div className="card">
+        <MetricGrid
+          items={[
+            { label: 'Durée', value: formatDuration(a.movingTime) },
+            { label: 'Distance', value: formatKm(a.distance) },
+            { label: 'D+', value: a.elevation != null ? `${a.elevation} m` : '–' },
+            { label: 'Charge', value: formatLoad(a.load) },
+            { label: 'P. pondérée', value: a.weightedWatts != null ? `${a.weightedWatts} W` : '–' },
+            { label: 'Intensité', value: formatIntensity(a.intensity) },
+          ]}
+        />
       </div>
 
       {hasCurves ? (
@@ -158,17 +157,6 @@ function ZoneRow({ label, seconds }: { label: string; seconds: number[] }) {
             </span>
           ) : null,
         )}
-      </div>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="caption secondary">{label}</div>
-      <div className="tabular-nums" style={{ fontSize: 18, fontWeight: 600 }}>
-        {value}
       </div>
     </div>
   );

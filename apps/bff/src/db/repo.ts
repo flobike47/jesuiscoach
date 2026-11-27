@@ -369,13 +369,19 @@ export interface SavedWorkoutRow {
   name: string;
   sport: 'Ride' | 'Run' | 'Swim';
   description: string;
+  favorite: boolean;
+  sent_count: number;
+  last_sent_at: Date | string | null;
   updated_at: Date | string;
 }
 
-const SAVED_COLS = 'id, name, sport, description, updated_at';
+const SAVED_COLS = 'id, name, sport, description, favorite, sent_count, last_sent_at, updated_at';
 
 export async function savedWorkoutsOf(coachId: string): Promise<SavedWorkoutRow[]> {
-  const { rows } = await db().query<SavedWorkoutRow>(`select ${SAVED_COLS} from saved_workouts where coach_id = $1 order by updated_at desc`, [coachId]);
+  const { rows } = await db().query<SavedWorkoutRow>(
+    `select ${SAVED_COLS} from saved_workouts where coach_id = $1 order by favorite desc, last_sent_at desc nulls last, updated_at desc`,
+    [coachId],
+  );
   return rows;
 }
 
@@ -410,6 +416,34 @@ export async function updateSavedWorkout(
   return rows[0] ?? null;
 }
 
+/**
+ * Met à jour le statut favori d'une séance enregistrée.
+ */
+export async function updateSavedWorkoutFavorite(coachId: string, id: string, favorite: boolean): Promise<SavedWorkoutRow | null> {
+  const { rows } = await db().query<SavedWorkoutRow>(
+    `update saved_workouts set favorite = $3, updated_at = now() where coach_id = $1 and id = $2 returning ${SAVED_COLS}`,
+    [coachId, id, favorite],
+  );
+  return rows[0] ?? null;
+}
+
 export async function deleteSavedWorkout(coachId: string, id: string): Promise<boolean> {
   return affected(await db().query('delete from saved_workouts where coach_id = $1 and id = $2', [coachId, id])) > 0;
+}
+
+/**
+ * Incrémente le compteur d'envoi et met à jour la date du dernier envoi.
+ * Utilisé pour tracker l'usage d'une séance enregistrée (après envoi à N athlètes).
+ */
+export async function incrementSavedWorkoutUsage(
+  coachId: string,
+  id: string,
+  count: number,
+): Promise<SavedWorkoutRow | null> {
+  const { rows } = await db().query<SavedWorkoutRow>(
+    `update saved_workouts set sent_count = sent_count + $3, last_sent_at = now()
+     where coach_id = $1 and id = $2 returning ${SAVED_COLS}`,
+    [coachId, id, count],
+  );
+  return rows[0] ?? null;
 }

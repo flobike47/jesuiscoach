@@ -333,3 +333,11 @@ export function validateWorkoutCheck(body: unknown): WorkoutCheck {
     highIntensity: b.highIntensity == null ? false : bool(b.highIntensity, 'highIntensity'),
   };
 }
+
+/** Disponibilité d'un jour : exception (« indisponible ») ou jour habituel sans sortie (« repos »). */
+export function availabilityOf(day: string, state: Pick<CareState, 'days' | 'exceptions'>): 'repos' | 'indisponible' | null {
+  if (state.exceptions.some((e) => e.fromDay <= day && day <= e.toDay)) return 'indisponible';
+  const weekday = (new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7;
+  const d = state.days.find((x) => x.weekday === weekday);
+  return d && !d.available ? 'repos' : null;
+}

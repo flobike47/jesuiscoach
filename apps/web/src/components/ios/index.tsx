@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Circle, X, Diamond, AlertTriangle } from 'lucide-react';
 import { useSheetDrag } from '@/hooks/useSheetDrag';
+import { setNavDirection } from '@/lib/navTransition';
 import { usePrefersReducedMotion } from '@/components/common/usePrefersReducedMotion';
+import { useMe } from '@/hooks/useCoach';
+import { formZone, gaugePosition } from '@/lib/form';
+import { signed } from '@/lib/format';
+import { METRIC_COLORS } from '@/theme';
 
 /**
  * Composants iOS de l'app (liste groupée, titre large, segmenté, anneau,
@@ -17,6 +22,8 @@ interface PageProps {
   /** Lien retour (« ‹ Équipe »). */
   back?: { to: string; label: string };
   actions?: ReactNode;
+  /** Affiche un lien vers les réglages en haut à droite (avatar avec initiales). */
+  account?: boolean;
   /** Sous le grand titre (avatar, sous-titre…). */
   header?: ReactNode;
   children: ReactNode;
@@ -26,9 +33,10 @@ interface PageProps {
  * Le grand titre défile avec le contenu ; quand il disparaît, le titre
  * compact apparaît dans la barre translucide (comme UINavigationBar).
  */
-export function Page({ title, back, actions, header, children }: PageProps) {
+export function Page({ title, back, actions, account, header, children }: PageProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const [compact, setCompact] = useState(false);
+  const me = useMe();
 
   useEffect(() => {
     const el = titleRef.current;
@@ -38,12 +46,23 @@ export function Page({ title, back, actions, header, children }: PageProps) {
     return () => io.disconnect();
   }, []);
 
+  const finalActions = (
+    <>
+      {actions}
+      {account && me.data && (
+        <Link to="/reglages" viewTransition onClick={() => setNavDirection('forward')} aria-label="Réglages" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', background: 'var(--fill-2)', color: 'var(--label)', textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>
+          {me.data.name.split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase()}
+        </Link>
+      )}
+    </>
+  );
+
   return (
     <div className="page">
       <div className={compact ? 'nav-bar compact' : 'nav-bar'} style={{ '--nav-title-opacity': compact ? 1 : 0 } as CSSProperties}>
         <div>
           {back && (
-            <Link to={back.to} className="nav-back">
+            <Link to={back.to} viewTransition onClick={() => setNavDirection('back')} className="nav-back">
               <ChevronLeft size={26} strokeWidth={2.2} aria-hidden />
               {back.label}
             </Link>
@@ -52,7 +71,7 @@ export function Page({ title, back, actions, header, children }: PageProps) {
         <span className="nav-title" aria-hidden>
           {title}
         </span>
-        <div className="nav-actions">{actions}</div>
+        <div className="nav-actions">{finalActions}</div>
       </div>
       <h1 ref={titleRef} className="large-title" style={{ margin: '4px 0 12px' }}>
         {title}
@@ -102,7 +121,7 @@ export function Cell({ title, subtitle, detail, leading, to, onClick, chevron, i
   const style = inset ? ({ '--separator-inset': `${inset}px` } as CSSProperties) : undefined;
   if (to) {
     return (
-      <Link to={to} className="cell" style={{ ...style, color: 'inherit' }}>
+      <Link to={to} viewTransition onClick={() => setNavDirection('forward')} className="cell" style={{ ...style, color: 'inherit' }}>
         {content}
       </Link>
     );
@@ -278,6 +297,215 @@ export function Placeholder({ title, children, action }: { title: string; childr
       </p>
       {children && <p className="footnote" style={{ margin: 0 }}>{children}</p>}
       {action && <div style={{ marginTop: 16 }}>{action}</div>}
+    </div>
+  );
+}
+
+/* ---------- Badge de statut ---------- */
+
+type StatusType = 'done' | 'planned' | 'missed' | 'extra' | 'watch';
+
+const STATUS_SPECS: Record<StatusType, { icon: ReactNode; label: string; color: string; bg: string }> = {
+  done: {
+    label: 'Faite',
+    color: 'var(--green)',
+    bg: 'color-mix(in srgb, var(--green) 16%, transparent)',
+    icon: <Check size={12} strokeWidth={3.2} aria-hidden />,
+  },
+  planned: {
+    label: 'Prévue',
+    color: 'var(--blue)',
+    bg: 'color-mix(in srgb, var(--blue) 16%, transparent)',
+    icon: <Circle size={11} strokeWidth={3} aria-hidden />,
+  },
+  missed: {
+    label: 'Manquée',
+    color: 'var(--red)',
+    bg: 'color-mix(in srgb, var(--red) 16%, transparent)',
+    icon: <X size={11} strokeWidth={3.2} aria-hidden />,
+  },
+  extra: {
+    label: 'Hors plan',
+    color: 'var(--label-2)',
+    bg: 'var(--fill-2)',
+    icon: <Diamond size={11} strokeWidth={3} aria-hidden />,
+  },
+  watch: {
+    label: 'À surveiller',
+    color: 'var(--orange)',
+    bg: 'color-mix(in srgb, var(--orange) 16%, transparent)',
+    icon: <AlertTriangle size={12} strokeWidth={2.6} aria-hidden />,
+  },
+};
+
+export function StatusBadge({ status }: { status: StatusType }) {
+  const spec = STATUS_SPECS[status];
+  return (
+    <span
+      className="status-badge"
+      style={{
+        color: spec.color,
+        background: spec.bg,
+      }}
+    >
+      {spec.icon}
+      {spec.label}
+    </span>
+  );
+}
+
+/* ---------- Grille de métriques ---------- */
+
+export function MetricGrid({ items }: { items: Array<{ label: string; value: ReactNode; color?: string }> }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px 8px' }}>
+      {items.map((item, i) => (
+        <div key={i}>
+          <div className="caption secondary">{item.label}</div>
+          <div className="metric" style={{ color: item.color }}>
+            {item.value}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Squelettes de chargement ---------- */
+
+export function Skeleton({ width, height, radius = 6 }: { width?: string | number; height?: string | number; radius?: number }) {
+  const reducedMotion = usePrefersReducedMotion();
+  return (
+    <div
+      style={{
+        background: 'var(--fill)',
+        borderRadius: `${radius}px`,
+        width,
+        height,
+        animation: reducedMotion ? undefined : 'pulse 2s ease-in-out infinite',
+      }}
+    />
+  );
+}
+
+export function SkeletonList({ rows = 4, avatar = true }: { rows?: number; avatar?: boolean }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          {avatar && <Skeleton width={36} height={36} radius={50} />}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <Skeleton width="40%" height={12} />
+            <Skeleton width="70%" height={10} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Jauge de forme ---------- */
+
+export function FormGauge({
+  form,
+  fitness,
+  fatigue,
+  audience = 'coach',
+}: {
+  form: number;
+  fitness: number;
+  fatigue: number;
+  audience?: 'coach' | 'athlete';
+}) {
+  const zone = formZone(form);
+  const position = gaugePosition(form);
+
+  return (
+    <div style={{ padding: '12px 0' }}>
+      {/* Mot d'état en couleur */}
+      <div
+        style={{
+          fontSize: 24,
+          fontWeight: 700,
+          color: zone.color,
+          marginBottom: 10,
+        }}
+      >
+        {audience === 'coach' ? zone.label : zone.athleteLabel}
+      </div>
+
+      {/* Phrase de conseil */}
+      <p style={{ fontSize: 13, lineHeight: 1.45, margin: '0 0 12px', color: 'var(--label-2)' }}>
+        {zone.advice}
+      </p>
+
+      {/* Jauge avec segments et curseur */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1.2fr 1.6fr 1fr 1.3fr 0.9fr',
+          gap: '3px',
+          height: 8,
+          marginBottom: 6,
+          position: 'relative',
+        }}
+        role="img"
+        aria-label={`Forme ${form} : ${zone.label}`}
+      >
+        {/* Segments de couleur */}
+        {(['var(--red)', 'var(--green)', 'var(--gray)', 'var(--blue)', 'var(--yellow)'] as const).map((color, i) => (
+          <span
+            key={i}
+            style={{
+              background: color,
+              borderRadius: i === 0 ? '4px 2px 2px 4px' : i === 4 ? '2px 4px 4px 2px' : '2px',
+            }}
+          />
+        ))}
+
+        {/* Curseur blanc */}
+        <span
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: `${position}%`,
+            top: '-5px',
+            width: 4,
+            height: 18,
+            borderRadius: 2,
+            background: 'var(--label)',
+            boxShadow: '0 0 0 2px var(--cell)',
+            transform: 'translateX(-50%)',
+          }}
+        />
+      </div>
+
+      {/* Libellés des zones sous la jauge */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1.2fr 1.6fr 1fr 1.3fr 0.9fr',
+          gap: '3px',
+          marginBottom: 12,
+          fontSize: 11,
+          color: 'var(--label-2)',
+        }}
+      >
+        <span>&lt; −30</span>
+        <span>−30 à −10</span>
+        <span>−10 à 5</span>
+        <span>5 à 25</span>
+        <span>&gt; 25</span>
+      </div>
+
+      {/* Métriques */}
+      <MetricGrid
+        items={[
+          { label: 'Fitness', value: Math.round(fitness), color: METRIC_COLORS.fitness },
+          { label: 'Fatigue', value: Math.round(fatigue), color: METRIC_COLORS.fatigue },
+          { label: 'Forme', value: signed(form) },
+        ]}
+      />
     </div>
   );
 }

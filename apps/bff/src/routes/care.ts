@@ -1,12 +1,10 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { requireUser, type AuthUser } from '../auth.js';
-import { config } from '../config.js';
-import { dbCareStore, type Actor, type CareStore } from '../db/careRepo.js';
-import { findUserByAthlete } from '../db/repo.js';
-import { demoCareStore } from '../demoCare.js';
+import type { Actor, CareStore } from '../db/careRepo.js';
+import { careStoreFor } from '../careStore.js';
 import { CARE_LIMITS, checkWorkout, splitInjuries, validateAvailability, validateEquipment, validateException, validateInjury, validateWorkoutCheck, type Warning, type WorkoutCheck } from '../lib/care.js';
 import { isoDay } from '../lib/summary.js';
-import { assertCanView, demoSource, teamOf } from '../sources.js';
+import { assertCanView, teamOf } from '../sources.js';
 import { ATHLETE_ID_RE, BadRequest, Conflict, Forbidden, NotFound, clampArray, validateUuid } from '../validation.js';
 
 /**
@@ -16,15 +14,6 @@ import { ATHLETE_ID_RE, BadRequest, Conflict, Forbidden, NotFound, clampArray, v
  */
 
 /** Store de l'athlète + son nom (pour les messages d'avertissement). */
-async function careStoreFor(athleteId: string): Promise<{ store: CareStore; name: string }> {
-  if (config.demoMode) {
-    const info = await demoSource().athlete(athleteId);
-    return { store: demoCareStore(athleteId), name: info.name ?? athleteId };
-  }
-  const user = await findUserByAthlete(athleteId);
-  if (!user) throw new NotFound('Athlète introuvable');
-  return { store: dbCareStore(user.id), name: user.name };
-}
 
 /** Qui modifie : l'athlète lui-même, ou son coach. */
 const actorOf = (me: AuthUser, athleteId: string): Actor => (me.athleteId === athleteId ? 'athlete' : 'coach');

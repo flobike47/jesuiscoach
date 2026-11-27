@@ -31,6 +31,12 @@
   --radius: 12px;
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
   --tabbar-h: calc(50px + env(safe-area-inset-bottom, 0px));
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
 }
 
 :root[data-theme='light'] {
@@ -323,6 +329,13 @@ a.cell:active {
   padding: 14px 16px;
 }
 
+/* Cartes empilées dans le flux de la page (pas dans une grille à gap). */
+.page > .card + .card,
+.page > .card + section,
+.page > section + .card {
+  margin-top: 12px;
+}
+
 /* ---------- Avatar, pastilles ---------- */
 
 .avatar {
@@ -496,6 +509,10 @@ a.cell:active {
 @keyframes fade-in {
   from { opacity: 0; }
 }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 
 /* ---------- Champs ---------- */
 
@@ -571,11 +588,291 @@ textarea.field {
   }
 }
 
+/* ---------- Composants --- */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 7px;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+
+/* ---------- Recherche, puces, cartes défilantes ---------- */
+
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--label);
+  font: inherit;
+  outline: none;
+}
+.chips {
+  display: flex;
+  gap: 6px;
+  margin: 10px -16px 0;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 17px;
+  background: var(--cell);
+  color: var(--label);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.chip.active {
+  background: var(--tint);
+  color: #fff;
+}
+.scroller {
+  display: flex;
+  gap: 8px;
+  margin: 0 -16px;
+  padding: 0 16px 4px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.create-card,
+.fav-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 96px;
+  text-align: left;
+}
+.token {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--token);
+  background: color-mix(in srgb, var(--token) 18%, transparent);
+}
+.fav-card {
+  flex: 0 0 156px;
+  scroll-snap-align: start;
+}
+
+/* ---------- Planning d'équipe, grand écran ---------- */
+
+/*
+ * Sort de la colonne de 720 px de .page : jusqu'à 1440 px, marges de 24 px.
+ * Centré par une marge négative, surtout pas par un transform : un transform
+ * fait du planning le repère de ses enfants en position: fixed (étiquette qui
+ * suit la souris, aperçu de charge, bandeau « Annuler »), qui se retrouvaient
+ * décalés par rapport au pointeur.
+ */
+.wide-planner {
+  --wide-planner-width: min(1440px, calc(100vw - 48px));
+  position: relative;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px;
+  width: var(--wide-planner-width);
+  margin-top: 16px;
+  margin-left: calc((100% - var(--wide-planner-width)) / 2);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.wide-library {
+  align-self: start;
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 56px);
+  max-height: calc(100dvh - var(--tabbar-h) - 80px);
+  overflow-y: auto;
+}
+.wide-shortcuts {
+  display: grid;
+  gap: 3px;
+  margin: 12px 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--fill);
+  line-height: 1.4;
+}
+.wide-shortcuts b {
+  color: var(--label);
+}
+.wide-lib-item {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--fill);
+  cursor: grab;
+  touch-action: none;
+}
+.wide-grid {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  align-items: stretch;
+}
+.wide-head {
+  font-size: 12px;
+  color: var(--label-2);
+  text-align: center;
+  align-self: end;
+}
+.wide-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+}
+.wide-name .dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.wide-cell {
+  display: grid;
+  place-items: center;
+  height: 44px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  touch-action: none;
+}
+.wide-cell.drop-ok {
+  box-shadow: inset 0 0 0 2px var(--tint);
+  background: color-mix(in srgb, var(--tint) 18%, var(--cell)) !important;
+}
+.wide-cell.drop-no {
+  box-shadow: inset 0 0 0 2px var(--red);
+}
+.wide-sum {
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+.wide-ghost,
+.wide-preview {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+.wide-ghost {
+  padding: 8px 10px;
+  background: var(--tint);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  transform: rotate(-2deg);
+}
+.wide-preview {
+  display: grid;
+  gap: 2px;
+  max-width: 300px;
+  padding: 10px 12px;
+  background: var(--cell-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.wide-undo {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + 16px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: var(--cell-2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transform: translateX(-50%);
+  font-size: 15px;
+}
+.wide-undo button {
+  color: var(--tint);
+  font-weight: 600;
+  min-height: 36px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wide-ghost {
+    transform: none;
+  }
+}
+
+/* ---------- Transitions entre écrans (View Transitions) ---------- */
+
+/* La barre d'onglets ne bouge pas : seul le contenu change. */
+.tab-bar {
+  view-transition-name: tab-bar;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 320ms;
+  animation-timing-function: var(--ease-ios);
+  animation-fill-mode: both;
+}
+/* Push iOS : le nouvel écran arrive de la droite, l'ancien recule un peu. */
+html[data-nav='forward']::view-transition-new(root) { animation-name: vt-from-right; }
+html[data-nav='forward']::view-transition-old(root) { animation-name: vt-to-left; }
+/* Retour : chemin inverse (même trajet, sens opposé). */
+html[data-nav='back']::view-transition-new(root) { animation-name: vt-from-left; }
+html[data-nav='back']::view-transition-old(root) { animation-name: vt-to-right; }
+/* Onglets : fondu court, sans déplacement. */
+html[data-nav='tab']::view-transition-new(root) { animation: 180ms ease-out both vt-fade-in; }
+html[data-nav='tab']::view-transition-old(root) { animation: 120ms ease-out both vt-fade-out; }
+
+@keyframes vt-from-right { from { transform: translateX(100%); } }
+@keyframes vt-to-left { to { transform: translateX(-25%); opacity: 0.6; } }
+@keyframes vt-from-left { from { transform: translateX(-25%); opacity: 0.6; } }
+@keyframes vt-to-right { to { transform: translateX(100%); } }
+@keyframes vt-fade-in { from { opacity: 0; } }
+@keyframes vt-fade-out { to { opacity: 0; } }
+
 /* ---------- Accessibilité ---------- */
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  /* Pas de glissement : un fondu court, quel que soit le sens. */
+  ::view-transition-new(root),
+  ::view-transition-old(root) {
+    animation: 160ms ease-out both vt-fade-in !important;
+  }
+  ::view-transition-old(root) {
+    animation-name: vt-fade-out !important;
   }
   .sheet {
     animation: fade-in 200ms ease-out;
@@ -586,6 +883,9 @@ textarea.field {
   }
   .pressable:active {
     transform: none;
+  }
+  @keyframes pulse {
+    0%, 100%, 50% { opacity: 1; }
   }
 }
 

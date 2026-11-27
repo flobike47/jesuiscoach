@@ -87,7 +87,7 @@ export default function Settings() {
   };
 
   return (
-    <Page title="Réglages">
+    <Page title="Réglages" back={{ to: '/', label: "Aujourd'hui" }}>
       <Section>
         <Cell title={me.data?.name ?? '…'} subtitle={me.data ? `${me.data.role === 'coach' ? 'Coach' : 'Athlète'}${demo ? ' · démo' : ''}` : undefined} />
         <Cell inset={52} leading={<UserRound size={20} color="var(--blue)" aria-hidden />} title="Mon profil" subtitle="Physiologie, disponibilités, santé" to="/profil" chevron />

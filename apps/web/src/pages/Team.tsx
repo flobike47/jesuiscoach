@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Avatar, Cell, Page, Placeholder, Rings, Section } from '@/components/ios';
-import { Spinner } from '@/components/common/PageLoader';
+import { useQueryClient } from '@tanstack/react-query';
+import { Avatar, Cell, Page, Placeholder, Rings, Section, SkeletonList } from '@/components/ios';
 import { useTeam } from '@/hooks/useCoach';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { PullIndicator } from '@/components/common/PullIndicator';
 import type { AthleteSummary } from '@/types';
 import { signed } from '@/lib/format';
 
@@ -9,6 +11,13 @@ import { signed } from '@/lib/format';
 export default function Team() {
   const { data, isLoading, error, refetch } = useTeam();
   const [query, setQuery] = useState('');
+  const queryClient = useQueryClient();
+
+  const { pullPosition, isRefreshing } = usePullToRefresh({
+    onRefresh: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['team'] });
+    },
+  });
   const athletes = useMemo(
     () => (data?.athletes ?? []).filter((a) => a.name.toLowerCase().includes(query.trim().toLowerCase())),
     [data, query],
@@ -22,25 +31,22 @@ export default function Team() {
   const active = all.filter((a) => a.daysSinceRide != null && a.daysSinceRide < 7).length;
 
   return (
-    <Page title="Équipe">
-      <Section>
-        <Cell title="Aujourd’hui" subtitle="Séances prévues et sorties de l’équipe" to="/aujourdhui" chevron />
-      </Section>
-      <input
-        type="search"
-        className="field"
-        placeholder="Rechercher"
-        aria-label="Rechercher un athlète"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        style={{ background: 'var(--fill)', borderRadius: 10, minHeight: 36, padding: '7px 12px' }}
-      />
-
-      {isLoading && (
-        <div style={{ display: 'grid', placeItems: 'center', padding: 48 }}>
-          <Spinner />
-        </div>
+    <>
+      <PullIndicator pullPosition={pullPosition} isRefreshing={isRefreshing} />
+      <Page title="Équipe" account>
+      {(data?.athletes ?? []).length >= 8 && (
+        <input
+          type="search"
+          className="field"
+          placeholder="Rechercher"
+          aria-label="Rechercher un athlète"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{ background: 'var(--fill)', borderRadius: 10, minHeight: 36, padding: '7px 12px', marginBottom: 12 }}
+        />
       )}
+
+      {isLoading && <SkeletonList rows={4} />}
       {error && (
         <Placeholder title="Équipe indisponible" action={<button type="button" className="button tinted pressable" onClick={() => refetch()}>Réessayer</button>}>
           {error.message}
@@ -86,6 +92,7 @@ export default function Team() {
         </>
       )}
     </Page>
+    </>
   );
 }
 

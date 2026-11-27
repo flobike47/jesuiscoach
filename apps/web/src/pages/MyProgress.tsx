@@ -6,5 +6,5 @@ import { PageLoader } from '@/components/common/PageLoader';
 export default function MyProgress() {
   const me = useMe();
   if (!me.data) return <PageLoader />;
-  return <AthleteView id={me.data.athleteId} title="Progrès" />;
+  return <AthleteView id={me.data.athleteId} title="Progrès" account />;
 }

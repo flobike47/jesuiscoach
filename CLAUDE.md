@@ -20,7 +20,7 @@ Agir en dev senior responsable de la stabilité en prod : cause racine plutôt q
 
 ## Commandes
 - `npm run db:up` puis `npm run dev` (web :5173, BFF :4000, Postgres :5433, Redis :6380)
-- Mode démo sans comptes : `DEMO_MODE=true` dans `apps/bff/.env` (10 cyclistes fictifs, bouton « Essayer avec une équipe de démo »)
+- Mode démo sans comptes : `DEMO_MODE=true` dans `apps/bff/.env` (10 cyclistes fictifs, boutons « Démo coach » et « Démo athlète »)
 - `npm run check` = typecheck + lint + tests + build (même porte que le CI)
 
 ## Garde-fous

@@ -21,7 +21,8 @@ vi.mock('ioredis', async () => {
 vi.mock('web-push', () => ({ default: { setVapidDetails: vi.fn(), sendNotification: vi.fn(async () => ({ statusCode: 201 })) } }));
 
 const COACH = { authorization: 'Bearer demo' };
-const T = new Date().toISOString().slice(0, 10);
+// Même « aujourd'hui » que l'app (Europe/Paris), sinon le test échoue entre minuit et 1 h.
+const T = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const addDays = (n: number) => new Date(Date.parse(`${T}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 let app: FastifyInstance;

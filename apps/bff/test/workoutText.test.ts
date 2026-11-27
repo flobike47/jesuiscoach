@@ -89,3 +89,17 @@ describe('parseWorkoutText', () => {
     expect(estimatedSeconds(parseWorkoutText('- 1km 90% Pace').blocks, 'Run')).toBe(300);
   });
 });
+
+describe('estimatedLoad', () => {
+  it('une heure au seuil vaut 100', async () => {
+    const { estimatedLoad, parseWorkoutText } = await import('../src/lib/workoutText.js');
+    expect(estimatedLoad(parseWorkoutText('- 60m 100%').blocks)).toBe(100);
+  });
+  it('compte les répétitions et ignore les paliers en distance', async () => {
+    const { estimatedLoad, parseWorkoutText } = await import('../src/lib/workoutText.js');
+    const sst = parseWorkoutText('- 15m 50-75%\n\n3x\n- 12m 88-93%\n- 4m 55%\n\n- 10m 50%').blocks;
+    expect(estimatedLoad(sst)).toBeGreaterThan(60);
+    expect(estimatedLoad(sst)).toBeLessThan(90);
+    expect(estimatedLoad(parseWorkoutText('- 5km 80%').blocks)).toBe(0);
+  });
+});

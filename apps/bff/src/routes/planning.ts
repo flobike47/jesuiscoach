@@ -4,6 +4,7 @@ import { createEvent } from '../calendarService.js';
 import {
   deletePlan,
   deleteSavedWorkout,
+  incrementSavedWorkoutUsage,
   insertPlan,
   insertSavedWorkout,
   planOf,
@@ -11,6 +12,7 @@ import {
   savedWorkoutsOf,
   updatePlan,
   updateSavedWorkout,
+  updateSavedWorkoutFavorite,
   type PlanRow,
   type SavedWorkoutRow,
 } from '../db/repo.js';
@@ -51,13 +53,29 @@ interface SavedBody {
   name?: unknown;
   sport?: unknown;
   description?: unknown;
+  favorite?: unknown;
 }
 
-const savedJson = (w: SavedWorkoutRow) => ({ id: w.id, name: w.name, sport: w.sport, description: w.description, updatedAt: new Date(w.updated_at).toISOString() });
+const savedJson = (w: SavedWorkoutRow) => ({
+  id: w.id,
+  name: w.name,
+  sport: w.sport,
+  description: w.description,
+  favorite: w.favorite,
+  sentCount: w.sent_count,
+  lastSentAt: w.last_sent_at ? new Date(w.last_sent_at).toISOString() : null,
+  updatedAt: new Date(w.updated_at).toISOString(),
+});
 
 function savedInput(body: SavedBody | undefined) {
   if (typeof body?.name !== 'string' || typeof body.description !== 'string') throw new BadRequest('name et description requis');
   return { name: validateString(body.name, 'name', 120), sport: validateSport(body.sport), description: validateString(body.description, 'description', 4000) };
+}
+
+/** Mise à jour partielle d'une séance enregistrée : le favori seulement. */
+function savedInputPartial(body: SavedBody | undefined): { favorite: boolean } {
+  if (typeof body?.favorite !== 'boolean') throw new BadRequest('favorite requis');
+  return { favorite: body.favorite };
 }
 
 function planInput(body: PlanBody | undefined) {
@@ -98,6 +116,27 @@ export async function registerPlanningRoutes(app: FastifyInstance) {
     const me = requireCoach(req);
     if (!(await deleteSavedWorkout(me.id, validateUuid(req.params.id)))) throw new NotFound('Séance introuvable');
     return { ok: true };
+  });
+
+  app.patch<{ Params: { id: string }; Body: SavedBody }>('/saved-workouts/:id', async (req) => {
+    const me = requireCoach(req);
+    const { favorite } = savedInputPartial(req.body);
+    const saved = await updateSavedWorkoutFavorite(me.id, validateUuid(req.params.id), favorite);
+    if (!saved) throw new NotFound('Séance introuvable');
+    return savedJson(saved);
+  });
+
+  interface UsedBody {
+    count?: unknown;
+  }
+
+  app.post<{ Params: { id: string }; Body: UsedBody }>('/saved-workouts/:id/used', async (req) => {
+    const me = requireCoach(req);
+    const count = req.body?.count;
+    if (typeof count !== 'number' || count < 1 || count > 50 || !Number.isInteger(count)) throw new BadRequest('count doit être un entier entre 1 et 50');
+    const saved = await incrementSavedWorkoutUsage(me.id, validateUuid(req.params.id), count);
+    if (!saved) throw new NotFound('Séance introuvable');
+    return savedJson(saved);
   });
 
   app.get('/plans', async (req) => {
