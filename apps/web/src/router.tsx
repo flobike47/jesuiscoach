@@ -66,6 +66,8 @@ export const router = createBrowserRouter(
             { path: 'activite', lazy: page(() => import('@/pages/Activity')) },
             { path: 'calendrier', lazy: page(() => import('@/pages/Calendar')) },
             { path: 'equipe', lazy: page(() => import('@/pages/Team')) },
+            // Tendances de l'équipe (P3) : fitness du groupe, sports pratiqués
+            { path: 'equipe/tendances', lazy: page(() => import('@/pages/TeamTrends')) },
             { path: 'seances', lazy: page(() => import('@/pages/Workouts')) },
             { path: 'reglages', lazy: page(() => import('@/pages/Settings')) },
             { path: 'bien-demarrer', lazy: page(() => import('@/pages/Welcome')) },
@@ -86,6 +88,8 @@ export const router = createBrowserRouter(
             { path: 'athletes/:id/profil/appareils', lazy: page(() => import('@/pages/profile/Devices')) },
             // Phase C : accueil du coach et équipe
             { path: 'aujourdhui', lazy: page(() => import('@/pages/TeamToday')) },
+            // Coach : résumé de la semaine (depuis la carte « Semaine écoulée » de l'accueil)
+            { path: 'semaine', lazy: page(() => import('@/pages/WeekReview')) },
             { path: '*', element: <Navigate to="/" replace /> },
           ],
         },

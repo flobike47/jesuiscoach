@@ -3,11 +3,13 @@ import dayjs from 'dayjs';
 import { Check, Circle, Flag, X } from 'lucide-react';
 import { Placeholder, SkeletonList } from '@/components/ios';
 import { MonthView } from '@/components/calendar/MonthView';
+import { RestCard } from '@/components/calendar/RestDay';
 import { WorkoutProfile } from '@/components/workout/StructureEditor';
 import { useCalendar } from '@/hooks/useCoach';
 import { useEventMutations, useGoals } from '@/hooks/useCalendarData';
 import { nextRace, raceSubtitle, raceWeekLabel } from '@/lib/raceWeeks';
 import { monthGrid } from '@/lib/calendar';
+import { isPrescribedRest } from '@/lib/restDay';
 import { formatDuration, formatLoad } from '@/lib/format';
 import { parseWorkout, workoutStats, type Sport } from '@/lib/workout';
 import type { AppEvent } from '@/services/calendarApi';
@@ -22,10 +24,13 @@ export function MonthPanel({
   athleteId,
   unavailable,
   onEdit,
+  restEditable = true,
 }: {
   athleteId: string;
   unavailable: (day: string) => 'repos' | 'indisponible' | null;
   onEdit: (e: AppEvent) => void;
+  /** Le coach modifie un repos prescrit ; l'athlète le voit en lecture seule. */
+  restEditable?: boolean;
 }) {
   const today = dayjs().format('YYYY-MM-DD');
   const [month, setMonth] = useState(() => dayjs().startOf('month'));
@@ -119,6 +124,7 @@ export function MonthPanel({
             </p>
           )}
           {onDay(selected).map((e) => {
+            if (isPrescribedRest(e)) return <RestCard key={String(e.id)} event={e} onEdit={restEditable ? () => onEdit(e) : undefined} />;
             const workout = e.category === 'WORKOUT';
             const steps = workout ? parseWorkout(e.description ?? '') : [];
             const stats = workoutStats(steps);

@@ -17,6 +17,7 @@ vi.mock('../src/sources.js', async (orig) => ({
   sourceFor: async (): Promise<AthleteSource> => ({
     athlete: async (id) => ({ id, name: 'Athlète B' }),
     wellness: async () => [{ id: '2026-11-24', ctl: 60, atl: 62, rampRate: 2 }],
+    wellnessHistory: async () => [],
     activities: async () => (source.calls++, source.activities),
     events: async () => [],
     createWorkout: async () => ({ start_date_local: '' }),

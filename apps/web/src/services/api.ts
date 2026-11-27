@@ -13,6 +13,8 @@ import type { Checkin, TodayView, PlannedEvent, AthleteOverview, AthleteSummary,
 
 /** Requêtes de données : Intervals.icu peut être lent au premier appel non mis en cache. */
 const DEFAULT_TIMEOUT_MS = 20_000;
+/** Envois groupés (une écriture Intervals.icu par séance, à la suite) : le BFF peut mettre plus de 20 s. */
+export const BATCH_TIMEOUT_MS = 120_000;
 
 let baseURL = runtimeConfig.bffUrl.replace(/\/+$/, '');
 let token = '';
@@ -93,8 +95,8 @@ async function get<T>(
   return res.data;
 }
 
-async function post<T, B = unknown>(path: string, body: B): Promise<T> {
-  const res = await getClient().post<T>(`/api${path}`, body);
+async function post<T, B = unknown>(path: string, body: B, opts?: { timeout?: number }): Promise<T> {
+  const res = await getClient().post<T>(`/api${path}`, body, opts?.timeout ? { timeout: opts.timeout } : undefined);
   return res.data;
 }
 

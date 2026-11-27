@@ -57,6 +57,29 @@ describe('validateEventInput', () => {
   });
 });
 
+describe('validateEventInput : repos prescrit', () => {
+  it("nomme « Repos » un repos sans nom et efface sport et champs de compétition", () => {
+    expect(validateEventInput({ kind: 'rest', date: '2026-12-01', sport: 'Ride', racePriority: 'A' })).toEqual({
+      kind: 'rest',
+      date: '2026-12-01',
+      name: 'Repos',
+      description: null,
+      sport: null,
+      racePriority: null,
+      raceDistanceM: null,
+      raceGoal: null,
+    });
+    expect(validateEventInput({ kind: 'rest', date: '2026-12-01', name: '  ' }).name).toBe('Repos');
+  });
+
+  it('garde le nom et la consigne donnés par le coach', () => {
+    expect(validateEventInput({ kind: 'rest', date: '2026-12-01', name: 'Repos complet', description: 'Étirements 10 min' })).toMatchObject({
+      name: 'Repos complet',
+      description: 'Étirements 10 min',
+    });
+  });
+});
+
 describe('validateEventPatch', () => {
   it('ne retourne que les champs présents', () => {
     expect(validateEventPatch({ name: ' Nouveau nom ' })).toEqual({ name: 'Nouveau nom' });
@@ -75,6 +98,10 @@ describe('categoryOf', () => {
     expect(categoryOf('race', 'B')).toBe('RACE_B');
     expect(categoryOf('workout', null)).toBe('WORKOUT');
     expect(categoryOf('note', null)).toBe('NOTE');
+  });
+
+  it('un repos prescrit part en NOTE (pas de catégorie repos chez Intervals.icu)', () => {
+    expect(categoryOf('rest', null)).toBe('NOTE');
   });
 });
 

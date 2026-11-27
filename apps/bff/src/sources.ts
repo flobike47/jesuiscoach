@@ -17,6 +17,11 @@ import { HttpError, NotFound } from './validation.js';
 export interface AthleteSource {
   athlete(id: string): Promise<IntervalsAthlete>;
   wellness(id: string, oldest: string, newest: string): Promise<IntervalsWellness[]>;
+  /**
+   * Même lecture sur une longue période (courbe du poids sur un an), gardée
+   * plus longtemps en cache ; vidée comme `wellness` après une pesée.
+   */
+  wellnessHistory(id: string, oldest: string, newest: string): Promise<IntervalsWellness[]>;
   activities(id: string, oldest: string, newest: string): Promise<IntervalsActivity[]>;
   events(id: string, oldest: string, newest: string): Promise<IntervalsEvent[]>;
   createWorkout(id: string, workout: NewWorkoutEvent): Promise<IntervalsEvent>;
@@ -78,6 +83,8 @@ function cachedSource(athleteId: string, client: IntervalsClient): AthleteSource
   return {
     athlete: (id) => cachedJson(k('athlete'), TTL.athlete, () => client.athlete(id)),
     wellness: (id, o, n) => cachedJson(k('wellness', o, n), TTL.wellness, () => client.wellness(id, o, n)),
+    // Préfixe `wellness` : `updateWellness` invalide aussi cette copie (pas de courbe périmée après une pesée).
+    wellnessHistory: (id, o, n) => cachedJson(k('wellness', o, n), TTL.wellnessHistory, () => client.wellness(id, o, n)),
     activities: (id, o, n) => cachedJson(k('activities', o, n), TTL.activities, () => client.activities(id, o, n)),
     events: (id, o, n) => cachedJson(k('events', o, n), TTL.events, () => client.events(id, o, n)),
     createWorkout: (id, w) => client.createWorkout(id, w),

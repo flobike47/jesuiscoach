@@ -73,11 +73,13 @@ export async function registerCalendarRoutes(app: FastifyInstance) {
     return readCalendar(id, from, to);
   });
 
-  /** Crée une séance, une compétition (A/B/C) ou une note dans le calendrier de l'athlète. */
+  /** Crée une séance, une compétition (A/B/C), une note ou un repos prescrit (coach) dans le calendrier de l'athlète. */
   app.post<{ Params: { id: string }; Body: unknown }>('/athletes/:id/events', async (req, reply) => {
     const { id } = req.params;
     const { me, by } = await access(req, id);
     const input = validateEventInput(req.body);
+    // Le repos prescrit est une consigne du coach ; l'athlète déclare les siens dans ses disponibilités.
+    if (input.kind === 'rest' && by !== 'coach') throw new Forbidden();
     await enforceQuota(me.id, 'editCalendar');
     const row = await createEvent(id, input, by);
     reply.code(201);

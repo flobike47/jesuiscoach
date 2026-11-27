@@ -7,6 +7,7 @@ import { useProfile, useSaveIdentity } from '@/hooks/useProfile';
 import { changedOf, LIMITS, maxBirthDate, todayIso } from '@/lib/physio';
 import type { IdentityValues } from '@/services/profileApi';
 import { CoachNote, SyncNote } from './Physiology';
+import { WeightSharingSection } from '@/components/trends/WeightSharingSection';
 
 /** Identité : date de naissance, sexe, taille, poids, FC de repos. Même envoi que la physiologie. */
 export { IdentityRow } from './Physiology';
@@ -97,6 +98,8 @@ export default function IdentityPage() {
         )}
         <SyncNote sync={data.sync} />
       </div>
+      {/* Partage de la courbe du poids : décision de l'athlète seul. */}
+      {self && <WeightSharingSection />}
     </Page>
   );
 }

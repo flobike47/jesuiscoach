@@ -115,6 +115,11 @@ export default function Privacy() {
               signalée sur ta fiche (« Modifié par ton coach le… »).
             </>,
             <>
+              <strong>Évolution de ton poids</strong> : toi seul vois la courbe de ton poids, sauf si tu autorises ton coach
+              à la voir (Profil → Identité → « Partage avec ton coach »). Désactivé par défaut, cet accord se retire à tout
+              moment et vaut seulement pour ton coach. Ton poids du jour reste dans ta fiche profil, que ton coach consulte.
+            </>,
+            <>
               Aucune vente, aucune publicité, aucun outil de mesure d'audience, aucun traitement par intelligence
               artificielle.
             </>,
@@ -243,6 +248,11 @@ export default function Privacy() {
               You, and the coach who invited you to their team. Other athletes cannot see your data. Your coach can view and
               change your profile sheet (availability, equipment, injuries); the last change is shown on your sheet ("Changed
               by your coach on…").
+            </>,
+            <>
+              <strong>Weight history</strong>: only you can see your weight curve, unless you allow your coach to see it
+              (Profile → Identity → "Share with your coach"). Off by default, this permission can be withdrawn at any time
+              and only covers your coach. Your current weight stays on your profile sheet, which your coach can view.
             </>,
             <>No selling, no advertising, no analytics, no artificial intelligence processing.</>,
             <>

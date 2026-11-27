@@ -6,6 +6,8 @@ import { Page, Placeholder, Segmented, Sheet, SkeletonList } from '@/components/
 import { AthletePicker } from '@/components/calendar/AthletePicker';
 import { EditEventSheet, NewEventSheet } from '@/components/calendar/EventSheets';
 import { MonthPanel } from '@/components/calendar/MonthPanel';
+import { RestCard, RestSheet } from '@/components/calendar/RestDay';
+import { BlockCopySheet } from '@/components/calendar/BlockCopySheet';
 import { TeamPlanning } from '@/components/calendar/TeamPlanning';
 import { TeamPlanningWide } from '@/components/calendar/TeamPlanningWide';
 import { useCalendar, useTeam } from '@/hooks/useCoach';
@@ -18,6 +20,7 @@ import { formatDuration, formatLoad, formatHours, dayShort } from '@/lib/format'
 import { parseWorkout, workoutStats, type Sport } from '@/lib/workout';
 import { WorkoutProfile } from '@/components/workout/StructureEditor';
 import { useMediaQuery } from '@/lib/mediaQuery';
+import { isPlainNote, isPrescribedRest, prescribedRestDays } from '@/lib/restDay';
 import type { AppEvent } from '@/services/calendarApi';
 
 /** Écran 6 (coach) : semaine d'un athlète de l'équipe, au choix. */
@@ -51,6 +54,7 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
   const [addingDay, setAddingDay] = useState<dayjs.Dayjs | null>(null);
   const [showCopyWeek, setShowCopyWeek] = useState(false);
   const [copyingWeek, setCopyingWeek] = useState(false);
+  const [copyingBlock, setCopyingBlock] = useState(false);
   const [resyncError, setResyncError] = useState<string | null>(null);
   const [view, setView] = useState<'semaine' | 'mois' | 'equipe'>(() => {
     const v = searchParams.get('vue');
@@ -72,9 +76,10 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
       const onDay = (e: AppEvent) => e.start_date_local.startsWith(key);
       const planned = events.filter((e) => e.category === 'WORKOUT' && onDay(e));
       const races = events.filter((e) => e.category?.startsWith('RACE_') && onDay(e));
-      const notes = events.filter((e) => e.category === 'NOTE' && onDay(e));
+      const notes = events.filter((e) => isPlainNote(e) && onDay(e));
+      const rests = events.filter((e) => isPrescribedRest(e) && onDay(e));
       const done = (cal.data?.activities ?? []).filter((a) => a.start_date_local.startsWith(key));
-      return { d, key, planned, races, notes, done };
+      return { d, key, planned, races, notes, rests, done };
     });
   }, [weekStart, events, cal.data?.activities]);
 
@@ -225,10 +230,10 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '16px 0' }}>
-            {days.map(({ d, key, planned, races, notes, done }) => {
+            {days.map(({ d, key, planned, races, notes, rests, done }) => {
               const status = care.data ? dayStatus(key, care.data) : null;
               const isToday = key === today;
-              const hasEvents = planned.length > 0 || races.length > 0 || notes.length > 0;
+              const hasEvents = planned.length > 0 || races.length > 0 || notes.length > 0 || rests.length > 0;
 
               return (
                 <div key={key} style={{ display: 'grid', gridTemplateColumns: '44px minmax(0, 1fr)', gap: 10, alignItems: 'start' }}>
@@ -292,7 +297,8 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
                                 type="button"
                                 onClick={() => {
                                   if (!care.data) return;
-                                  const busy = new Set(planned.map((x) => x.start_date_local.slice(0, 10)));
+                                  // Ni un jour déjà pris, ni un repos prescrit par le coach.
+                                  const busy = new Set([...planned.map((x) => x.start_date_local.slice(0, 10)), ...prescribedRestDays(events)]);
                                   const nextDay = nextFreeDay(key, busy, (day) => !isDayOpen(day, care.data), 14);
                                   if (nextDay) {
                                     setEditing(e);
@@ -327,6 +333,11 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
                         </div>
                         {e.raceGoal && <div style={{ fontSize: 13, color: 'var(--label-2)' }}>{e.raceGoal}</div>}
                       </div>
+                    ))}
+
+                    {/* Repos prescrits par le coach (l'athlète les voit en lecture seule) */}
+                    {rests.map((e) => (
+                      <RestCard key={`rest${String(e.id)}`} event={e} onEdit={fixed ? undefined : () => setEditing(e)} />
                     ))}
 
                     {/* Notes */}
@@ -397,16 +408,20 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
             athleteId={athleteId}
             unavailable={(day) => (care.data ? dayStatus(day, care.data) : null)}
             onEdit={(e) => setEditing(e)}
+            restEditable={!fixed}
           />
         ) : null
       )}
 
       {view === 'equipe' && (isWideScreen ? <TeamPlanningWide /> : <TeamPlanning />)}
 
-      {editing && athleteId && (
+      {editing && athleteId && isPrescribedRest(editing) && (
+        <RestSheet key={String(editing.id)} athleteId={athleteId} event={editing} weekStart={weekStart} onClose={() => setEditing(null)} />
+      )}
+      {editing && athleteId && !isPrescribedRest(editing) && (
         <EditEventSheet key={String(editing.id)} athleteId={athleteId} event={editing} weekStart={weekStart} initialDate={editingInitialDate ?? undefined} onClose={() => { setEditing(null); setEditingInitialDate(null); }} />
       )}
-      {adding && athleteId && <NewEventSheet athleteId={athleteId} weekStart={weekStart} defaultDay={addingDay ?? selectedDay} onClose={() => { setAdding(false); setAddingDay(null); }} />}
+      {adding && athleteId && <NewEventSheet athleteId={athleteId} weekStart={weekStart} defaultDay={addingDay ?? selectedDay} allowRest={!fixed} onClose={() => { setAdding(false); setAddingDay(null); }} />}
 
       {showCopyWeek && (
         <Sheet open onClose={() => setShowCopyWeek(false)} title="Actions de la semaine">
@@ -434,6 +449,15 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
             </button>
             <button
               type="button"
+              className="button tinted block pressable"
+              style={{ marginTop: 8, minHeight: 44 }}
+              disabled={copyingWeek}
+              onClick={() => (setShowCopyWeek(false), setCopyingBlock(true))}
+            >
+              Dupliquer un bloc de semaines…
+            </button>
+            <button
+              type="button"
               onClick={() => setShowCopyWeek(false)}
               disabled={copyingWeek}
               style={{
@@ -453,6 +477,7 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
           </div>
         </Sheet>
       )}
+      {copyingBlock && athleteId && <BlockCopySheet athleteId={athleteId} monday={from} athletes={athletes} onClose={() => setCopyingBlock(false)} />}
     </Page>
   );
 }

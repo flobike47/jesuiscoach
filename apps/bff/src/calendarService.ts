@@ -190,7 +190,7 @@ function mergeRow(row: CalendarRow, patch: EventPatch): NewCalendarRow {
   };
   if (row.kind === 'workout' && !merged.sport) throw new BadRequest('sport requis pour une séance');
   if (row.kind === 'race' && !merged.racePriority) throw new BadRequest('priorité A, B ou C requise pour une compétition');
-  if (row.kind === 'note') merged.sport = null;
+  if (row.kind === 'note' || row.kind === 'rest') merged.sport = null;
   return merged;
 }
 
@@ -333,6 +333,8 @@ export async function teamDay(athleteIds: string[], date: string): Promise<TeamD
 export interface TeamCalendarDay {
   date: string;
   availability: 'repos' | 'indisponible' | null;
+  /** Repos prescrit par le coach ce jour-là (distinct du repos habituel des disponibilités). */
+  rest: { id: string; name: string; description: string | null } | null;
   workouts: Array<{
     id: string;
     name: string;
@@ -434,8 +436,10 @@ export async function teamCalendar(
 
           // Calculer la disponibilité du jour
           const availability = care ? availabilityOf(date, care) : null;
+          const restEvent = dayEvents.find((e) => e.kind === 'rest');
+          const rest = restEvent ? { id: String(restEvent.id), name: restEvent.name ?? 'Repos', description: restEvent.description ?? null } : null;
 
-          return { date, availability, workouts, races, activities: activitiesData };
+          return { date, availability, rest, workouts, races, activities: activitiesData };
         });
 
         // Calculer les charges

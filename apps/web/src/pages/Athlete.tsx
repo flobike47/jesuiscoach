@@ -14,6 +14,8 @@ import { formatDuration, formatKm, relativeDay, formatLoad } from '@/lib/format'
 import { METRIC_COLORS } from '@/theme';
 import { RaceBlockSheet } from '@/components/calendar/RaceBlockSheet';
 import { nextRace } from '@/lib/raceWeeks';
+import { WeightCard } from '@/components/trends/WeightCard';
+import { AthleteSportsCard } from '@/components/trends/SportsBreakdown';
 import type { SeriesPoint } from '@/types';
 
 type Range = '30' | '90';
@@ -33,14 +35,19 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
   const [range, setRange] = useState<Range>('90');
   const [raceBlockSheetOpen, setRaceBlockSheetOpen] = useState(false);
   const [allRides, setAllRides] = useState(false);
-  const coach = useMe().data?.role === 'coach';
+  const me = useMe().data;
+  const coach = me?.role === 'coach';
   const enc = encodeURIComponent(id ?? '');
   const name = data?.summary.name ?? 'Athlète';
   const queryClient = useQueryClient();
 
   const { pullPosition, isRefreshing } = usePullToRefresh({
     onRefresh: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['athlete', id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+        queryClient.invalidateQueries({ queryKey: ['athlete-sports', id] }),
+        queryClient.invalidateQueries({ queryKey: ['weight', id] }),
+      ]);
     },
   });
 
@@ -139,6 +146,10 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
               <Legend color={METRIC_COLORS.form} label="Forme" />
             </div>
           </div>
+
+          {id && <AthleteSportsCard athleteId={id} />}
+
+          {id && <WeightCard athleteId={id} self={me?.athleteId === id} name={name} />}
 
           {data.summary.alerts.length > 0 && (
             <Section header="Points d'attention">

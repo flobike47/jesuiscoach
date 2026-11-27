@@ -5,7 +5,7 @@
  * données, ici aucun accès réseau ni base.
  *
  * Principe : un score par jour candidat (100 au départ), des jours exclus
- * (indisponible, trop court, blessure), des pénalités nommées ci-dessous ;
+ * (repos prescrit, indisponible, trop court, blessure), des pénalités nommées ci-dessous ;
  * on garde le meilleur score, le plus tôt à égalité.
  */
 
@@ -58,6 +58,8 @@ export interface AssignDay {
   /** Jour de la fenêtre de placement (sinon : contexte, veille ou lendemain). */
   inWindow: boolean;
   availability: 'repos' | 'indisponible' | null;
+  /** Repos prescrit par le coach ce jour-là : aucune séance n'y est proposée. */
+  rest: boolean;
   /** Durée maximale ce jour-là (minutes), d'après les disponibilités habituelles. */
   maxMinutes: number | null;
   /** Séances déjà prévues ce jour-là. */
@@ -143,7 +145,7 @@ export function suggest(workout: AssignWorkout, athletes: AssignAthlete[]): Sugg
   return athletes.map((a) => byId.get(a.id)!);
 }
 
-const openDays = (a: AssignAthlete) => a.days.filter((d) => d.inWindow && !d.availability && !d.blocked).length;
+const openDays = (a: AssignAthlete) => a.days.filter((d) => d.inWindow && !d.rest && !d.availability && !d.blocked).length;
 
 export function suggestFor(workout: AssignWorkout, a: AssignAthlete, crowd: ReadonlyMap<string, number> = new Map()): Suggestion {
   const base: Suggestion = { athleteId: a.id, name: a.name, date: null, variant: 'standard', intensityScale: 1, reasons: [], alternatives: [], replaces: null, blocked: null };
@@ -161,6 +163,7 @@ export function suggestFor(workout: AssignWorkout, a: AssignAthlete, crowd: Read
   const excluded: string[] = [];
   window.forEach((day, i) => {
     if (day.blocked) return void excluded.push(day.blocked);
+    if (day.rest) return void excluded.push('repos prescrit');
     if (day.availability) return void excluded.push(day.availability === 'repos' ? 'repos' : 'indisponible');
 
     // Variante : la longue redescend en standard si le jour est trop court ; exclu si même la séance standard ne tient pas.

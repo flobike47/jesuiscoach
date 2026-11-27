@@ -17,6 +17,7 @@ function day(date: string, overrides?: Partial<AssignDay>): AssignDay {
     date,
     inWindow: true,
     availability: null,
+    rest: false,
     maxMinutes: 120,
     existing: [],
     doneLoad: 0,
@@ -61,6 +62,25 @@ describe("moteur assign - exclusions et scoring", () => {
       });
       const suggestion = suggestFor(workout(), a);
       expect(suggestion.date).toBe("2026-11-29");
+    });
+
+    it("exclut un jour de repos prescrit par le coach", () => {
+      const a = athlete({
+        days: [
+          day("2026-11-28", { rest: true }),
+          day("2026-11-29"),
+        ],
+      });
+      const suggestion = suggestFor(workout(), a);
+      expect(suggestion.date).toBe("2026-11-29");
+      expect(suggestion.alternatives).not.toContain("2026-11-28");
+    });
+
+    it("explique l'absence de jour quand toute la fenêtre est en repos prescrit", () => {
+      const a = athlete({ days: [day("2026-11-28", { rest: true })] });
+      const suggestion = suggestFor(workout(), a);
+      expect(suggestion.date).toBeNull();
+      expect(suggestion.reasons[0]).toContain("repos prescrit");
     });
 
     it("exclut un jour avec availability = indisponible", () => {
