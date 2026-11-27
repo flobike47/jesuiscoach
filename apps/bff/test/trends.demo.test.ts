@@ -46,3 +46,25 @@ describe('tendances de l’équipe (mode démo)', () => {
     expect((await app.inject({ method: 'GET', url: '/api/team/fitness', headers: julie })).statusCode).toBe(403);
   });
 });
+
+describe('sports pratiqués (mode démo)', () => {
+  it("répartit le temps de l'équipe entre plusieurs sports", async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/team/sports', headers: coach });
+    expect(res.statusCode).toBe(200);
+    const { team, athletes, errors } = res.json();
+    expect(errors).toEqual([]);
+    expect(athletes).toHaveLength(10);
+    expect(team.Ride).toBeGreaterThan(team.Run);
+    expect(team.Run).toBeGreaterThan(0);
+    expect(team.Swim).toBeGreaterThan(0);
+    // Le total de l'équipe est la somme des temps de chacun
+    const sum = athletes.reduce((s: number, a: { time: { Ride: number } }) => s + a.time.Ride, 0);
+    expect(team.Ride).toBe(sum);
+  });
+
+  it("donne la même répartition sur la fiche de l'athlète que dans la vue d'équipe", async () => {
+    const team = (await app.inject({ method: 'GET', url: '/api/team/sports', headers: coach })).json();
+    const own = (await app.inject({ method: 'GET', url: '/api/athletes/demo-1/sports', headers: julie })).json();
+    expect(own.time).toEqual(team.athletes.find((a: { id: string }) => a.id === 'demo-1').time);
+  });
+});

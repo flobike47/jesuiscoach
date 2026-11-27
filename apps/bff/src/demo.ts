@@ -165,9 +165,34 @@ function simulate(k: number, now: Date): DemoAthlete {
     },
     wellness,
     olderWeighIns: addDemoWeighIns(k, now, wellness, 62 + k * 2),
-    activities,
+    activities: retagDemoSports(k, activities),
     events,
   };
+}
+
+/**
+ * Quelques sorties de semaine deviennent course, natation ou renforcement,
+ * pour que la répartition des sports ait du relief (deux triathlètes, les
+ * autres courent un peu). Tirage séparé : le nombre, les dates et les durées
+ * des sorties ne changent pas.
+ */
+function retagDemoSports(k: number, activities: IntervalsActivity[]): IntervalsActivity[] {
+  const r = rng(seedOf(`sports-${k}`));
+  const triathlete = k % 5 === 3;
+  for (const a of activities) {
+    const weekday = new Date(`${a.start_date_local.slice(0, 10)}T12:00:00Z`).getUTCDay();
+    if (weekday === 0 || weekday === 6) continue;
+    const x = r();
+    const hours = (a.moving_time ?? 3600) / 3600;
+    if (x < (triathlete ? 0.25 : 0.1)) {
+      Object.assign(a, { type: 'Run', name: 'Footing', distance: Math.round(hours * 10_500) });
+    } else if (triathlete && x < 0.4) {
+      Object.assign(a, { type: 'Swim', name: 'Natation', distance: Math.round(hours * 2_600) });
+    } else if (x > 0.97) {
+      Object.assign(a, { type: 'WeightTraining', name: 'Renforcement', distance: 0 });
+    }
+  }
+  return activities;
 }
 
 /**

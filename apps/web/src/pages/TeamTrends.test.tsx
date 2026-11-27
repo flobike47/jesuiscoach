@@ -3,12 +3,18 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import { renderPage } from '@/hooks/test-utils';
 import TeamTrends from './TeamTrends';
 
-const api = vi.hoisted(() => ({ teamFitness: vi.fn() }));
+const api = vi.hoisted(() => ({ teamFitness: vi.fn(), teamSports: vi.fn() }));
 vi.mock('@/services/trendsApi', () => ({ trendsApi: api }));
 
 const series = (values: number[]) => values.map((fitness, i) => ({ date: `2026-11-${String(i + 1).padStart(2, '0')}`, fitness }));
 
-beforeEach(() => api.teamFitness.mockReset());
+const noSports = { from: '2026-10-31', to: '2026-11-27', team: { Ride: 0, Run: 0, Swim: 0, Other: 0 }, athletes: [], errors: [] };
+
+beforeEach(() => {
+  api.teamFitness.mockReset();
+  api.teamSports.mockReset();
+  api.teamSports.mockResolvedValue(noSports);
+});
 
 describe('TeamTrends', () => {
   it('montre une courbe par athlète, à la même échelle, avec son évolution', async () => {
@@ -45,5 +51,27 @@ describe('TeamTrends', () => {
     api.teamFitness.mockResolvedValue({ from: '2026-11-01', to: '2026-11-02', athletes: [], errors: [{ id: 'i3', error: 'x' }] });
     renderPage(<TeamTrends />);
     expect(await screen.findByText(/1 athlète\(s\) indisponible\(s\)/)).toBeInTheDocument();
+  });
+
+  it("répartit le temps par sport pour l'équipe puis pour chaque athlète", async () => {
+    api.teamFitness.mockResolvedValue({ from: '2026-11-01', to: '2026-11-02', athletes: [], errors: [] });
+    api.teamSports.mockResolvedValue({
+      ...noSports,
+      team: { Ride: 8 * 3600, Run: 2 * 3600, Swim: 0, Other: 0 },
+      athletes: [
+        { id: 'i1', name: 'Julie', time: { Ride: 2 * 3600, Run: 2 * 3600, Swim: 0, Other: 0 } },
+        { id: 'i2', name: 'Paul', time: { Ride: 6 * 3600, Run: 0, Swim: 0, Other: 0 } },
+        { id: 'i3', name: 'Léa', time: { Ride: 0, Run: 0, Swim: 0, Other: 0 } },
+      ],
+    });
+    renderPage(<TeamTrends />);
+    expect(await screen.findByText('10 h au total')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Vélo 80 %, Course 20 %' })).toBeInTheDocument();
+    expect(screen.getByText('8 h · 80 %')).toBeInTheDocument();
+    const rows = within(screen.getByRole('list', { name: 'Sports de chaque athlète' })).getAllByRole('listitem');
+    // Le plus actif d'abord ; l'athlète sans sortie reste listé
+    expect(rows.map((r) => within(r).getByRole('link').textContent)).toEqual(['Paul', 'Julie', 'Léa']);
+    expect(within(rows[1]).getByRole('img', { name: 'Vélo 50 %, Course 50 %' })).toBeInTheDocument();
+    expect(within(rows[2]).getByText('Aucune sortie')).toBeInTheDocument();
   });
 });

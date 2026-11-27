@@ -1,21 +1,27 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Page, Placeholder, SkeletonList } from '@/components/ios';
 import { TeamFitnessGrid } from '@/components/trends/TeamFitnessGrid';
+import { TeamSports } from '@/components/trends/SportsBreakdown';
 import { PullIndicator } from '@/components/common/PullIndicator';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-import { trendKeys, useTeamFitness } from '@/hooks/useTrends';
+import { trendKeys, useTeamFitness, useTeamSports } from '@/hooks/useTrends';
 
 /**
- * Tendances de l'équipe (coach) : fitness de chaque athlète côte à côte.
+ * Tendances de l'équipe (coach) : fitness de chaque athlète côte à côte et
+ * répartition des sports pratiqués.
  * Page à part (chargée à la demande) pour garder « Équipe » légère : elle
  * reste l'écran du quotidien, les tendances se consultent de temps en temps.
  */
 export default function TeamTrends() {
   const fitness = useTeamFitness();
+  const sports = useTeamSports();
   const queryClient = useQueryClient();
   const { pullPosition, isRefreshing } = usePullToRefresh({
     onRefresh: async () => {
-      await queryClient.invalidateQueries({ queryKey: trendKeys.teamFitness });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: trendKeys.teamFitness }),
+        queryClient.invalidateQueries({ queryKey: trendKeys.teamSports }),
+      ]);
     },
   });
 
@@ -51,6 +57,18 @@ export default function TeamTrends() {
           {fitness.data && fitness.data.errors.length > 0 && (
             <p className="section-footer">{fitness.data.errors.length} athlète(s) indisponible(s) : connexion Intervals.icu à refaire.</p>
           )}
+        </section>
+
+        <section aria-labelledby="sports-groupe">
+          <h2 id="sports-groupe" className="section-header" style={{ margin: '24px 0 6px' }}>
+            Sports pratiqués
+          </h2>
+          <p className="footnote secondary" style={{ margin: '0 4px 10px' }}>
+            Temps passé par sport sur les 4 dernières semaines, pour l’équipe puis pour chacun.
+          </p>
+          {sports.isLoading && <SkeletonList rows={3} avatar={false} />}
+          {sports.error && <Placeholder title="Répartition indisponible">{sports.error.message}</Placeholder>}
+          {sports.data && <TeamSports data={sports.data} />}
         </section>
       </Page>
     </>

@@ -22,7 +22,12 @@ vi.mock('../src/sources.js', async (orig) => ({
       { id: o, ctl: 40, atl: 45 },
       { id: n, ctl: 42.5, atl: 50 },
     ]),
-    activities: async (id: string, o: string, n: string) => (reads.push(`activities:${id}:${o}:${n}`), []),
+    activities: async (id: string, o: string, n: string) => (reads.push(`activities:${id}:${o}:${n}`), [
+      { id: 'a1', start_date_local: `${n}T08:00:00`, type: 'Ride', moving_time: 3600 },
+      { id: 'a2', start_date_local: `${n}T18:00:00`, type: 'Run', moving_time: 1800 },
+      // Hors des 4 semaines : J−28 est lu (clé de /team) mais pas compté
+      { id: 'a3', start_date_local: `${o}T08:00:00`, type: 'Swim', moving_time: 999 },
+    ]),
     events: async (id: string, o: string, n: string) => (reads.push(`events:${id}:${o}:${n}`), []),
     rawStreams: async () => [],
     _for: athleteId,
@@ -85,5 +90,49 @@ describe('fitness du groupe', () => {
     await get('/api/team/fitness', auth('token-a'));
     expect(reads.length).toBeGreaterThan(0);
     for (const r of reads) expect(team).toContain(r);
+  });
+});
+
+describe('sports pratiqués', () => {
+  it('refuse la vue d’équipe sans session (401) et à un athlète (403)', async () => {
+    expect((await app.inject({ method: 'GET', url: '/api/team/sports' })).statusCode).toBe(401);
+    expect((await get('/api/team/sports', auth('token-b'))).statusCode).toBe(403);
+    expect(reads).toEqual([]);
+  });
+
+  it("donne le temps par sport sur 4 semaines, pour l'équipe du coach seulement", async () => {
+    const res = await get('/api/team/sports', auth('token-a'));
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.athletes).toEqual([{ id: 'iB', name: 'Bérénice', time: { Ride: 3600, Run: 1800, Swim: 0, Other: 0 } }]);
+    expect(body.team).toEqual({ Ride: 3600, Run: 1800, Swim: 0, Other: 0 });
+    expect(reads.every((r) => r.includes(':iB'))).toBe(true);
+  });
+
+  it('réutilise la lecture des sorties de /team (même fenêtre)', async () => {
+    await get('/api/team', auth('token-a'));
+    const team = reads.filter((r) => r.startsWith('activities:'));
+    reads.length = 0;
+    await get('/api/team/sports', auth('token-a'));
+    const sports = reads.filter((r) => r.startsWith('activities:'));
+    expect(sports).toHaveLength(1);
+    expect(team).toContain(sports[0]);
+  });
+
+  it("par athlète : lui-même ou son coach ; 404 sinon, 400 si l'id est invalide", async () => {
+    expect((await get('/api/athletes/iB/sports', auth('token-b'))).json().time).toEqual({ Ride: 3600, Run: 1800, Swim: 0, Other: 0 });
+    expect((await get('/api/athletes/iB/sports', auth('token-a'))).statusCode).toBe(200);
+    expect((await get('/api/athletes/iB/sports', { authorization: 'Bearer token-c' })).statusCode).toBe(404);
+    expect((await get('/api/athletes/iD/sports', auth('token-b'))).statusCode).toBe(404);
+    expect((await get('/api/athletes/a%20b/sports', auth('token-b'))).statusCode).toBe(400);
+  });
+
+  it('par athlète : même fenêtre que la fiche athlète (même clé de cache)', async () => {
+    await get('/api/athletes/iB/overview', auth('token-b'));
+    const overview = reads.filter((r) => r.startsWith('activities:'));
+    reads.length = 0;
+    await get('/api/athletes/iB/sports', auth('token-b'));
+    expect(reads).toHaveLength(1);
+    expect(overview).toContain(reads[0]);
   });
 });

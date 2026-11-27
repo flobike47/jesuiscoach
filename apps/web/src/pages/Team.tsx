@@ -83,7 +83,7 @@ export default function Team() {
               inset={52}
               leading={<LineChart size={20} color="var(--blue)" aria-hidden />}
               title="Tendances"
-              subtitle="Fitness du groupe"
+              subtitle="Fitness du groupe, sports pratiqués"
               chevron
             />
           </Section>

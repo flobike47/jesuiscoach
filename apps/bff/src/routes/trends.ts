@@ -2,9 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { requireUser } from '../auth.js';
 import { appFitness, storeOf } from '../activityStore.js';
 import { fitnessPoints } from '../lib/fitness.js';
+import { addSportTimes, timeBySport } from '../lib/sportTime.js';
 import { isoDay } from '../lib/summary.js';
-import { sourceFor, teamOf } from '../sources.js';
-import { Forbidden, HttpError } from '../validation.js';
+import { assertCanView, sourceFor, teamOf } from '../sources.js';
+import { ATHLETE_ID_RE, BadRequest, Forbidden, HttpError } from '../validation.js';
 
 /**
  * Tendances de l'équipe (coach). Aucune lecture nouvelle chez Intervals.icu :
@@ -14,6 +15,8 @@ import { Forbidden, HttpError } from '../validation.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (now: Date, n: number) => isoDay(new Date(now.getTime() - n * DAY));
+/** Répartition des sports : 4 semaines, aujourd'hui compris (J−27 → J). */
+const SPORT_DAYS = 28;
 
 /** Un athlète en erreur (compte déconnecté…) ne bloque pas les autres. */
 async function perAthlete<T>(ids: string[], fn: (id: string) => Promise<T>, log: (err: unknown, id: string) => void) {
@@ -56,5 +59,40 @@ export async function registerTrendRoutes(app: FastifyInstance) {
     );
     ok.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
     return { from, to, athletes: ok, errors };
+  });
+
+  /**
+   * Temps par sport sur 4 semaines, pour l'équipe et par athlète. Lit les
+   * sorties de /team (fenêtre J−28 → J, même clé de cache) puis garde J−27 → J.
+   */
+  app.get('/team/sports', async (req) => {
+    const me = requireUser(req);
+    if (me.role !== 'coach') throw new Forbidden();
+    const now = new Date();
+    const from = daysAgo(now, SPORT_DAYS - 1);
+    const { ok, errors } = await perAthlete(
+      await teamOf(me),
+      async (id) => {
+        const src = await sourceFor(id);
+        const [info, activities] = await Promise.all([src.athlete(id), src.activities(id, daysAgo(now, 28), isoDay(now))]);
+        return { id, name: info.name ?? id, time: timeBySport(activities, from) };
+      },
+      (err, id) => req.log.warn({ err, athleteId: id }, 'team/sports : athlète en erreur'),
+    );
+    ok.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    return { from, to: isoDay(now), team: addSportTimes(ok.map((a) => a.time)), athletes: ok, errors };
+  });
+
+  /** Même répartition pour un athlète (lui-même ou son coach). Fenêtre de la fiche athlète (J−30, même clé de cache). */
+  app.get<{ Params: { id: string } }>('/athletes/:id/sports', async (req) => {
+    const me = requireUser(req);
+    const id = req.params.id;
+    if (!ATHLETE_ID_RE.test(id)) throw new BadRequest('id invalide');
+    await assertCanView(me, id);
+    const now = new Date();
+    const from = daysAgo(now, SPORT_DAYS - 1);
+    const src = await sourceFor(id);
+    const activities = await src.activities(id, daysAgo(now, 30), isoDay(now));
+    return { from, to: isoDay(now), time: timeBySport(activities, from) };
   });
 }

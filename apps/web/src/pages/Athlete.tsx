@@ -15,6 +15,7 @@ import { METRIC_COLORS } from '@/theme';
 import { RaceBlockSheet } from '@/components/calendar/RaceBlockSheet';
 import { nextRace } from '@/lib/raceWeeks';
 import { WeightCard } from '@/components/trends/WeightCard';
+import { AthleteSportsCard } from '@/components/trends/SportsBreakdown';
 import type { SeriesPoint } from '@/types';
 
 type Range = '30' | '90';
@@ -42,7 +43,11 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
 
   const { pullPosition, isRefreshing } = usePullToRefresh({
     onRefresh: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['athlete', id] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
+        queryClient.invalidateQueries({ queryKey: ['athlete-sports', id] }),
+        queryClient.invalidateQueries({ queryKey: ['weight', id] }),
+      ]);
     },
   });
 
@@ -141,6 +146,8 @@ export function AthleteView({ id, back, title, account }: { id: string | undefin
               <Legend color={METRIC_COLORS.form} label="Forme" />
             </div>
           </div>
+
+          {id && <AthleteSportsCard athleteId={id} />}
 
           {id && <WeightCard athleteId={id} self={me?.athleteId === id} name={name} />}
 
