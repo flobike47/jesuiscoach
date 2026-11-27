@@ -66,6 +66,8 @@ export const router = createBrowserRouter(
             { path: 'activite', lazy: page(() => import('@/pages/Activity')) },
             { path: 'calendrier', lazy: page(() => import('@/pages/Calendar')) },
             { path: 'equipe', lazy: page(() => import('@/pages/Team')) },
+            // Tendances de l'équipe (P3) : fitness du groupe, sports pratiqués
+            { path: 'equipe/tendances', lazy: page(() => import('@/pages/TeamTrends')) },
             { path: 'seances', lazy: page(() => import('@/pages/Workouts')) },
             { path: 'reglages', lazy: page(() => import('@/pages/Settings')) },
             { path: 'bien-demarrer', lazy: page(() => import('@/pages/Welcome')) },
