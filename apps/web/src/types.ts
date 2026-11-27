@@ -283,6 +283,8 @@ export interface Group {
 export interface TeamCalendarDay {
   date: string;
   availability: 'repos' | 'indisponible' | null;
+  /** Repos prescrit par le coach (distinct du repos habituel des disponibilités). Toujours renvoyé par le BFF. */
+  rest?: { id: string; name: string; description: string | null } | null;
   workouts: Array<{ id: string; name: string; description: string | null; sport: string | null; load: number | null; seconds: number | null; done: boolean }>;
   races: Array<{ id: string; name: string; priority: 'A' | 'B' | 'C' | null }>;
   activities: Array<{ id: string; name: string | null; moving_time: number | null; load: number | null }>;

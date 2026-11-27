@@ -1,11 +1,17 @@
 import type { Group, TeamCalendarAthlete, TeamCalendarDay } from '@/types';
 import { parseWorkout, zoneColor } from '@/lib/workout';
 
-export type CellKind = 'free' | 'off' | 'workout' | 'extra';
+/** `rest` : repos prescrit par le coach ; `off` : repos habituel ou indisponibilité (profil). */
+export type CellKind = 'free' | 'off' | 'rest' | 'workout' | 'extra';
 
-/** Détermine le type de cellule pour une journée d'athlète. */
+/**
+ * Détermine le type de cellule pour une journée d'athlète. Une séance prime
+ * sur tout ; puis le repos prescrit (même si l'athlète a roulé : la consigne
+ * reste visible) ; puis la sortie hors plan ; puis les disponibilités.
+ */
 export function cellKind(day: TeamCalendarDay): CellKind {
   if (day.workouts.length > 0) return 'workout';
+  if (day.rest) return 'rest';
   if (day.activities.length > 0) return 'extra';
   if (day.availability === 'repos' || day.availability === 'indisponible') return 'off';
   return 'free';
@@ -100,7 +106,7 @@ export function weekCounts(athletes: TeamCalendarAthlete[]): { planned: number; 
     for (const day of athlete.days) {
       if (day.workouts.length > 0) {
         planned += 1;
-      } else if (day.availability === null) {
+      } else if (day.availability === null && !day.rest) {
         free += 1;
       }
     }

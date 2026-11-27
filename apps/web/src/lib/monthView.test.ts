@@ -4,6 +4,16 @@ import type { Activity } from '@/types';
 import { dayMarks, weekPlannedLoad } from './monthView';
 
 describe('monthView : dayMarks', () => {
+  it('marque le repos prescrit (kind rest), pas une note ordinaire', () => {
+    const events: AppEvent[] = [
+      { id: 'r', kind: 'rest', category: 'NOTE', name: 'Repos', start_date_local: '2026-12-08T00:00:00' },
+      { id: 'n', kind: 'note', category: 'NOTE', name: 'Repos', start_date_local: '2026-12-09T00:00:00' },
+    ];
+    expect(dayMarks('2026-12-08', events, [], []).rest).toBe(true);
+    expect(dayMarks('2026-12-09', events, [], []).rest).toBe(false);
+    expect(dayMarks('2026-12-08', events, [], []).bars).toEqual([]);
+  });
+
   it('retourne une barre par séance WORKOUT avec largeur 25-100%', () => {
     const events: AppEvent[] = [
       {

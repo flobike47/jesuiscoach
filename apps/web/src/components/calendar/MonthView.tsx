@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Check, Flag } from 'lucide-react';
+import { Bed, ChevronLeft, ChevronRight, Check, Flag } from 'lucide-react';
 import type { AppEvent } from '@/services/calendarApi';
 import type { Activity } from '@/types';
 import { monthGrid } from '@/lib/calendar';
@@ -180,6 +180,8 @@ export function MonthView(props: MonthViewProps) {
                   if (isUnavailable === 'indisponible' || isUnavailable === 'repos') {
                     cellBackground = 'repeating-linear-gradient(135deg, var(--fill-2) 0 2px, transparent 2px 6px)';
                   }
+                  // Repos prescrit par le coach : teinte indigo, distincte des rayures du repos habituel.
+                  if (marks.rest) cellBackground = 'color-mix(in srgb, var(--indigo) 18%, var(--cell))';
 
                   const handleClick = () => {
                     if (picking) {
@@ -193,7 +195,7 @@ export function MonthView(props: MonthViewProps) {
                   const dayName = new Date(`${day.date}T00:00:00Z`).toLocaleString('fr-FR', {
                     weekday: 'long',
                   });
-                  const ariaLabel = `${day.dayOfMonth} ${dayName}${marks.bars.length ? `, ${marks.bars.length} séance${marks.bars.length > 1 ? 's' : ''}` : ''}${marks.done ? ', faite' : ''}`;
+                  const ariaLabel = `${day.dayOfMonth} ${dayName}${marks.bars.length ? `, ${marks.bars.length} séance${marks.bars.length > 1 ? 's' : ''}` : ''}${marks.rest ? ', repos prescrit' : ''}${marks.done ? ', faite' : ''}`;
 
                   return (
                     <button
@@ -253,6 +255,9 @@ export function MonthView(props: MonthViewProps) {
                           }}
                           aria-hidden
                         />
+                      )}
+                      {marks.rest && (
+                        <Bed size={13} strokeWidth={2.4} color="var(--indigo)" style={{ position: 'absolute', left: '5px', bottom: '5px' }} aria-hidden />
                       )}
                       {marks.race && (
                         <Flag

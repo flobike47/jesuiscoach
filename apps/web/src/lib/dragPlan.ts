@@ -72,8 +72,8 @@ export function canDrop(athlete: TeamCalendarAthlete, date: string): boolean {
   const day = athlete.days.find((d) => d.date === date);
   if (!day) return false;
 
-  // Doit être sans séance, sans indisponibilité
-  const isFree = day.workouts.length === 0 && day.availability === null;
+  // Doit être sans séance, sans indisponibilité, sans repos prescrit
+  const isFree = day.workouts.length === 0 && day.availability === null && !day.rest;
   return isFree;
 }
 

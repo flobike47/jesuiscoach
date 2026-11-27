@@ -235,7 +235,7 @@ export async function deviceStatus(userId: string | null): Promise<DeviceStatus[
 /** Champs d'une ligne du calendrier utiles à l'envoi. */
 export interface PushableEvent {
   id: string;
-  kind: 'workout' | 'race' | 'note';
+  kind: 'workout' | 'race' | 'note' | 'rest';
   origin: 'app' | 'intervals';
   sport: Sport | null;
   day: string;

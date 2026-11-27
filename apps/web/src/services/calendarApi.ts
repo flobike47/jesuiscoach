@@ -7,7 +7,8 @@ import type { PlannedEvent, Sport, Group, TeamCalendar } from '@/types';
  * avec des champs en plus de ceux d'Intervals.icu (voir docs/plans/C-calendrier.md).
  */
 
-export type EventKind = 'workout' | 'race' | 'note';
+/** `rest` : repos prescrit par le coach (NOTE chez Intervals.icu). */
+export type EventKind = 'workout' | 'race' | 'note' | 'rest';
 export type RacePriority = 'A' | 'B' | 'C';
 export type SyncStatus = 'pending' | 'synced' | 'error';
 

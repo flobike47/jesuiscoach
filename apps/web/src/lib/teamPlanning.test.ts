@@ -43,6 +43,21 @@ describe('teamPlanning', () => {
     });
   });
 
+  describe('cellKind : repos prescrit', () => {
+    const base: TeamCalendarDay = { date: '2026-11-23', availability: null, rest: null, workouts: [], races: [], activities: [] };
+    const rest = { id: 'r1', name: 'Repos', description: null };
+    const workout = { id: 'w1', name: 'Séance', description: null, sport: 'Ride', load: 80, seconds: 3600, done: false };
+    const ride = { id: 'a1', name: 'Sortie', moving_time: 3600, load: 60 };
+    it.each<[string, Partial<TeamCalendarDay>, ReturnType<typeof cellKind>]>([
+      ['repos seul', { rest }, 'rest'],
+      ['repos prescrit un jour de repos habituel', { rest, availability: 'repos' }, 'rest'],
+      ['repos prescrit mais sortie faite : la consigne reste visible', { rest, activities: [ride] }, 'rest'],
+      ['séance et repos le même jour : la séance prime', { rest, workouts: [workout] }, 'workout'],
+    ])('%s', (_, day, expected) => {
+      expect(cellKind({ ...base, ...day })).toBe(expected);
+    });
+  });
+
   describe('shortDuration', () => {
     it('formate les durées courtes', () => {
       expect(shortDuration(3600)).toBe('1h');
@@ -135,6 +150,25 @@ describe('teamPlanning', () => {
       const counts = weekCounts(athletes);
       expect(counts.planned).toBe(1);
       expect(counts.free).toBe(1);
+    });
+
+    it('ne compte pas un jour de repos prescrit comme case libre', () => {
+      const athletes: TeamCalendarAthlete[] = [
+        {
+          id: '1',
+          name: 'Alice',
+          ftp: 200,
+          form: 10,
+          groupIds: [],
+          error: null,
+          days: [
+            { date: '2026-11-24', availability: null, rest: null, workouts: [], races: [], activities: [] },
+            { date: '2026-11-25', availability: null, rest: { id: 'r1', name: 'Repos', description: null }, workouts: [], races: [], activities: [] },
+          ],
+          load: { planned: 0, done: 0, usual: null },
+        },
+      ];
+      expect(weekCounts(athletes)).toEqual({ planned: 0, free: 1 });
     });
   });
 
