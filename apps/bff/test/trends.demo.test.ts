@@ -29,10 +29,8 @@ describe('tendances de l’équipe (mode démo)', () => {
     const { athletes, errors } = res.json();
     expect(errors).toEqual([]);
     expect(athletes).toHaveLength(10);
-    for (const a of athletes) {
-      expect(a.series).toHaveLength(91);
-      expect(typeof a.series[0].fitness).toBe('number');
-    }
+    expect(athletes.map((a: { series: unknown[] }) => a.series.length)).toEqual(Array(10).fill(91));
+    expect(athletes.every((a: { series: Array<{ fitness: unknown }> }) => typeof a.series[0].fitness === 'number')).toBe(true);
   });
 
   it('montre la même fitness que la fiche athlète', async () => {

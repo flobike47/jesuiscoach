@@ -89,7 +89,7 @@ describe('fitness du groupe', () => {
     reads.length = 0;
     await get('/api/team/fitness', auth('token-a'));
     expect(reads.length).toBeGreaterThan(0);
-    for (const r of reads) expect(team).toContain(r);
+    expect(reads.filter((r) => !team.includes(r))).toEqual([]);
   });
 });
 
