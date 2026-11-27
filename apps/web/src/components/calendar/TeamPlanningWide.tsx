@@ -6,6 +6,7 @@ import { WorkoutProfile } from '@/components/workout/StructureEditor';
 import { EditEventSheet } from '@/components/calendar/EventSheets';
 import { RestSheet } from '@/components/calendar/RestDay';
 import { isPrescribedRest, teamRestAsEvent } from '@/lib/restDay';
+import { TeamLoadChart } from '@/components/calendar/TeamLoadChart';
 import { teamWorkoutAsEvent } from '@/lib/teamEvent';
 import { useSavedWorkouts, useTeam } from '@/hooks/useCoach';
 import { useEventMutations } from '@/hooks/useCalendarData';
@@ -370,6 +371,7 @@ export function TeamPlanningWide() {
         <p className="footnote secondary" style={{ marginTop: 12 }}>
           Les cases rayées viennent des disponibilités du profil ; les cases « Repos » sont des repos prescrits (double-clic pour les modifier).
         </p>
+        {cal.data && <TeamLoadChart athletes={athletes} from={from} to={to} today={today} />}
         {error && (
           <p role="alert" className="footnote" style={{ color: 'var(--red)' }}>
             {error}

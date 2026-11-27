@@ -168,50 +168,67 @@ export async function registerPlanningRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  /**
-   * Applique un plan à partir d'une date : chaque séance est créée dans le
-   * calendrier Intervals.icu de chaque athlète choisi (une écriture par
-   * séance, sur le quota `assignWorkout` du coach). Séances d'un même athlète
-   * envoyées une à une, athlètes en parallèle.
-   */
+  /** Applique un plan enregistré à partir d'une date (voir `applyWorkouts`). */
   app.post<{ Params: { id: string }; Body: ApplyBody }>('/plans/:id/apply', async (req) => {
     const me = requireCoach(req);
     const plan = await planOf(me.id, validateUuid(req.params.id));
     if (!plan) throw new NotFound('Plan introuvable');
-    const { athleteIds, startDate } = req.body ?? {};
-    if (typeof startDate !== 'string' || !DATE_RE.test(startDate) || Number.isNaN(Date.parse(startDate))) throw new BadRequest('startDate invalide (AAAA-MM-JJ)');
-    if (!Array.isArray(athleteIds) || athleteIds.length === 0) throw new BadRequest('athleteIds requis');
-    const team = new Set(await teamOf(me));
-    const targets = [...new Set(clampArray(athleteIds, 50))].filter((id): id is string => typeof id === 'string' && team.has(id));
-    if (targets.length === 0) throw new BadRequest('Aucun athlète de ton équipe dans la sélection');
-
-    const dated = planDates(startDate, validatePlanWorkouts(plan.workouts));
-    const writes = dated.length * targets.length;
-    if (writes > PLAN_LIMITS.maxWritesPerApply) {
-      throw new BadRequest(`Trop de séances d'un coup (${writes}) : ${PLAN_LIMITS.maxWritesPerApply} au plus. Applique le plan à moins d'athlètes à la fois.`);
-    }
-    await enforceQuota(me.id, 'assignWorkout', writes);
-
-    // Chaque séance devient une ligne du calendrier de l'athlète, recopiée vers Intervals.icu (quota déjà compté ci-dessus).
-    // Arrêt à la première séance en erreur, comme avant : les suivantes ne partent pas.
-    const results = await Promise.all(
-      targets.map(async (id) => {
-        let created = 0;
-        try {
-          for (const w of dated) {
-            const row = await createEvent(id, { kind: 'workout', date: w.date, name: w.name, description: w.description, sport: w.sport ?? 'Ride', racePriority: null, raceDistanceM: null, raceGoal: null }, 'coach');
-            if (row.syncStatus !== 'synced') {
-              return { id, ok: false as const, created, error: row.syncError ?? 'Envoi à Intervals.icu impossible' };
-            }
-            created++;
-          }
-          return { id, ok: true as const, created };
-        } catch (e) {
-          req.log.warn({ err: e, athleteId: id, created }, 'plans: application en échec');
-          return { id, ok: false as const, created, error: e instanceof HttpError ? e.message : 'Envoi à Intervals.icu impossible' };
-        }
-      }),
-    );
-    return { total: dated.length, results };
+    return applyWorkouts(req, me, plan.workouts, req.body ?? {});
   });
+
+  /**
+   * Applique des séances sans enregistrer de plan : bloc de semaines dupliqué
+   * depuis un calendrier, ou séance récurrente (la sortie club tous les
+   * mardis). Mêmes bornes, même quota et même envoi que `/plans/:id/apply` ;
+   * les séances créées sont indépendantes, aucune « série » n'est gardée.
+   */
+  app.post<{ Body: ApplyBody & { workouts?: unknown } }>('/plans/apply', async (req) => {
+    const me = requireCoach(req);
+    const body = req.body ?? {};
+    return applyWorkouts(req, me, body.workouts, body);
+  });
+}
+
+/**
+ * Crée les séances d'un plan à partir d'une date dans le calendrier
+ * Intervals.icu de chaque athlète choisi : une écriture par séance et par
+ * athlète, toutes débitées d'avance du quota `assignWorkout` du coach (rien ne
+ * part si elles ne tiennent pas). Séances d'un même athlète envoyées une à
+ * une, athlètes en parallèle.
+ */
+async function applyWorkouts(req: FastifyRequest, me: AuthUser, workouts: unknown, { athleteIds, startDate }: ApplyBody) {
+  if (typeof startDate !== 'string' || !DATE_RE.test(startDate) || Number.isNaN(Date.parse(startDate))) throw new BadRequest('startDate invalide (AAAA-MM-JJ)');
+  if (!Array.isArray(athleteIds) || athleteIds.length === 0) throw new BadRequest('athleteIds requis');
+  const team = new Set(await teamOf(me));
+  const targets = [...new Set(clampArray(athleteIds, 50))].filter((id): id is string => typeof id === 'string' && team.has(id));
+  if (targets.length === 0) throw new BadRequest('Aucun athlète de ton équipe dans la sélection');
+
+  const dated = planDates(startDate, validatePlanWorkouts(workouts));
+  const writes = dated.length * targets.length;
+  if (writes > PLAN_LIMITS.maxWritesPerApply) {
+    throw new BadRequest(`Trop de séances d'un coup (${writes}) : ${PLAN_LIMITS.maxWritesPerApply} au plus. Envoie à moins d'athlètes à la fois.`);
+  }
+  await enforceQuota(me.id, 'assignWorkout', writes);
+
+  // Chaque séance devient une ligne du calendrier de l'athlète, recopiée vers Intervals.icu (quota déjà compté ci-dessus).
+  // Arrêt à la première séance en erreur, comme avant : les suivantes ne partent pas.
+  const results = await Promise.all(
+    targets.map(async (id) => {
+      let created = 0;
+      try {
+        for (const w of dated) {
+          const row = await createEvent(id, { kind: 'workout', date: w.date, name: w.name, description: w.description, sport: w.sport ?? 'Ride', racePriority: null, raceDistanceM: null, raceGoal: null }, 'coach');
+          if (row.syncStatus !== 'synced') {
+            return { id, ok: false as const, created, error: row.syncError ?? 'Envoi à Intervals.icu impossible' };
+          }
+          created++;
+        }
+        return { id, ok: true as const, created };
+      } catch (e) {
+        req.log.warn({ err: e, athleteId: id, created }, 'plans: application en échec');
+        return { id, ok: false as const, created, error: e instanceof HttpError ? e.message : 'Envoi à Intervals.icu impossible' };
+      }
+    }),
+  );
+  return { total: dated.length, results };
 }

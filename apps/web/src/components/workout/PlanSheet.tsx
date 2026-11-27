@@ -220,14 +220,14 @@ function PlanItem({
   );
 }
 
-interface Source {
+export interface Source {
   name: string;
   description: string;
   sport?: Sport;
 }
 
-/** Choix d'une séance à ajouter : mes séances, séances types et bibliothèque Intervals.icu. */
-function SourcePicker({ onPick, onCancel }: { onPick: (w: Source) => void; onCancel: () => void }) {
+/** Choix d'une séance à ajouter : mes séances, séances types et bibliothèque Intervals.icu (aussi pour la séance récurrente). */
+export function SourcePicker({ onPick, onCancel }: { onPick: (w: Source) => void; onCancel: () => void }) {
   const library = useLibrary();
   const saved = useSavedWorkouts();
   const mine = saved.data?.workouts ?? [];

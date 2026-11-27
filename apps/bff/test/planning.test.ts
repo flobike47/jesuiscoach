@@ -324,3 +324,79 @@ describe('routes de planification', () => {
     expect((await call('PATCH', `/api/saved-workouts/${w.id}`, 'token-a', { favorite: 'yes' as never })).statusCode).toBe(400);
   });
 });
+
+describe('POST /plans/apply : séances envoyées sans plan enregistré (bloc dupliqué, séance récurrente)', () => {
+  const C = '33333333-3333-4333-8333-333333333333';
+  const addAthlete = async (id: string, intervalsId: string) => {
+    await db.query(`insert into users (id, intervals_athlete_id, name) values ($1, $2, $2)`, [id, intervalsId]);
+    await db.query(`insert into coach_athletes (coach_id, athlete_id) values ($1, $2)`, [USER_A, id]);
+  };
+  // La sortie club tous les mardis pendant 3 semaines (départ un lundi).
+  const club = [1, 8, 15].map((day) => ({ day, name: 'Sortie club', description: '- 2h 70%' }));
+
+  it('exige une session de coach', async () => {
+    expect((await call('POST', '/api/plans/apply', null, { workouts: club, athleteIds: ['iB'], startDate: '2026-12-07' })).statusCode).toBe(401);
+    expect((await call('POST', '/api/plans/apply', 'token-b', { workouts: club, athleteIds: ['iB'], startDate: '2026-12-07' })).statusCode).toBe(403);
+    expect(writes).toEqual([]);
+  });
+
+  it("crée chaque occurrence chez chaque athlète de l'équipe, sans rien enregistrer comme plan", async () => {
+    await addAthlete(C, 'iC');
+    const res = await call('POST', '/api/plans/apply', 'token-a', { workouts: club, athleteIds: ['iB', 'iC', 'iZ'], startDate: '2026-12-07' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      total: 3,
+      results: [
+        { id: 'iB', ok: true, created: 3 },
+        { id: 'iC', ok: true, created: 3 },
+      ],
+    });
+    expect(writes.filter((x) => x.id === 'iB').map((x) => x.w.date)).toEqual(['2026-12-08', '2026-12-15', '2026-12-22']);
+    expect(writes).toHaveLength(6);
+    expect((await call('GET', '/api/plans', 'token-a')).json().plans).toEqual([]);
+  });
+
+  it("débite d'avance une unité de quota par séance écrite : rien ne part au-delà (429)", async () => {
+    await redis.set(`quota:assignWorkout:${USER_A}`, '195');
+    const ok = await call('POST', '/api/plans/apply', 'token-a', { workouts: club, athleteIds: ['iB'], startDate: '2026-12-07' });
+    expect(ok.statusCode).toBe(200);
+    expect(writes).toHaveLength(3);
+    const refused = await call('POST', '/api/plans/apply', 'token-a', { workouts: club, athleteIds: ['iB'], startDate: '2026-12-07' });
+    expect(refused.statusCode).toBe(429);
+    expect(writes).toHaveLength(3);
+  });
+
+  it('refuse plus de 120 écritures, plus de 12 semaines ou plus de 40 séances', async () => {
+    for (const [id, a] of [[C, 'iC'], ['44444444-4444-4444-8444-444444444444', 'iD'], ['55555555-5555-4555-8555-555555555555', 'iE']]) await addAthlete(id, a);
+    const forty = Array.from({ length: 40 }, (_, i) => ({ day: i, name: `J${i}`, description: '- 10m 70%' }));
+    const tooMany = await call('POST', '/api/plans/apply', 'token-a', { workouts: forty, athleteIds: ['iB', 'iC', 'iD', 'iE'], startDate: '2026-12-07' });
+    expect(tooMany.statusCode).toBe(400);
+    expect(tooMany.json().error).toMatch(/120 au plus/);
+    const lateDay = await call('POST', '/api/plans/apply', 'token-a', { workouts: [{ day: 84, name: 'x', description: '- 1h 70%' }], athleteIds: ['iB'], startDate: '2026-12-07' });
+    expect(lateDay.statusCode).toBe(400);
+    const fortyOne = await call('POST', '/api/plans/apply', 'token-a', { workouts: [...forty, { day: 50, name: 'x', description: '- 1h 70%' }], athleteIds: ['iB'], startDate: '2026-12-07' });
+    expect(fortyOne.statusCode).toBe(400);
+    expect(writes).toEqual([]);
+  });
+
+  it('valide les séances, la date et les athlètes', async () => {
+    const apply = (body: unknown) => call('POST', '/api/plans/apply', 'token-a', body);
+    expect((await apply({ athleteIds: ['iB'], startDate: '2026-12-07' })).statusCode).toBe(400);
+    expect((await apply({ workouts: [], athleteIds: ['iB'], startDate: '2026-12-07' })).statusCode).toBe(400);
+    expect((await apply({ workouts: [{ day: 0, name: 'x', description: '   ' }], athleteIds: ['iB'], startDate: '2026-12-07' })).statusCode).toBe(400);
+    expect((await apply({ workouts: [{ day: 0, name: 'x', description: '- 1h 70%', sport: 'Ski' }], athleteIds: ['iB'], startDate: '2026-12-07' })).statusCode).toBe(400);
+    expect((await apply({ workouts: club, athleteIds: ['iB'], startDate: '07/12/2026' })).statusCode).toBe(400);
+    expect((await apply({ workouts: club, athleteIds: ['iZ'], startDate: '2026-12-07' })).statusCode).toBe(400);
+    expect(writes).toEqual([]);
+  });
+
+  it("s'arrête à la première séance en échec pour un athlète, sans bloquer les autres", async () => {
+    await addAthlete(C, 'iC');
+    state.failFor = 'iC';
+    const { results } = (await call('POST', '/api/plans/apply', 'token-a', { workouts: club, athleteIds: ['iB', 'iC'], startDate: '2026-12-07' })).json();
+    expect(results).toMatchObject([
+      { id: 'iB', ok: true, created: 3 },
+      { id: 'iC', ok: false, created: 0, error: 'Envoi à Intervals.icu impossible' },
+    ]);
+  });
+});

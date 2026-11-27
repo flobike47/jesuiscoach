@@ -10,6 +10,7 @@ import { formatLoad, dayShort } from '@/lib/format';
 import { formZone } from '@/lib/form';
 import { TEMPLATES, SPORT_LABELS } from '@/lib/workout';
 import { EditEventSheet } from '@/components/calendar/EventSheets';
+import { TeamLoadChart } from '@/components/calendar/TeamLoadChart';
 import { teamWorkoutAsEvent } from '@/lib/teamEvent';
 import { RestSheet } from '@/components/calendar/RestDay';
 import { isPrescribedRest, teamRestAsEvent } from '@/lib/restDay';
@@ -372,6 +373,8 @@ export function TeamPlanning() {
           </div>
         ))}
       </div>
+
+      <TeamLoadChart athletes={athletes} from={from} to={to} />
 
       {/* Barre flottante de sélection */}
       {selectedCells.length > 0 && (
