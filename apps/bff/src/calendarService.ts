@@ -82,6 +82,8 @@ export interface CalendarRead {
   events: Array<IntervalsEvent & Record<string, unknown>>;
   activities: IntervalsActivity[];
   doneEventIds: string[];
+  /** Séance réalisée → sortie qui la réalise (id de l'événement → id de la sortie). */
+  activityByEvent: Record<string, string>;
 }
 
 /**
@@ -108,8 +110,9 @@ export async function readCalendar(athleteId: string, from: string, to: string):
   const passthrough = events.filter((e) => importedFields(e) === null);
   const mapped = [...rows.map(eventJson), ...passthrough] as CalendarRead['events'];
   const { activityOf } = matchPlan(mapped, activities);
-  const doneEventIds = [...activityOf.keys()].filter((e) => e.id != null).map((e) => String(e.id));
-  return { events: mapped, activities, doneEventIds };
+  const activityByEvent: Record<string, string> = {};
+  for (const [e, a] of activityOf) if (e.id != null) activityByEvent[String(e.id)] = String(a.id);
+  return { events: mapped, activities, doneEventIds: Object.keys(activityByEvent), activityByEvent };
 }
 
 /* ---------- Écriture ---------- */
@@ -343,6 +346,8 @@ export interface TeamCalendarDay {
     load: number | null;
     seconds: number | null;
     done: boolean;
+    /** Sortie qui réalise la séance, s'il y en a une. */
+    activityId: string | null;
   }>;
   races: Array<{ id: string; name: string; priority: 'A' | 'B' | 'C' | null }>;
   activities: Array<{ id: string; name: string | null; moving_time: number | null; load: number | null }>;
@@ -392,7 +397,7 @@ export async function teamCalendar(
 
       try {
         const src = await sourceFor(id);
-        const [info, { events, activities, doneEventIds }, care] = await Promise.all([
+        const [info, { events, activities, doneEventIds, activityByEvent }, care] = await Promise.all([
           src.athlete(id),
           readCalendar(id, from, to),
           careStoreFor(id).then(({ store }) => store.read()).catch(() => null),
@@ -418,6 +423,7 @@ export async function teamCalendar(
               load: blocks.length ? estimatedLoad(blocks) : null,
               seconds: blocks.length ? Math.round(estimatedSeconds(blocks, sport)) : null,
               done: doneEventIds.includes(String(e.id)),
+              activityId: activityByEvent[String(e.id)] ?? null,
             };
           });
 

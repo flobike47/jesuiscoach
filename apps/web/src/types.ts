@@ -120,6 +120,8 @@ export interface CalendarRange {
   activities: Activity[];
   /** Séances réalisées (appariées par Intervals.icu, sinon sortie du même jour). */
   doneEventIds: string[];
+  /** Séance réalisée → sortie qui la réalise. Facultatif : absent d'un BFF plus ancien. */
+  activityByEvent?: Record<string, string>;
 }
 
 /* ---------- Tableaux de bord avancés (BFF : lib/dashboards.ts) ---------- */
@@ -285,7 +287,7 @@ export interface TeamCalendarDay {
   availability: 'repos' | 'indisponible' | null;
   /** Repos prescrit par le coach (distinct du repos habituel des disponibilités). Toujours renvoyé par le BFF. */
   rest?: { id: string; name: string; description: string | null } | null;
-  workouts: Array<{ id: string; name: string; description: string | null; sport: string | null; load: number | null; seconds: number | null; done: boolean }>;
+  workouts: Array<{ id: string; name: string; description: string | null; sport: string | null; load: number | null; seconds: number | null; done: boolean; activityId?: string | null }>;
   races: Array<{ id: string; name: string; priority: 'A' | 'B' | 'C' | null }>;
   activities: Array<{ id: string; name: string | null; moving_time: number | null; load: number | null }>;
 }

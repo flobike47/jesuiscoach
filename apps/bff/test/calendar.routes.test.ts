@@ -250,6 +250,8 @@ describe('calendrier : import et réconciliation à la lecture', () => {
     icu.activities.push({ id: 'a1', start_date_local: `${addDays(-1)}T08:00:00`, type: 'Ride', paired_event_id: 600 });
     const res = (await call('GET', `${cal()}?from=${addDays(-3)}&to=${addDays(3)}`, 'token-b')).json();
     expect(res.doneEventIds).toEqual(['600']);
+    // La séance faite pointe vers la sortie qui la réalise (lien depuis le calendrier).
+    expect(res.activityByEvent).toEqual({ '600': 'a1' });
   });
 });
 

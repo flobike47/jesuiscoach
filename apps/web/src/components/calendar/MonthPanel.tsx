@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { Check, Circle, Flag, X } from 'lucide-react';
+import { Check, ChevronRight, Circle, Flag, X } from 'lucide-react';
 import { Placeholder, SkeletonList } from '@/components/ios';
 import { MonthView } from '@/components/calendar/MonthView';
 import { RestCard } from '@/components/calendar/RestDay';
 import { WorkoutProfile } from '@/components/workout/StructureEditor';
 import { useCalendar } from '@/hooks/useCoach';
+import { useActivityLink } from '@/hooks/useActivityLink';
 import { useEventMutations, useGoals } from '@/hooks/useCalendarData';
+import { setNavDirection } from '@/lib/navTransition';
 import { nextRace, raceSubtitle, raceWeekLabel } from '@/lib/raceWeeks';
 import { monthGrid } from '@/lib/calendar';
 import { isPrescribedRest } from '@/lib/restDay';
@@ -28,7 +31,8 @@ export function MonthPanel({
 }: {
   athleteId: string;
   unavailable: (day: string) => 'repos' | 'indisponible' | null;
-  onEdit: (e: AppEvent) => void;
+  /** Ouvre la feuille de l'événement ; `activityId` : la sortie qui réalise la séance, s'il y en a une. */
+  onEdit: (e: AppEvent, activityId?: string | null) => void;
   /** Le coach modifie un repos prescrit ; l'athlète le voit en lecture seule. */
   restEditable?: boolean;
 }) {
@@ -47,9 +51,13 @@ export function MonthPanel({
   const events = (cal.data?.events ?? []) as AppEvent[];
   const activities = cal.data?.activities ?? [];
   const doneIds = new Set(cal.data?.doneEventIds ?? []);
+  const activityByEvent = cal.data?.activityByEvent ?? {};
+  const paired = new Set(Object.values(activityByEvent));
+  const activityLink = useActivityLink();
 
   const onDay = (day: string) => events.filter((e) => e.start_date_local.slice(0, 10) === day);
-  const dayActivities = selected ? activities.filter((a) => a.start_date_local.slice(0, 10) === selected) : [];
+  // Sorties du jour non appariées à une séance (les autres s'ouvrent depuis leur séance).
+  const dayActivities = selected ? activities.filter((a) => a.start_date_local.slice(0, 10) === selected && !paired.has(String(a.id))) : [];
 
   const pick = async (day: string) => {
     if (!picking) return;
@@ -134,7 +142,12 @@ export function MonthPanel({
             const color = e.category?.startsWith('RACE_') ? 'var(--orange)' : made ? 'var(--green)' : missed ? 'var(--red)' : 'var(--blue)';
             return (
               <div key={String(e.id)} style={{ display: 'grid', gap: 8 }}>
-                <button type="button" onClick={() => !made && onEdit(e)} style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', minHeight: 44 }}>
+                <button
+                  type="button"
+                  className="pressable"
+                  onClick={() => onEdit(e, e.id != null ? activityByEvent[String(e.id)] : undefined)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', minHeight: 44 }}
+                >
                   <Icon size={16} color={color} strokeWidth={2.8} aria-label={made ? 'Faite' : missed ? 'Manquée' : 'Prévue'} />
                   <span style={{ flex: 1, minWidth: 0 }}>{e.name ?? 'Séance'}</span>
                   {workout && stats.seconds > 0 && (
@@ -160,15 +173,25 @@ export function MonthPanel({
               </div>
             );
           })}
-          {dayActivities
-            .filter(() => !onDay(selected).some((e) => e.category === 'WORKOUT'))
-            .map((a) => (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {dayActivities.map((a) => {
+            const link = activityLink(athleteId, String(a.id));
+            return (
+              <Link
+                key={a.id}
+                to={link.to}
+                state={link.state}
+                viewTransition
+                onClick={() => setNavDirection('forward')}
+                className="pressable"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, color: 'inherit', textDecoration: 'none' }}
+              >
                 <Check size={16} color="var(--label-2)" aria-hidden />
                 <span style={{ flex: 1 }}>{a.name ?? 'Sortie'}</span>
                 <span className="footnote secondary tabular-nums">Hors plan · {formatDuration(a.moving_time)}</span>
-              </div>
-            ))}
+                <ChevronRight size={16} color="var(--label-3)" aria-hidden />
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
