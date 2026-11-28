@@ -53,7 +53,7 @@ export function TeamPlanning() {
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false);
   const [pickerProgress, setPickerProgress] = useState({ current: 0, total: 0 });
   const [pickerError, setPickerError] = useState<string | null>(null);
-  const [editingEvent, setEditingEvent] = useState<{ event: AppEvent; athleteId: string } | null>(null);
+  const [editingEvent, setEditingEvent] = useState<{ event: AppEvent; athleteId: string; activityId?: string | null } | null>(null);
   const [showGroupSheet, setShowGroupSheet] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const groupMutations = useGroupMutations();
@@ -323,7 +323,7 @@ export function TeamPlanning() {
                   aria-pressed={kind === 'free' ? isSelected : undefined}
                   onClick={() => {
                     if (isWorkout) {
-                      setEditingEvent({ event: teamWorkoutAsEvent(day.workouts[0], day.date), athleteId: athlete.id });
+                      setEditingEvent({ event: teamWorkoutAsEvent(day.workouts[0], day.date), athleteId: athlete.id, activityId: day.workouts[0].activityId });
                     } else if (kind === 'rest' && day.rest) {
                       setEditingEvent({ event: teamRestAsEvent(day.rest, day.date), athleteId: athlete.id });
                     } else {
@@ -469,6 +469,7 @@ export function TeamPlanning() {
         <EditEventSheet
           athleteId={editingEvent.athleteId}
           event={editingEvent.event}
+          activityId={editingEvent.activityId}
           weekStart={weekStart}
           onClose={() => setEditingEvent(null)}
         />

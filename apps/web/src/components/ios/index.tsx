@@ -100,13 +100,15 @@ interface CellProps {
   detail?: ReactNode;
   leading?: ReactNode;
   to?: string;
+  /** État de navigation passé avec `to` (ex. l'écran de retour). */
+  state?: unknown;
   onClick?: () => void;
   chevron?: boolean;
   /** Alignement du séparateur avec le texte quand il y a un élément à gauche. */
   inset?: number;
 }
 
-export function Cell({ title, subtitle, detail, leading, to, onClick, chevron, inset }: CellProps) {
+export function Cell({ title, subtitle, detail, leading, to, state, onClick, chevron, inset }: CellProps) {
   const content = (
     <>
       {leading}
@@ -121,7 +123,7 @@ export function Cell({ title, subtitle, detail, leading, to, onClick, chevron, i
   const style = inset ? ({ '--separator-inset': `${inset}px` } as CSSProperties) : undefined;
   if (to) {
     return (
-      <Link to={to} viewTransition onClick={() => setNavDirection('forward')} className="cell" style={{ ...style, color: 'inherit' }}>
+      <Link to={to} state={state} viewTransition onClick={() => setNavDirection('forward')} className="cell" style={{ ...style, color: 'inherit' }}>
         {content}
       </Link>
     );

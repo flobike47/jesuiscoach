@@ -144,6 +144,8 @@ describe('route /team/calendar (mode démo)', () => {
       expect(workout.load === null || typeof workout.load === 'number').toBe(true);
       expect(workout.seconds === null || typeof workout.seconds === 'number').toBe(true);
       expect(typeof workout.done).toBe('boolean');
+      expect(workout.activityId === null || typeof workout.activityId === 'string').toBe(true);
+      expect(workout.activityId != null).toBe(workout.done);
     }
   });
 

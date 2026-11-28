@@ -74,7 +74,7 @@ export function TeamPlanningWide() {
   const [preview, setPreview] = useState<DropPreview | null>(null);
   const [undo, setUndo] = useState<Undo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<{ athleteId: string; event: AppEvent } | null>(null);
+  const [editing, setEditing] = useState<{ athleteId: string; event: AppEvent; activityId?: string | null } | null>(null);
   const hoverTimer = useRef<number | undefined>(undefined);
   const undoTimer = useRef<number | undefined>(undefined);
 
@@ -334,7 +334,7 @@ export function TeamPlanningWide() {
                               onPointerDown={w ? (e) => startDrag(e, { kind: 'event', athleteId: a.id, event: w, fromDate: day.date, x: e.clientX, y: e.clientY }) : undefined}
                               onDoubleClick={
                                 w
-                                  ? () => setEditing({ athleteId: a.id, event: teamWorkoutAsEvent(w, day.date) })
+                                  ? () => setEditing({ athleteId: a.id, event: teamWorkoutAsEvent(w, day.date), activityId: w.activityId })
                                   : kind === 'rest' && day.rest
                                     ? () => setEditing({ athleteId: a.id, event: teamRestAsEvent(day.rest!, day.date) })
                                     : undefined
@@ -414,7 +414,7 @@ export function TeamPlanningWide() {
       )}
 
       {editing && isPrescribedRest(editing.event) && <RestSheet athleteId={editing.athleteId} event={editing.event} weekStart={weekStart} onClose={() => setEditing(null)} />}
-      {editing && !isPrescribedRest(editing.event) && <EditEventSheet athleteId={editing.athleteId} event={editing.event} weekStart={weekStart} onClose={() => setEditing(null)} />}
+      {editing && !isPrescribedRest(editing.event) && <EditEventSheet athleteId={editing.athleteId} event={editing.event} activityId={editing.activityId} weekStart={weekStart} onClose={() => setEditing(null)} />}
     </div>
   );
 }

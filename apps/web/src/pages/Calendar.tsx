@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { ChevronLeft, ChevronRight, Check, Flag, Plus, X, MoreVertical } from 'lucide-react';
 import { Page, Placeholder, Segmented, Sheet, SkeletonList } from '@/components/ios';
@@ -20,6 +20,8 @@ import { formatDuration, formatLoad, formatHours, dayShort } from '@/lib/format'
 import { parseWorkout, workoutStats, type Sport } from '@/lib/workout';
 import { WorkoutProfile } from '@/components/workout/StructureEditor';
 import { useMediaQuery } from '@/lib/mediaQuery';
+import { setNavDirection } from '@/lib/navTransition';
+import { useActivityLink } from '@/hooks/useActivityLink';
 import { isPlainNote, isPrescribedRest, prescribedRestDays } from '@/lib/restDay';
 import type { AppEvent } from '@/services/calendarApi';
 
@@ -48,7 +50,9 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
   const race = nextRace(useGoals(athleteId).data?.races, dayjs().format('YYYY-MM-DD'));
   const { create } = useEventMutations();
   const today = dayjs().format('YYYY-MM-DD');
-  const [editing, setEditing] = useState<AppEvent | null>(null);
+  // Événement ouvert dans sa feuille, et la sortie qui le réalise (lien « Voir la sortie réalisée »).
+  const [editing, setEditing] = useState<{ event: AppEvent; activityId?: string | null } | null>(null);
+  const activityLink = useActivityLink();
   const [editingInitialDate, setEditingInitialDate] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [addingDay, setAddingDay] = useState<dayjs.Dayjs | null>(null);
@@ -65,6 +69,9 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
 
   const events = useMemo(() => (cal.data?.events ?? []) as AppEvent[], [cal.data?.events]);
   const doneIds = useMemo(() => new Set(cal.data?.doneEventIds ?? []), [cal.data?.doneEventIds]);
+  const activityByEvent = useMemo(() => cal.data?.activityByEvent ?? {}, [cal.data?.activityByEvent]);
+  // Sorties appariées à une séance : elles s'ouvrent depuis la séance, pas en « hors plan ».
+  const pairedActivities = useMemo(() => new Set(Object.values(activityByEvent)), [activityByEvent]);
 
   // Calcul de la charge semaine : une seule fois
   const weekLoadData = useMemo(() => weekLoad(events, cal.data?.activities ?? [], from, to), [events, cal.data?.activities, from, to]);
@@ -78,10 +85,10 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
       const races = events.filter((e) => e.category?.startsWith('RACE_') && onDay(e));
       const notes = events.filter((e) => isPlainNote(e) && onDay(e));
       const rests = events.filter((e) => isPrescribedRest(e) && onDay(e));
-      const done = (cal.data?.activities ?? []).filter((a) => a.start_date_local.startsWith(key));
+      const done = (cal.data?.activities ?? []).filter((a) => a.start_date_local.startsWith(key) && !pairedActivities.has(String(a.id)));
       return { d, key, planned, races, notes, rests, done };
     });
-  }, [weekStart, events, cal.data?.activities]);
+  }, [weekStart, events, cal.data?.activities, pairedActivities]);
 
   // Statistiques pour la sous-ligne de charge
   const missedCount = useMemo(() => {
@@ -276,49 +283,66 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
                       const stats = workoutStats(steps);
                       const sport = (e.type ?? 'Ride') as Sport;
 
+                      const activityId = e.id != null ? activityByEvent[String(e.id)] : undefined;
+
                       return (
-                        <div key={`p${i}`} style={{ background: 'var(--cell)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {made ? (
-                              <Check size={16} color="var(--green)" aria-label="Faite" style={{ flexShrink: 0 }} />
-                            ) : missed ? (
-                              <X size={16} color="var(--red)" aria-label="Manquée" style={{ flexShrink: 0 }} />
-                            ) : (
-                              <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--tint)', flexShrink: 0 }} aria-label="À venir" />
-                            )}
-                            <span style={{ flex: 1, fontSize: 16 }}>{e.name ?? 'Séance'}</span>
-                            {stats.seconds > 0 && (
-                              <span style={{ fontSize: 13, color: 'var(--label-2)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                                {formatDuration(stats.seconds)} · {formatLoad(stats.load)}
-                              </span>
-                            )}
-                            {missed && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (!care.data) return;
-                                  // Ni un jour déjà pris, ni un repos prescrit par le coach.
-                                  const busy = new Set([...planned.map((x) => x.start_date_local.slice(0, 10)), ...prescribedRestDays(events)]);
-                                  const nextDay = nextFreeDay(key, busy, (day) => !isDayOpen(day, care.data), 14);
-                                  if (nextDay) {
-                                    setEditing(e);
-                                    setEditingInitialDate(nextDay);
-                                  }
-                                }}
-                                style={{ background: 'none', border: 'none', color: 'var(--tint)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, minHeight: 'auto' }}
-                              >
-                                Reporter
-                              </button>
-                            )}
-                          </div>
-                          {steps.length > 0 && <WorkoutProfile steps={steps} sport={sport} height={22} />}
+                        <div key={`p${String(e.id ?? i)}`} style={{ background: 'var(--cell)', borderRadius: 12, display: 'flex', alignItems: 'flex-start' }}>
+                          <button
+                            type="button"
+                            className="pressable"
+                            aria-label={`${e.name ?? 'Séance'}${made ? ', faite' : missed ? ', manquée' : ''} : ouvrir`}
+                            onClick={() => setEditing({ event: e, activityId })}
+                            style={{ flex: 1, minWidth: 0, minHeight: 44, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left', color: 'inherit' }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+                              {made ? (
+                                <Check size={16} color="var(--green)" aria-hidden style={{ flexShrink: 0 }} />
+                              ) : missed ? (
+                                <X size={16} color="var(--red)" aria-hidden style={{ flexShrink: 0 }} />
+                              ) : (
+                                <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--tint)', flexShrink: 0 }} aria-hidden />
+                              )}
+                              <span style={{ flex: 1, minWidth: 0, fontSize: 16 }}>{e.name ?? 'Séance'}</span>
+                              {stats.seconds > 0 && (
+                                <span style={{ fontSize: 13, color: 'var(--label-2)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                                  {formatDuration(stats.seconds)} · {formatLoad(stats.load)}
+                                </span>
+                              )}
+                            </span>
+                            {steps.length > 0 && <span style={{ display: 'block', width: '100%' }}><WorkoutProfile steps={steps} sport={sport} height={22} /></span>}
+                          </button>
+                          {missed && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!care.data) return;
+                                // Ni un jour déjà pris, ni un repos prescrit par le coach.
+                                const busy = new Set([...planned.map((x) => x.start_date_local.slice(0, 10)), ...prescribedRestDays(events)]);
+                                const nextDay = nextFreeDay(key, busy, (day) => !isDayOpen(day, care.data), 14);
+                                if (nextDay) {
+                                  setEditing({ event: e });
+                                  setEditingInitialDate(nextDay);
+                                }
+                              }}
+                              style={{ background: 'none', border: 'none', color: 'var(--tint)', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: '0 12px', minHeight: 44 }}
+                            >
+                              Reporter
+                            </button>
+                          )}
                         </div>
                       );
                     })}
 
                     {/* Compétitions */}
                     {races.map((e) => (
-                      <div key={`r${String(e.id)}`} style={{ background: 'var(--cell)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <button
+                        type="button"
+                        className="pressable"
+                        key={`r${String(e.id)}`}
+                        aria-label={`${e.name ?? 'Compétition'} : ouvrir`}
+                        onClick={() => setEditing({ event: e })}
+                        style={{ background: 'var(--cell)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left', color: 'inherit', minHeight: 44 }}
+                      >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <Flag size={16} color="var(--orange)" aria-label="Compétition" style={{ flexShrink: 0 }} />
                           <span style={{ flex: 1, fontSize: 16 }}>{e.name ?? 'Compétition'}</span>
@@ -332,31 +356,50 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
                           {[e.racePriority ? `Priorité ${e.racePriority}` : null, formatRaceDistance(e.raceDistanceM ?? null)].filter(Boolean).join(' · ') || 'Compétition'}
                         </div>
                         {e.raceGoal && <div style={{ fontSize: 13, color: 'var(--label-2)' }}>{e.raceGoal}</div>}
-                      </div>
+                      </button>
                     ))}
 
                     {/* Repos prescrits par le coach (l'athlète les voit en lecture seule) */}
                     {rests.map((e) => (
-                      <RestCard key={`rest${String(e.id)}`} event={e} onEdit={fixed ? undefined : () => setEditing(e)} />
+                      <RestCard key={`rest${String(e.id)}`} event={e} onEdit={fixed ? undefined : () => setEditing({ event: e })} />
                     ))}
 
                     {/* Notes */}
                     {notes.map((e) => (
-                      <div key={`n${String(e.id)}`} style={{ background: 'var(--cell)', borderRadius: 12, padding: '10px 12px', fontSize: 13 }}>
+                      <button
+                        type="button"
+                        className="pressable"
+                        key={`n${String(e.id)}`}
+                        aria-label={`Note ${e.name ?? ''} : ouvrir`}
+                        onClick={() => setEditing({ event: e })}
+                        style={{ background: 'var(--cell)', borderRadius: 12, padding: '10px 12px', fontSize: 13, textAlign: 'left', color: 'inherit', minHeight: 44 }}
+                      >
                         {e.name ?? 'Note'}
-                      </div>
+                      </button>
                     ))}
 
-                    {/* Sorties hors plan */}
-                    {done.filter(() => planned.length === 0).map((a) => (
-                      <div key={a.id} style={{ background: 'var(--cell)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <Check size={16} color="var(--label-2)" style={{ flexShrink: 0 }} aria-hidden />
-                          <span style={{ flex: 1, fontSize: 16 }}>{a.name ?? 'Sortie'}</span>
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--label-2)' }}>Hors plan · {formatDuration(a.moving_time)}</div>
-                      </div>
-                    ))}
+                    {/* Sorties hors plan (non appariées à une séance) : ouvrent leur fiche */}
+                    {athleteId && done.map((a) => {
+                      const link = activityLink(athleteId, String(a.id));
+                      return (
+                        <Link
+                          key={a.id}
+                          to={link.to}
+                          state={link.state}
+                          viewTransition
+                          onClick={() => setNavDirection('forward')}
+                          className="pressable"
+                          style={{ background: 'var(--cell)', borderRadius: 12, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4, color: 'inherit', textDecoration: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Check size={16} color="var(--label-2)" style={{ flexShrink: 0 }} aria-hidden />
+                            <span style={{ flex: 1, fontSize: 16 }}>{a.name ?? 'Sortie'}</span>
+                            <ChevronRight size={16} color="var(--label-3)" aria-hidden style={{ flexShrink: 0 }} />
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--label-2)' }}>Hors plan · {formatDuration(a.moving_time)}</div>
+                        </Link>
+                      );
+                    })}
 
                     {/* Bouton Ajouter si jour libre et sans événement */}
                     {!hasEvents && !status && (
@@ -407,7 +450,7 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
           <MonthPanel
             athleteId={athleteId}
             unavailable={(day) => (care.data ? dayStatus(day, care.data) : null)}
-            onEdit={(e) => setEditing(e)}
+            onEdit={(e, activityId) => setEditing({ event: e, activityId })}
             restEditable={!fixed}
           />
         ) : null
@@ -415,11 +458,22 @@ export function CalendarView({ fixed, account }: { fixed?: { id: string; title: 
 
       {view === 'equipe' && (isWideScreen ? <TeamPlanningWide /> : <TeamPlanning />)}
 
-      {editing && athleteId && isPrescribedRest(editing) && (
-        <RestSheet key={String(editing.id)} athleteId={athleteId} event={editing} weekStart={weekStart} onClose={() => setEditing(null)} />
+      {editing && athleteId && isPrescribedRest(editing.event) && (
+        <RestSheet key={String(editing.event.id)} athleteId={athleteId} event={editing.event} weekStart={weekStart} onClose={() => setEditing(null)} />
       )}
-      {editing && athleteId && !isPrescribedRest(editing) && (
-        <EditEventSheet key={String(editing.id)} athleteId={athleteId} event={editing} weekStart={weekStart} initialDate={editingInitialDate ?? undefined} onClose={() => { setEditing(null); setEditingInitialDate(null); }} />
+      {editing && athleteId && !isPrescribedRest(editing.event) && (
+        <EditEventSheet
+          key={String(editing.event.id)}
+          athleteId={athleteId}
+          event={editing.event}
+          activityId={editing.activityId}
+          weekStart={weekStart}
+          initialDate={editingInitialDate ?? undefined}
+          onClose={() => {
+            setEditing(null);
+            setEditingInitialDate(null);
+          }}
+        />
       )}
       {adding && athleteId && <NewEventSheet athleteId={athleteId} weekStart={weekStart} defaultDay={addingDay ?? selectedDay} allowRest={!fixed} onClose={() => { setAdding(false); setAddingDay(null); }} />}
 

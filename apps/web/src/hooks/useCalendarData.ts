@@ -23,7 +23,16 @@ export function useEventMutations() {
     mutationFn: (v: { athleteId: string; eventId: string; body: EventPatch }) => calendarApi.updateEvent(v.athleteId, v.eventId, v.body),
     onSuccess: refresh,
   });
-  const remove = useMutation({ mutationFn: (v: { athleteId: string; eventId: string }) => calendarApi.deleteEvent(v.athleteId, v.eventId), onSuccess: refresh });
+  // Si Intervals.icu refuse, le BFF garde la ligne (en erreur) et répond `ok: false` :
+  // c'est un échec pour l'écran, sinon la feuille se ferme et la séance reste en place.
+  const remove = useMutation({
+    mutationFn: async (v: { athleteId: string; eventId: string }) => {
+      const res = await calendarApi.deleteEvent(v.athleteId, v.eventId);
+      if (!res.ok) throw new Error(res.error ?? 'Suppression chez Intervals.icu impossible. Réessaie.');
+      return res;
+    },
+    onSettled: refresh,
+  });
   const resync = useMutation({ mutationFn: (v: { athleteId: string; eventId: string }) => calendarApi.resyncEvent(v.athleteId, v.eventId), onSuccess: refresh });
   return { create, update, remove, resync };
 }
